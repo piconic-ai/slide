@@ -1785,16 +1785,6 @@ export const pageStyle = html`<style>
   .link-row form {
     margin: 0;
   }
-  .link-kinds {
-    margin: 0 0 20px;
-  }
-  .link-kinds > .link-rows {
-    margin-bottom: 12px;
-  }
-  .link-row-kind > select {
-    width: auto;
-    max-width: 9em;
-  }
   .link-row-place {
     color: var(--muted-foreground);
     font-size: 13px;
@@ -1805,6 +1795,7 @@ export const pageStyle = html`<style>
     gap: 8px;
     flex: none;
     min-width: 76px;
+    min-height: 44px;
     font-size: 13px;
     font-weight: 700;
   }
@@ -1826,12 +1817,12 @@ export const pageStyle = html`<style>
   /* On a narrow screen the kind and "remove" share the first line, and the
      title, the site and the place take the whole second one. */
   @media (max-width: 599px) {
-    .link-kinds .link-row {
+    .link-rows .link-row {
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
       gap: 8px 12px;
     }
-    .link-kinds .link-row > .link-row-body {
+    .link-rows .link-row > .link-row-body {
       grid-column: 1 / -1;
       grid-row: 2;
     }
@@ -1913,6 +1904,52 @@ export const pageStyle = html`<style>
   .panel > h2 {
     margin: 0 0 12px;
     font-size: 20px;
+  }
+  /* A panel with a ? mark for its help in the top right corner. The mark is
+     28px, and 44px to press; the heading leaves room for it. */
+  .panel-with-help {
+    position: relative;
+  }
+  .panel-with-help > h2 {
+    padding-right: 40px;
+  }
+  .help-mark {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    color: var(--muted-foreground);
+    text-decoration: none;
+  }
+  .help-mark > span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--control-border, var(--border));
+    border-radius: var(--radius-full);
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  /* A panel of one row: the mark sits in the middle of the row. */
+  .panel-compact > .help-mark {
+    top: 50%;
+    transform: translateY(-50%);
+  }
+  .help-mark:hover,
+  .help-mark:focus-visible {
+    color: var(--foreground);
+  }
+  .help-mark:hover > span,
+  .help-mark:focus-visible > span {
+    border-color: var(--foreground);
   }
   /* A panel that holds one row: less space above and below it than the others. */
   .panel-compact {

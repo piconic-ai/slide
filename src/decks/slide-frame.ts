@@ -15,7 +15,7 @@ import {
 import { dayFormats } from '../share/dates'
 import type { Handle } from '../share/handle'
 import { ownerViewerPath } from '../share/path'
-import { frameHelpLink } from '../help/frame-links'
+import { frameHelpMark } from '../help/frame-links'
 import { dropZoneBody } from '../site/drop-zone-body'
 import { messages, type Lang } from '../site/i18n'
 import type { DeckSlug } from './deck-id'
@@ -195,12 +195,12 @@ export function slideFrame(
   const received = view.latest !== null || view.pointed !== null
   const shown = view.takedown ? [] : rows
   return html`<section
-    class="panel"
+    class="panel panel-with-help"
     data-deck-frame="slide"
     aria-labelledby="slide-heading"
   >
     <h2 id="slide-heading">${text[lang].heading}</h2>
-    ${frameHelpLink('deck-replace', lang)} ${publicationNotices(view, lang)}
+    ${frameHelpMark('deck-slide', lang)} ${publicationNotices(view, lang)}
     ${
       shown.length
         ? html`<ul class="version-rows">

@@ -1,6 +1,7 @@
 import { html, raw } from 'hono/html'
 import type { HtmlEscapedString } from 'hono/utils/html'
 import { dayFormats } from '../share/dates'
+import { frameHelpMark } from '../help/frame-links'
 import { messages, type Lang } from '../site/i18n'
 import { stateOf, type ArticleState } from './article'
 import { MAX_ARTICLE_CHARS } from './markdown'
@@ -372,7 +373,11 @@ export function articleFrameBody(
 ) {
   const t = text[lang]
   const state = stateOf(article)
-  return html`<section class="panel panel-compact" data-deck-frame="article">
+  return html`<section
+    class="panel panel-compact panel-with-help"
+    data-deck-frame="article"
+  >
+    ${frameHelpMark('deck-article', lang)}
     <div class="article-frame-head">
       <h2>${t.heading}</h2>
       ${stateChips(state, lang)}
@@ -397,6 +402,7 @@ export function articleFrameBody(
          left, the buttons at the right end; the buttons go under on a narrow
          screen. */
       .article-frame-head {
+        padding-right: 40px;
         display: flex;
         flex-wrap: wrap;
         align-items: center;

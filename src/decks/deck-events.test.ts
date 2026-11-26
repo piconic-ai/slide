@@ -59,35 +59,29 @@ const frame = (body: string, name: string) =>
   )?.[0] ?? ''
 const kinds = async () => (await listLinks(db, 'talk')).map((link) => link.kind)
 
-test('F27-AC83: Given the add form, When the slide page opens, Then the kind is chosen from the four kinds, from the URL unless chosen, in either language', async () => {
-  for (const [lang, names] of [
-    ['ja', ['URL から決める', '動画', '記事', 'イベント', 'その他']],
-    ['en', ['From the URL', 'Video', 'Article', 'Event', 'Other']],
-  ] as const) {
+test('F27-AC87: Given the add form, When the slide page opens, Then it has no choice of kind, in either language', async () => {
+  for (const lang of ['ja', 'en'] as const) {
+    const body = await page(lang)
     const form =
-      /<form[^>]*class="link-form"[\s\S]*?<\/form>/.exec(
-        await page(lang),
-      )?.[0] ?? ''
-    const select = /<select id="link-kind" name="kind">[\s\S]*?<\/select>/.exec(
-      form,
-    )?.[0]
-    expect(select).toBeDefined()
-    expect(
-      [
-        ...(select ?? '').matchAll(/<option value="([^"]*)"[^>]*>([^<]*)</g),
-      ].map(([, value, name]) => [value, name?.trim()]),
-    ).toEqual([
-      ['', names[0]],
-      ['video', names[1]],
-      ['article', names[2]],
-      ['event', names[3]],
-      ['other', names[4]],
-    ])
-    expect(select).toMatch(/<option value="" selected>/)
+      /<form[^>]*class="link-form"[\s\S]*?<\/form>/.exec(body)?.[0] ?? ''
+    expect(form).toContain('name="url"')
+    expect(form).not.toMatch(/<select|name="kind"/)
+    expect(frame(body, 'links')).not.toMatch(/<select/)
   }
 })
 
-test('F27-AC84: Given links of the slide, When the author chooses kinds again and saves, Then the new kinds are shown on the page', async () => {
+test('F27-AC87: Given a link that is added without a kind, When its row is shown, Then the kind is the one its URL stands for', async () => {
+  await post('/my/slides/talk/links', {
+    url: 'https://luma.com/x1',
+    title: 'Night',
+  })
+  expect(await kinds()).toEqual(['event'])
+  expect(frame(await page(), 'links')).toMatch(
+    /class="link-row-kind"[\s\S]*?イベント/,
+  )
+})
+
+test('F27-AC88: Given links of the slide, When kinds are saved to the route the page no longer links to, Then the new kinds are shown on the page', async () => {
   await post('/my/slides/talk/links', {
     url: 'https://example.com/a',
     title: 'A',
@@ -105,19 +99,14 @@ test('F27-AC84: Given links of the slide, When the author chooses kinds again an
   expect(response.headers.get('Location')).toBe('/my/slides/talk#links')
   expect(await kinds()).toEqual(['event', 'video'])
   const links = frame(await page(), 'links')
-  expect(links).toMatch(
-    new RegExp(
-      `name="kind-${a!.id}"[^>]*>[\\s\\S]*?<option value="event" selected>`,
+  expect(
+    [...links.matchAll(/class="link-row-kind"[\s\S]*?<\/span/g)].map(
+      ([row]) => /イベント|動画/.exec(row)?.[0],
     ),
-  )
-  expect(links).toMatch(
-    new RegExp(
-      `name="kind-${night!.id}"[^>]*>[\\s\\S]*?<option value="video" selected>`,
-    ),
-  )
+  ).toEqual(['イベント', '動画'])
 })
 
-test('F27-AC84: Given a kind that is none of the four, When it is saved, Then nothing changes and the reason is shown', async () => {
+test('F27-AC88: Given a kind that is none of the four, When it is saved, Then nothing changes and the reason is shown', async () => {
   await post('/my/slides/talk/links', { url: 'https://example.com/a' })
   const [a] = await listLinks(db, 'talk')
   const response = await post('/my/slides/talk/links/kinds', {
@@ -129,7 +118,7 @@ test('F27-AC84: Given a kind that is none of the four, When it is saved, Then no
   expect(await kinds()).toEqual(['other'])
 })
 
-test("F27-AC84: Given another author's slide, When kinds are saved on it, Then it is not found and nothing changes", async () => {
+test("F27-AC88: Given another author's slide, When kinds are saved on it, Then it is not found and nothing changes", async () => {
   await post('/my/slides/talk/links', { url: 'https://luma.com/x1' })
   const [link] = await listLinks(db, 'talk')
   const response = await post(

@@ -18,7 +18,7 @@ export default defineArticle({
           <li>
             URL
             を入れ、題名は入れたいときだけ入れて、「追加する」を押します。種類は、URL
-            から決まります(選んで足すこともできます)。
+            から決まります。
           </li>
           <li>
             要らなくなったら、その行の「外す」を押します。並びは足した順で、並べ替えはできません。
@@ -65,7 +65,7 @@ export default defineArticle({
           <li>Open the “Related links” area on the edit page of the slides.</li>
           <li>
             Enter the URL, a title only if you want one, and press “Add”. The
-            kind is read from the URL (you can also choose it as you add one).
+            kind is read from the URL.
           </li>
           <li>
             When you no longer need one, press “Remove” on its row. They stay in

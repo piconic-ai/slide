@@ -241,6 +241,8 @@ H1 の枠に、このスコープで増えた機能の記事を足した。URL �
 
 迷いやすい画面から、対応する記事へ 1 回で行ける(D-52)。リンクの置き場と行き先は、`src/help/frame-places.ts` の表 `FRAME_HELP` が 1 か所で持つ。枠の中のリンクは `frameHelpLink(場所, lang)` が、枠の見出しか説明のすぐ下の注記として 1 つだけ描く(押せる高さ 44px の `help-link`)。1 つの枠に 1 つまで(F36-AC41)。
 
+スライドの 1 本の管理の「スライド」「記事」「関連リンク」「ダウンロード」の枠は、見出しの下のリンクではなく、枠の右上の `?` で行き先を示す。行き先は同じファイルの表 `FRAME_MARKS` が持ち、`frameHelpMark(枠, lang)` が描く(見た目は 28px、押せる範囲は 44px の `help-mark`。置く枠は `panel-with-help`)。「スライド」は `/help/slides`、「記事」は `/help/articles`、「関連リンク」は `/help/articles/related-links`、「ダウンロード」は『スライドを書き出す』の記事へ行く。
+
 | 場所 | 行き先(`/help/<狙い>/<記事>`) |
 | --- | --- |
 | 設定「プロフィール」 | `account/edit-profile` |

@@ -1,6 +1,5 @@
 import { html } from 'hono/html'
 import {
-  LINK_KINDS,
   linkLabelOf,
   MAX_LINKS,
   MAX_TITLE_LENGTH,
@@ -9,6 +8,7 @@ import {
 } from '../links/link'
 import { kindNames, linkIcon } from '../links/link-parts'
 import type { StoredLink } from '../links/store'
+import { frameHelpMark } from '../help/frame-links'
 import { messages, type Lang } from '../site/i18n'
 import type { EventCommunity } from '../events/deck-event'
 
@@ -17,10 +17,6 @@ const text = messages({
     heading: '関連リンク',
     note: `発表の録画やブログの記事など、外のページへのリンクを、スライドの題名の下に載せます。${MAX_LINKS} 件まで、足した順に並びます。`,
     url: 'URL',
-    kind: '種類',
-    kindFromUrl: 'URL から決める',
-    kindLabel: (title: string) => `『${title}』の種類`,
-    saveKinds: '保存する',
     placedIn: (community: string | null) =>
       community === null
         ? 'イベントとして並びます。'
@@ -49,10 +45,6 @@ const text = messages({
     heading: 'Related links',
     note: `Links to a recording, a blog post or another page appear under the title of the slides. Up to ${MAX_LINKS}, in the order you add them.`,
     url: 'URL',
-    kind: 'Kind',
-    kindFromUrl: 'From the URL',
-    kindLabel: (title: string) => `Kind of "${title}"`,
-    saveKinds: 'Save',
     placedIn: (community: string | null) =>
       community === null
         ? 'Listed as a talk of the event.'
@@ -78,15 +70,6 @@ const text = messages({
     },
   },
 })
-
-/** The choice of a kind; the one given is chosen. */
-const kindOptions = (lang: Lang, chosen: string) =>
-  LINK_KINDS.map(
-    (kind) =>
-      html`<option value="${kind}" ${chosen === kind ? 'selected' : ''}>
-        ${kindNames[lang][kind]}
-      </option>`,
-  )
 
 /** Under a link of the kind event, where it is listed. */
 const placeOf = (
@@ -118,55 +101,49 @@ export const linksFrame = (
 ) => {
   const t = text[lang]
   const communities = view.communities ?? new Map()
-  return html`<section class="panel" data-deck-frame="links" id="links">
+  return html`<section
+    class="panel panel-with-help"
+    data-deck-frame="links"
+    id="links"
+  >
     <h2>${t.heading}</h2>
+    ${frameHelpMark('deck-links', lang)}
     <p class="field-note">${t.note}</p>
     ${
       view.links.length
-        ? html`<form
-            method="post"
-            action="/my/slides/${view.slug}/links/kinds"
-            class="link-kinds"
-          >
-            <ul class="link-rows">
-              ${view.links.map(
-                (link) =>
-                  html`<li class="link-row">
-                    <span class="link-row-kind">
-                      ${linkIcon(link.kind)}
-                      <select
-                        name="kind-${link.id}"
-                        aria-label="${t.kindLabel(linkLabelOf(link))}"
-                      >
-                        ${kindOptions(lang, link.kind)}
-                      </select>
-                    </span>
-                    <span class="link-row-body">
-                      <span class="link-row-title">${linkLabelOf(link)}</span>
-                      ${
-                        link.title === null
-                          ? ''
-                          : html`<span class="link-row-site"
-                              >${siteNameOf(link.href)}</span
-                            >`
-                      }
-                      ${placeOf(link, communities, lang)}
-                    </span>
+        ? html`<ul class="link-rows">
+            ${view.links.map(
+              (link) =>
+                html`<li class="link-row">
+                  <span class="link-row-kind"
+                    >${linkIcon(link.kind)} ${kindNames[lang][link.kind]}</span
+                  >
+                  <span class="link-row-body">
+                    <span class="link-row-title">${linkLabelOf(link)}</span>
+                    ${
+                      link.title === null
+                        ? ''
+                        : html`<span class="link-row-site"
+                            >${siteNameOf(link.href)}</span
+                          >`
+                    }
+                    ${placeOf(link, communities, lang)}
+                  </span>
+                  <form
+                    method="post"
+                    action="/my/slides/${view.slug}/links/${link.id}/delete"
+                  >
                     <button
                       class="button-secondary"
                       type="submit"
-                      formaction="/my/slides/${view.slug}/links/${link.id}/delete"
                       aria-label="${t.removeLabel(linkLabelOf(link))}"
                     >
                       ${t.remove}
                     </button>
-                  </li>`,
-              )}
-            </ul>
-            <button class="button-secondary" type="submit">
-              ${t.saveKinds}
-            </button>
-          </form>`
+                  </form>
+                </li>`,
+            )}
+          </ul>`
         : ''
     }
     ${
@@ -181,13 +158,6 @@ export const linksFrame = (
       action="/my/slides/${view.slug}/links"
       class="link-form"
     >
-      <div class="field">
-        <label for="link-kind">${t.kind}</label>
-        <select id="link-kind" name="kind">
-          <option value="" selected>${t.kindFromUrl}</option>
-          ${kindOptions(lang, '')}
-        </select>
-      </div>
       <div class="field">
         <label for="link-url">${t.url}</label>
         <input
