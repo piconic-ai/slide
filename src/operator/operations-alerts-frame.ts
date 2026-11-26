@@ -16,7 +16,7 @@ export type RecentAlert = Readonly<{
 }>
 
 /** Where the steps to set the webhook are (D-08, F39-AC11). */
-export const WEBHOOK_STEPS = 'docs/dev/alerts-runbook.md#discord-webhook'
+export const WEBHOOK_STEPS = 'docs/dev/deploy.md#通知と監視作業-m'
 
 /**
  * What the frame shows: whether the Discord webhook can be used, and the

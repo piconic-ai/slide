@@ -4,7 +4,7 @@ import { operatorFrame } from './operator-frame'
 import { timeTag } from './operator-time'
 
 /** Where the steps to create the backup bucket and add its binding are (D-08, F39-AC30). */
-export const BACKUP_STEPS = 'docs/dev/deploy.md#r2-をバックアップから戻す'
+export const BACKUP_STEPS = 'docs/dev/deploy.md#バックアップ作業-b'
 
 /**
  * What the frame shows: that the backup bucket is not set up (D-08), or the

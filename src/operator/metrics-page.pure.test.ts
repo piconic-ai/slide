@@ -130,7 +130,7 @@ test('F40-AC22, F40-AC23: Given settings that are missing, When drawn, Then the 
   expect(page).toContain('未設定:')
   expect(page).toContain('<code>ANALYTICS_READ_TOKEN</code>')
   expect(page).toContain('<code>ANALYTICS_ACCOUNT_ID</code>')
-  expect(page).toContain('<code>docs/dev/metrics-setup.md</code>')
+  expect(page).toContain('<code>docs/dev/deploy.md#計測作業-a</code>')
   expect(page.indexOf('<h2>週ごとの数</h2>')).toBeLessThan(
     page.indexOf('未設定:'),
   )

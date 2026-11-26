@@ -277,7 +277,7 @@ test('F40-AC22: Given no dataset bound, When the page is opened, Then it says AN
   expect(page).toContain('未設定:')
   expect(page).toContain('<code>ANALYTICS</code>')
   expect(page).not.toContain('<code>ANALYTICS_READ_TOKEN</code>')
-  expect(page).toContain('<code>docs/dev/metrics-setup.md</code>')
+  expect(page).toContain('<code>docs/dev/deploy.md#計測作業-a</code>')
   expect(page).toContain('<span class="n">12</span>')
 })
 

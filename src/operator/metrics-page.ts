@@ -12,7 +12,7 @@ import { operatorFrame } from './operator-frame'
 import { operatorNav } from './operator-nav'
 
 /** Where the steps to set what the metrics need are (D-08, F40-AC22). */
-export const METRICS_STEPS = 'docs/dev/metrics-setup.md'
+export const METRICS_STEPS = 'docs/dev/deploy.md#計測作業-a'
 
 /** Where the weekly table is written out as CSV. */
 export const METRICS_CSV_PATH = '/metrics.csv'

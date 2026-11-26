@@ -82,7 +82,7 @@ test('F39-AC30: Given no backup bucket, When the operations page is opened, Then
   const frame = frameOf(page)
   expect(frame).toContain('未設定')
   expect(frame).toContain('UPLOADS_BACKUP')
-  expect(frame).toContain('docs/dev/deploy.md#r2-をバックアップから戻す')
+  expect(frame).toContain('docs/dev/deploy.md#バックアップ作業-b')
   expect(page).toContain('<h2>通知</h2>')
 })
 

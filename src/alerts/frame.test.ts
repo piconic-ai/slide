@@ -63,7 +63,7 @@ test('F39-AC11: Given no webhook, When the operations page is opened, Then the a
   )
   expect(frame).toContain('未設定')
   expect(frame).toContain('DISCORD_WEBHOOK_URL')
-  expect(frame).toContain('docs/dev/alerts-runbook.md#discord-webhook')
+  expect(frame).toContain('docs/dev/deploy.md#通知と監視作業-m')
 })
 
 test('F39-AC11: Given a secret that is not a Discord webhook, When the page is opened, Then it says 未設定 and does not show the value', async () => {
