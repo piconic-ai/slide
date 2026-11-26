@@ -1,4 +1,4 @@
--- Migration number: 0062 	 2026-11-26T09:10:00.000Z
+-- Migration number: 0060 	 2026-11-26T09:10:00.000Z
 -- Things that happened, kept only so that they can be counted within a
 -- window before an alert is raised (docs/dev/alerts.md). Today that is the
 -- failures to send login mail, which raise an alert when enough of them

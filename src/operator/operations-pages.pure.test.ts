@@ -20,25 +20,19 @@ const view = (email = 'op@example.com'): OperationsView => ({
     lastHour: 0,
     lastDay: 0,
   },
-  email: { kind: 'not_configured' },
   backups: { kind: 'not_configured' },
   alerts: { kind: 'not_configured', recent: [] },
 })
 
-test('Given the operations page, When drawn, Then the five frames follow in the order of the page list and each of those not built says so', async () => {
+test('Given the operations page, When drawn, Then the four frames follow in the order of the page list and each of those not built says so', async () => {
   const page = String(await operationsPage(view()))
-  const headings = [
-    'メンテナンスの予定',
-    '新しい登録',
-    'メールアドレスの暗号化',
-    'バックアップ',
-    '通知',
-  ]
+  const headings = ['メンテナンスの予定', '新しい登録', 'バックアップ', '通知']
   const at = headings.map((heading) => page.indexOf(`<h2>${heading}</h2>`))
   expect(at.every((index) => index > 0)).toBe(true)
   expect([...at].sort((a, b) => a - b)).toEqual(at)
-  expect(page.match(/<h2>/g)).toHaveLength(5)
-  // The frames of the notice, the email addresses, the backups, the alerts and new sign-ups are built; no frame is a placeholder any more.
+  expect(page.match(/<h2>/g)).toHaveLength(4)
+  // The frames of the notice, new sign-ups, the backups and the alerts are
+  // built; no frame is a placeholder any more.
   expect(page.match(/準備中です。/g)).toBeNull()
   expect(page.match(/<h1>/g)).toHaveLength(1)
   expect(page).toContain('<title>運用 - ')

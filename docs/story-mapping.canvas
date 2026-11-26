@@ -702,7 +702,7 @@
     {
       "id": "story-10-41",
       "type": "text",
-      "text": "### F41\nデータベースだけが漏れても、メールアドレスは読めない\n\n[メールアドレスを暗号化して持つ](features/f41-email-encryption.md)",
+      "text": "### F41\nデータベースだけが漏れても、メールアドレスは読めない(やめた)\n\n[メールアドレスを暗号化して持つ](features/f41-email-encryption.md)",
       "x": 0,
       "y": 2300,
       "width": 310,

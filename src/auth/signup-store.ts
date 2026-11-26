@@ -1,39 +1,10 @@
 import { sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
-import {
-  addressOf,
-  storedIdentifier,
-  type EmailCrypto,
-} from '../db/email-cipher'
 import { OPEN_SIGNUP_INVITER } from './signup-mode'
 import { staleSignups, type SignupUser } from './signup-sweep'
 
-/**
- * The name of the rows a person's sign-in made for a code, as D1 holds it:
- * Better Auth's `sign-in-otp-<address>`, hashed while the keys are on. Null
- * when the person's address cannot be read (no user, or keys that do not
- * open it); the code then runs out by itself, and the sweep removes it.
- */
-async function codeIdentifier(
-  database: D1Database,
-  userId: string,
-  crypto: EmailCrypto,
-): Promise<string | null> {
-  const row = await database
-    .prepare('SELECT email, email_ciphertext FROM auth_user WHERE id = ?1')
-    .bind(userId)
-    .first<{ email: string; email_ciphertext: string | null }>()
-  if (!row) return null
-  try {
-    const address = await addressOf(crypto, {
-      email: row.email,
-      emailCiphertext: row.email_ciphertext,
-    })
-    return await storedIdentifier(crypto, `sign-in-otp-${address}`)
-  } catch {
-    return null
-  }
-}
+/** The rows a person's sign-in made for a code: Better Auth's identifier. */
+const CODE_IDENTIFIER = `'sign-in-otp-' || (SELECT email FROM auth_user WHERE id = ?1)`
 
 /**
  * Removes what a first sign-in left of one person: their code, their
@@ -48,10 +19,8 @@ async function codeIdentifier(
 export async function leaveBeforeSignup(
   database: D1Database,
   userId: string,
-  crypto: EmailCrypto,
 ): Promise<void> {
   const noAccount = `NOT EXISTS (SELECT 1 FROM accounts WHERE user_id = ?1)`
-  const identifier = await codeIdentifier(database, userId, crypto)
   await database.batch([
     // First, while the user row that names the address is still there.
     database
@@ -62,9 +31,9 @@ export async function leaveBeforeSignup(
       .bind(userId, OPEN_SIGNUP_INVITER),
     database
       .prepare(
-        `DELETE FROM auth_verification WHERE identifier = ?2 AND ${noAccount}`,
+        `DELETE FROM auth_verification WHERE identifier = ${CODE_IDENTIFIER} AND ${noAccount}`,
       )
-      .bind(userId, identifier),
+      .bind(userId),
     database
       .prepare(`DELETE FROM auth_session WHERE user_id = ?1 AND ${noAccount}`)
       .bind(userId),
@@ -121,7 +90,6 @@ export type SignupSweep = Readonly<{
 export async function sweepSignups(
   database: D1Database,
   now: number,
-  crypto: EmailCrypto,
 ): Promise<SignupSweep> {
   const expired = await database
     .prepare('DELETE FROM auth_verification WHERE expires_at < ?1')
@@ -134,7 +102,7 @@ export async function sweepSignups(
     .bind(now * 1000)
     .run()
   const stale = staleSignups(await readUnfinished(database), now)
-  for (const id of stale) await leaveBeforeSignup(database, id, crypto)
+  for (const id of stale) await leaveBeforeSignup(database, id)
   return {
     users: stale.length,
     codes: expired.meta.changes,

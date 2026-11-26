@@ -1,6 +1,5 @@
 import { Hono, type Context } from 'hono'
 import { csrf } from 'hono/csrf'
-import { emailCryptoOf } from '../db/email-settings'
 import { currentOwner } from '../auth/owner-middleware'
 import { ownerSession, type Owner } from '../auth/owner-session'
 import { listDeviceSessions } from '../auth/sessions-store'
@@ -92,7 +91,7 @@ async function settingsPage(
     slideCount,
   ] = await Promise.all([
     readHandle(c.env.DB, owner.userId),
-    readEmail(c.env.DB, owner.userId, emailCryptoOf(c.env)),
+    readEmail(c.env.DB, owner.userId),
     readProfile(c.env.DB, owner.userId),
     readPictureTime(c.env.DB, owner.userId),
     listBlocked(c.env.DB, owner.userId),

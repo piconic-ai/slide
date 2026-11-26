@@ -14,7 +14,6 @@ import {
 } from './gravatar-store'
 import { servedPictureType } from './picture-policy'
 import { readPictureObject } from './picture-store'
-import { emailCryptoOf } from '../db/email-settings'
 import { markGravatarAsked, readEmail, readFaceFacts } from './store'
 
 export const faceRoutes = new Hono<{ Bindings: Env }>()
@@ -74,7 +73,7 @@ async function gravatarFace(
       await markGravatarAsked(env.DB, userId, kept.kept.at)
     return fromKept(kept)
   }
-  const email = await readEmail(env.DB, userId, emailCryptoOf(env))
+  const email = await readEmail(env.DB, userId)
   if (!email) return null
   const answer = await fetchGravatar(await gravatarHash(email))
   if (answer.kind === 'unreachable') return kept ? fromKept(kept) : null

@@ -3,10 +3,9 @@ import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
 import { authUser, authVerification } from '../db/auth-schema'
-import { emailCryptoOf } from '../db/email-settings'
 import { accounts, loginCodeRequests, signupPauseEvents } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
-import type { EmailAddress } from '../mail/address'
+import { normalizeAddress, type EmailAddress } from '../mail/address'
 import { readOutbox } from '../mail/outbox-store'
 import {
   emailOf,
@@ -28,18 +27,6 @@ const db = platform.env.DB
 const orm = drizzle(db)
 const closed = testEnv(platform.env)
 const open = { ...closed, OPEN_SIGNUP: 'on' } as Env
-
-const b64 = (seed: number) =>
-  btoa(String.fromCharCode(...new Uint8Array(32).fill(seed)))
-    .replaceAll('+', '-')
-    .replaceAll('/', '_')
-    .replace(/=+$/, '')
-const sealed = {
-  ...closed,
-  EMAIL_CIPHER_KEYS: `1:${b64(1)}`,
-  EMAIL_CIPHER_CURRENT: '1',
-  EMAIL_LOOKUP_KEY: b64(9),
-} as unknown as Env
 
 beforeAll(() => applyMigrations(db))
 beforeEach(() => resetTables(db), 30_000)
@@ -201,37 +188,6 @@ test('F42-AC14: Given new sign-ups are stopped, When a wrong code is entered for
   expect(a.body).toContain(NOTICE)
 })
 
-test('F42-AC14: Given the keys are on and new sign-ups are stopped, When registered and unregistered addresses ask, Then the answers are the same and only the registered one is mailed', async () => {
-  const member = emailOf('member')
-  const crypto = emailCryptoOf(sealed)
-  await addInvite(
-    db,
-    { email: member as EmailAddress, invitedBy: 'op@example.com', now: 1 },
-    crypto,
-  )
-  // Sign the person up through the service so that the rows are sealed.
-  await (await ask(member, sealed)).text()
-  const [mail] = await readOutbox(db, member, crypto)
-  const code = /\b(\d{6})\b/.exec(`${mail?.subject} ${mail?.body}`)![1]!
-  const first = await enter(member, code, sealed)
-  const cookie = cookieOf(first)
-  await send(
-    '/welcome',
-    { fields: { handle: 'member', name: 'Member', terms: 'on' }, cookie },
-    sealed,
-  )
-  expect(await isRegistered(db, member, crypto)).toBe(true)
-  await pause()
-  const a = await ask(member, sealed)
-  const b = await ask(emailOf('stranger'), sealed)
-  expect(a.status).toBe(b.status)
-  expect((await a.text()).replaceAll(member, 'X')).toBe(
-    (await b.text()).replaceAll(emailOf('stranger'), 'X'),
-  )
-  expect(await readOutbox(db, member, crypto)).toHaveLength(2)
-  expect(await readOutbox(db, emailOf('stranger'), crypto)).toEqual([])
-})
-
 test('F42-AC15: Given new sign-ups were stopped, When the operator resumes, Then a new address in an open service gets a code and can sign up', async () => {
   await pause()
   await (await ask(emailOf('newcomer'), open)).text()
@@ -319,12 +275,16 @@ test('F42-AC12: Given presses made together, When they land, Then one row is add
 })
 
 test('F42-AC13: Given addresses in different states, When they are looked up as registered, Then only one with a user and an account is, in any spelling of the case', async () => {
-  const crypto = emailCryptoOf(closed)
+  // As the login routes ask: the typed text is spelled the service's way
+  // first, and the lookup takes that spelling.
+  const typed = (text: string) =>
+    isRegistered(db, normalizeAddress(text) as EmailAddress)
   await registered('member', 'm1')
   await seedPerson(db, 'u2', 'noaccount')
-  expect(await isRegistered(db, 'member@mail.example', crypto)).toBe(true)
-  expect(await isRegistered(db, 'MEMBER@mail.example', crypto)).toBe(true)
-  expect(await isRegistered(db, 'noaccount@mail.example', crypto)).toBe(false)
-  expect(await isRegistered(db, 'nobody@mail.example', crypto)).toBe(false)
+  expect(await typed('member@mail.example')).toBe(true)
+  expect(await typed('MEMBER@mail.example')).toBe(true)
+  expect(await typed(' Member@Mail.example ')).toBe(true)
+  expect(await typed('noaccount@mail.example')).toBe(false)
+  expect(await typed('nobody@mail.example')).toBe(false)
   expect(OWNER_ID).toBeTruthy()
 })

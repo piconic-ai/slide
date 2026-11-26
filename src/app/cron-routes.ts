@@ -1,5 +1,4 @@
 import { sweepSignups } from '../auth/signup-store'
-import { emailCryptoOf } from '../db/email-settings'
 import { readFeedsOnSchedule } from '../feeds/reader-routes'
 import { sweepPreviews } from '../preview/store'
 import { purgeDelaySeconds, purgeDeletedDecks } from '../decks/deletion-store'
@@ -42,9 +41,7 @@ export const CRON_TASKS = registerTasks([
   hourly('preview_sweep', (env, at) => sweepPreviews(env.DB, at), {
     logsSuccess: false,
   }),
-  hourly('signup_sweep', (env, at) =>
-    sweepSignups(env.DB, at, emailCryptoOf(env)),
-  ),
+  hourly('signup_sweep', (env, at) => sweepSignups(env.DB, at)),
   hourly('upload_cleanup', (env, at) => runUploadCleanup(env, at), {
     errorFields: describeCleanupError,
   }),

@@ -58,7 +58,7 @@ const LIST = 'order by "deployments"."ready_at"'
 const ADDED: readonly Added[] = [
   {
     index: 'deployments_ready_at',
-    migration: 'migrations/0068_deployments_ready_at.sql',
+    migration: 'migrations/0066_deployments_ready_at.sql',
     targets: [
       {
         screen: 'top page, a visitor (/api/public/slides)',

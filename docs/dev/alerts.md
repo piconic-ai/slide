@@ -81,8 +81,8 @@ Cloudflare のアラートに任せる 3 つ(5xx の割合、上限に当たっ�
 
 | 表 | 何を持つか | migration |
 | --- | --- | --- |
-| `alerts` | 通知 1 件が 1 行。種類、急ぎ、件数、リンク、処理の名前(`cron_failed` だけ)、時刻、状態(すぐ: `sending`・`sent`・`failed`・`refused`・`not_configured`、翌日: `queued`・`mailed`)、副種別(`maintenance` だけ)。急ぎと状態の組み合わせ、`mailed_at` が `mailed` のときだけあることは、CHECK で守る。30 日を過ぎた(待っていない)行は、翌日のメールの後で消す | `0061_alerts.sql` |
-| `alert_signals` | 数えるための出来事。種類と時刻だけ。ログインのメールの送信失敗を数える。1 日を過ぎた行は、書くときに消す。数える窓(`loginMailWindowSeconds`)は、この保存の期間(1 日)を超えて指定できない | `0062_alert_signals.sql` |
+| `alerts` | 通知 1 件が 1 行。種類、急ぎ、件数、リンク、処理の名前(`cron_failed` だけ)、時刻、状態(すぐ: `sending`・`sent`・`failed`・`refused`・`not_configured`、翌日: `queued`・`mailed`)、副種別(`maintenance` だけ)。急ぎと状態の組み合わせ、`mailed_at` が `mailed` のときだけあることは、CHECK で守る。30 日を過ぎた(待っていない)行は、翌日のメールの後で消す | `0059_alerts.sql` |
+| `alert_signals` | 数えるための出来事。種類と時刻だけ。ログインのメールの送信失敗を数える。1 日を過ぎた行は、書くときに消す。数える窓(`loginMailWindowSeconds`)は、この保存の期間(1 日)を超えて指定できない | `0060_alert_signals.sql` |
 
 どちらも、メールアドレス、IP アドレス、利用者の番号を持たない。
 

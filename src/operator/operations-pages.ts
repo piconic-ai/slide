@@ -4,19 +4,17 @@ import { operatorDocument } from './operator-document'
 import { operatorNav } from './operator-nav'
 import { alertsFrame, type AlertsFrameView } from './operations-alerts-frame'
 import { backupsFrame, type BackupsFrameView } from './operations-backups-frame'
-import { emailFrame, type EmailFrameView } from './operations-email-frame'
 import {
   maintenanceFrame,
   type MaintenanceFrameView,
 } from './operations-maintenance-frame'
 import { signupsFrame, type SignupsFrameView } from './operations-signups-frame'
 
-/** What the operations page shows: one view for each of its five frames. */
+/** What the operations page shows: one view for each of its four frames. */
 export type OperationsView = Readonly<{
   operator: Operator
   maintenance: MaintenanceFrameView
   signups: SignupsFrameView
-  email: EmailFrameView
   backups: BackupsFrameView
   alerts: AlertsFrameView
 }>
@@ -33,6 +31,5 @@ export const operationsPage = (view: OperationsView) =>
       <h1>運用</h1>
       <p>${view.operator.email} として操作しています。</p>
       ${maintenanceFrame(view.maintenance)} ${signupsFrame(view.signups)}
-      ${emailFrame(view.email)} ${backupsFrame(view.backups)}
-      ${alertsFrame(view.alerts)}`,
+      ${backupsFrame(view.backups)} ${alertsFrame(view.alerts)}`,
   )

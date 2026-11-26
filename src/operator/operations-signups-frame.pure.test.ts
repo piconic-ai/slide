@@ -67,14 +67,13 @@ test('F42-AC16: Given the page, When the frames are drawn together, Then the fra
     operator: { email: 'op@example.com' },
     maintenance: readyView(null, false),
     signups: running,
-    email: { kind: 'not_configured' },
     backups: { kind: 'not_configured' },
     alerts: { kind: 'not_configured', recent: [] },
   }
   const page = String(await operationsPage(views))
   const at = page.indexOf('<h2>新しい登録</h2>')
   expect(at).toBeGreaterThan(page.indexOf('<h2>メンテナンスの予定</h2>'))
-  expect(at).toBeLessThan(page.indexOf('<h2>メールアドレスの暗号化</h2>'))
+  expect(at).toBeLessThan(page.indexOf('<h2>バックアップ</h2>'))
   const frame = page.slice(at, page.indexOf('</section>', at))
   expect(frame).not.toContain('準備中です')
 })

@@ -49,12 +49,6 @@ interface Env {
   // When alerts are raised and how often they are told; see
   // src/alerts/thresholds.ts. Any of its names may be set; the rest default.
   ALERT_THRESHOLDS?: unknown
-  // Email address encryption (work C). Keys are secrets: the encryption keys
-  // by version, which version encrypts new rows, and the key of the lookup
-  // value.
-  EMAIL_CIPHER_KEYS?: string
-  EMAIL_CIPHER_CURRENT?: string
-  EMAIL_LOOKUP_KEY?: string
   // "on" lets anyone sign up; anything else keeps sign-up invite-only
   // (work R).
   OPEN_SIGNUP?: string

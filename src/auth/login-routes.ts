@@ -3,8 +3,6 @@ import { drizzle } from 'drizzle-orm/d1'
 import { Hono, type Context, type MiddlewareHandler } from 'hono'
 import { csrf } from 'hono/csrf'
 import { authVerification } from '../db/auth-schema'
-import { storedIdentifier, type EmailCrypto } from '../db/email-cipher'
-import { emailCryptoOf } from '../db/email-settings'
 import { loginCodeMail } from '../mail/login-code-mail'
 import { normalizeAddress } from '../mail/address'
 import { mailerOf } from '../mail/mailer-routes'
@@ -144,10 +142,9 @@ const later = (c: C, work: Promise<unknown>) => {
  * does not depend on the answers.
  */
 async function standingOf(env: Env, address: string): Promise<Standing> {
-  const crypto = emailCryptoOf(env)
   const [invited, registered] = await Promise.all([
-    isInvited(env.DB, address, crypto),
-    isRegistered(env.DB, address, crypto),
+    isInvited(env.DB, address),
+    isRegistered(env.DB, address),
   ])
   return { invited, registered }
 }
@@ -192,14 +189,7 @@ loginRoutes.post('/login', csrf(), async (c) => {
   if (!email) return again({ kind: 'invalid_email' }, 400)
   const secret = authSecret(c.env)
   const mailer = mailerOf(c.env)
-  // Keys that are set but unusable are not "off": answering as if sign-in
-  // worked would mail nothing and say nothing (F41-AC14).
-  if (
-    !secret ||
-    !mailer ||
-    !turnstileReady(c.env) ||
-    emailCryptoOf(c.env).kind === 'invalid'
-  ) {
+  if (!secret || !mailer || !turnstileReady(c.env)) {
     // Login not being set up is an answer the service means to give, not a
     // fault the 5xx alert should count.
     c.header(INTENDED_503_HEADER, 'not_configured')
@@ -285,22 +275,14 @@ loginRoutes.post('/login', csrf(), async (c) => {
   )
 })
 
-/** The name of the code's row as D1 holds it: hashed while the keys are on. */
-const verificationKey = (crypto: EmailCrypto, email: string) =>
-  storedIdentifier(crypto, `sign-in-otp-${email}`)
+const verificationKey = (email: string) => `sign-in-otp-${email}`
 
 /** How many wrong tries the code at this address has left, if it still lives. */
-async function triesLeft(
-  database: D1Database,
-  crypto: EmailCrypto,
-  email: string,
-) {
+async function triesLeft(database: D1Database, email: string) {
   const row = await drizzle(database)
     .select({ value: authVerification.value })
     .from(authVerification)
-    .where(
-      eq(authVerification.identifier, await verificationKey(crypto, email)),
-    )
+    .where(eq(authVerification.identifier, verificationKey(email)))
     .get()
   if (!row) return null
   const used = Number(row.value.slice(row.value.lastIndexOf(':') + 1))
@@ -321,7 +303,7 @@ loginRoutes.post('/login/code', csrf(), async (c) => {
     recordFrom(c, { name: 'login_code_entered', outcome: 'rejected' })
     // No code left to try (used up, expired, or never asked for) reads the
     // same for every address.
-    const left = await triesLeft(c.env.DB, emailCryptoOf(c.env), email)
+    const left = await triesLeft(c.env.DB, email)
     const problem =
       left === null || left === 0
         ? ({ kind: 'dead' } as const)
@@ -391,11 +373,11 @@ loginRoutes.post('/login/code', csrf(), async (c) => {
   // person act" is the one it always was, and so that they stay when sign-up
   // is closed again (F42-AC4). It goes with the address's user row.
   if (!invited)
-    await addInvite(
-      c.env.DB,
-      { email, invitedBy: OPEN_SIGNUP_INVITER, now: at },
-      emailCryptoOf(c.env),
-    )
+    await addInvite(c.env.DB, {
+      email,
+      invitedBy: OPEN_SIGNUP_INVITER,
+      now: at,
+    })
   for (const cookie of response.headers.getSetCookie())
     c.header('Set-Cookie', cookie, { append: true })
   recordFrom(c, { name: 'login_code_entered', outcome: 'accepted' })
@@ -502,7 +484,7 @@ loginRoutes.post('/welcome/leave', csrf(), async (c) => {
     return c.redirect(landingOf(carry.to, carry.drop), 303)
   }
   if (state.kind === 'needs_welcome')
-    await leaveBeforeSignup(c.env.DB, state.userId, emailCryptoOf(c.env))
+    await leaveBeforeSignup(c.env.DB, state.userId)
   deleteCookie(c, OWNER_COOKIE, { path: '/', secure: true })
   return c.redirect('/', 303)
 })

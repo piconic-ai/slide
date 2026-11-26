@@ -1,4 +1,4 @@
-import { eq, sql } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
@@ -17,8 +17,6 @@ import {
   withInvited,
 } from '../publication/test-support'
 import { hashToken } from './authorization'
-import { emailCryptoOf } from '../db/email-settings'
-import { rewriteEmails } from '../db/email-rewrite-store'
 import { exportAccount } from './export-api'
 import {
   callTool,
@@ -311,62 +309,4 @@ test('F35-AC42: Given another author’s slide, When get_article_draft asks for 
   })
   expect(isError).toBe(true)
   expect(data.error).toBe('unknown_slide')
-})
-
-const b64 = (n: number) =>
-  btoa(String.fromCharCode(...new Uint8Array(32).fill(n)))
-    .replaceAll('+', '-')
-    .replaceAll('/', '_')
-    .replace(/=+$/, '')
-const keyed = {
-  ...env,
-  EMAIL_CIPHER_KEYS: `1:${b64(1)}`,
-  EMAIL_CIPHER_CURRENT: '1',
-  EMAIL_LOOKUP_KEY: b64(9),
-} as unknown as Env
-// Some of the three secrets set: the keys are unusable, not off.
-const broken = {
-  ...env,
-  EMAIL_CIPHER_KEYS: `1:${b64(1)}`,
-} as unknown as Env
-
-const asAgent = async (who: Env) => {
-  const client = await mcpClient(who, aliceTokens.access_token)
-  const answer = await callTool(client, 'export_account')
-  await client.close()
-  return answer
-}
-
-test('F35-AC32, F41-AC18: Given the email keys are set but unusable and the rows are still plain, When the agent calls export_account, Then the account file holds the plain address as before', async () => {
-  expect(emailCryptoOf(broken).kind).toBe('invalid')
-  const { isError, data } = await asAgent(broken)
-  expect(isError).toBe(false)
-  expect((data as unknown as Account).account.account.email).toBe(
-    emailOf('alice'),
-  )
-})
-
-test('F35-AC32, F41-AC18: Given the people are sealed under the email keys, When the agent calls export_account, Then the account file holds the author’s own address in the clear, and no one else’s', async () => {
-  await rewriteEmails(database, emailCryptoOf(keyed))
-  const stored = await db.all<{ email: string }>(
-    sql`SELECT email FROM auth_user`,
-  )
-  expect(stored.every((row) => row.email.startsWith('enc1:'))).toBe(true)
-  const { isError, data } = await asAgent(keyed)
-  expect(isError).toBe(false)
-  expect((data as unknown as Account).account.account.email).toBe(
-    emailOf('alice'),
-  )
-  expect(JSON.stringify(data)).not.toContain(emailOf('bob'))
-})
-
-test('F35-AC32, F41-AC18: Given the people are sealed and the email keys are then unusable, When the agent calls export_account, Then it is refused with a fixed sentence that names no address or key, not a crash', async () => {
-  const { isError, data } = await asAgent(broken)
-  expect(isError).toBe(true)
-  expect(data.error).toBe('email_unavailable')
-  expect(String(data.message)).toContain('nothing was read')
-  const text = JSON.stringify(data)
-  expect(text).not.toContain(emailOf('alice'))
-  expect(text).not.toContain('enc1:')
-  expect(text).not.toContain(b64(1))
 })

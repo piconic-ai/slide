@@ -5,9 +5,6 @@ import { isAPIError } from 'better-auth/api'
 import { emailOTP } from 'better-auth/plugins'
 import { drizzle } from 'drizzle-orm/d1'
 import * as schema from '../db/auth-schema'
-import { hashedIdentifier } from '../db/email-cipher'
-import { emailBoundary } from '../db/email-adapter-store'
-import { emailCryptoOf } from '../db/email-settings'
 import { decryptCode, encryptCode } from './code-cipher'
 import { deviceLabel, storedDeviceLabel } from './device-label'
 import {
@@ -40,10 +37,6 @@ type Options = {
 export function createAuth(env: Env, options: Options = {}) {
   const secret = authSecret(env)
   if (!secret) return null
-  // Keys that are set but unusable stop sign-in altogether: carrying on would
-  // write plain addresses beside sealed ones (F41-AC14).
-  const email = emailCryptoOf(env)
-  if (email.kind === 'invalid') return null
   const db = drizzle(env.DB)
   const { waitUntil } = options
   return betterAuth({
@@ -51,32 +44,16 @@ export function createAuth(env: Env, options: Options = {}) {
     baseURL: env.PUBLIC_ORIGIN,
     basePath: '/auth',
     secret,
-    // The address is sealed on its way into D1 and opened on its way out, so
-    // Better Auth works with the address as it always did (F41-AC16).
-    database: emailBoundary(
-      drizzleAdapter(db, {
-        provider: 'sqlite',
-        schema: {
-          user: schema.authUser,
-          account: schema.authAccount,
-          session: schema.authSession,
-          verification: schema.authVerification,
-        },
-        transaction: false,
-      }),
-      { config: email, database: env.DB },
-    ),
-    // A code's row is named after the address it went to; with the keys on,
-    // the name is a keyed hash instead.
-    ...(email.kind === 'on'
-      ? {
-          verification: {
-            storeIdentifier: {
-              hash: (identifier: string) => hashedIdentifier(email, identifier),
-            },
-          },
-        }
-      : {}),
+    database: drizzleAdapter(db, {
+      provider: 'sqlite',
+      schema: {
+        user: schema.authUser,
+        account: schema.authAccount,
+        session: schema.authSession,
+        verification: schema.authVerification,
+      },
+      transaction: false,
+    }),
     trustedOrigins: [env.PUBLIC_ORIGIN],
     plugins: [
       emailOTP({
@@ -95,19 +72,7 @@ export function createAuth(env: Env, options: Options = {}) {
         },
       }),
     ],
-    user: {
-      deleteUser: { enabled: false },
-      // The sealed address rides along in the user row; the boundary takes it
-      // off before Better Auth sees the row.
-      additionalFields: {
-        emailCiphertext: {
-          type: 'string',
-          required: false,
-          input: false,
-          returned: false,
-        },
-      },
-    },
+    user: { deleteUser: { enabled: false } },
     session: {
       expiresIn: OWNER_SESSION_SECONDS,
       updateAge: OWNER_SESSION_RENEW_SECONDS,

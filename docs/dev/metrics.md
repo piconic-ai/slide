@@ -123,7 +123,7 @@ Workers Analytics Engine は、書き込みが多いと、書くときと読む�
 
 ## 日ごとの集計(D1)
 
-1 日 1 回、前の日(UTC)の件数を Analytics Engine から読み、D1 の表に写す(D-75)。migration `0066_metric_daily.sql`。
+1 日 1 回、前の日(UTC)の件数を Analytics Engine から読み、D1 の表に写す(D-75)。migration `0064_metric_daily.sql`。
 
 | 表 | 何を持つか |
 | --- | --- |

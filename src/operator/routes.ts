@@ -1,14 +1,7 @@
 import { Hono, type Context, type MiddlewareHandler } from 'hono'
 import type { JWTVerifyGetKey } from 'jose'
-import {
-  addInvite,
-  listInvites,
-  removeInvite,
-  type Invite,
-} from '../auth/invites-store'
-import { EmailCryptoError } from '../db/email-cipher'
+import { addInvite, listInvites, removeInvite } from '../auth/invites-store'
 import { deckIdSchema } from '../decks/deck-id'
-import { emailCryptoOf } from '../db/email-settings'
 import { normalizeAddress } from '../mail/address'
 import { checkRemovalReason } from '../profile/picture-removal'
 import { removePictureAsOperator } from '../profile/picture-removal-store'
@@ -124,33 +117,6 @@ async function releaseSuspension(
 }
 
 /**
- * The invitations as the home page shows them. Keys that do not open them
- * must not take the whole page down (reports, suspensions and takedowns are
- * still needed then), so only the crypto error is caught, and the page says
- * the list cannot be read. The log line holds the code, never an address.
- */
-async function readInvites(env: Env): Promise<Invite[] | 'unreadable'> {
-  try {
-    return await listInvites(env.DB, emailCryptoOf(env))
-  } catch (error) {
-    if (!(error instanceof EmailCryptoError)) throw error
-    console.warn(
-      JSON.stringify({
-        event: 'operator_invites_unreadable',
-        code: error.code,
-      }),
-    )
-    return 'unreadable'
-  }
-}
-
-/** The result of a change that keys which do not work refused. */
-function keysUnusable(error: unknown): OperatorResultMessage {
-  if (!(error instanceof EmailCryptoError)) throw error
-  return 'invite_keys'
-}
-
-/**
  * The app that answers on the operator host and nowhere else. Cloudflare
  * Access stands in front of the host, and every request is verified again
  * here, so a request that reached the Worker by another path is answered
@@ -206,7 +172,7 @@ export function operatorApp(
         operator: c.get('operator'),
         reported: await listReportedDecks(c.env.DB),
         suspended: await listSuspendedAccounts(c.env.DB),
-        invites: await readInvites(c.env),
+        invites: await listInvites(c.env.DB),
         ...(await listHiddenDecks(c.env.DB, parsePage(c.req.query('page')))),
         result: parseOperatorResult(c.req.query('result')),
         communities: await listOperatorCommunities(c.env.DB),
@@ -260,15 +226,11 @@ export function operatorApp(
     const form = await c.req.parseBody()
     const email = normalizeAddress(form.email)
     if (!email) return c.redirect(done('invalid_email'), 303)
-    try {
-      await addInvite(
-        c.env.DB,
-        { email, invitedBy: c.get('operator').email, now: now() },
-        emailCryptoOf(c.env),
-      )
-    } catch (error) {
-      return c.redirect(done(keysUnusable(error)), 303)
-    }
+    await addInvite(c.env.DB, {
+      email,
+      invitedBy: c.get('operator').email,
+      now: now(),
+    })
     return c.redirect(done('invited'), 303)
   })
   // The address travels in the body, not the path, so no log keeps it.
@@ -276,11 +238,7 @@ export function operatorApp(
     const form = await c.req.parseBody()
     const email = normalizeAddress(form.email)
     if (!email) return c.redirect(done('invalid_email'), 303)
-    try {
-      await removeInvite(c.env.DB, email, emailCryptoOf(c.env))
-    } catch (error) {
-      return c.redirect(done(keysUnusable(error)), 303)
-    }
+    await removeInvite(c.env.DB, email)
     return c.redirect(done('invite_removed'), 303)
   })
   app.post('/pictures/remove', sameOrigin, async (c) => {

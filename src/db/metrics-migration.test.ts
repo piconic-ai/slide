@@ -9,7 +9,7 @@ import { applyMigrations } from './test-migrations'
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = drizzle(platform.env.DB)
 
-const METRICS = '0066_metric_daily.sql'
+const METRICS = '0064_metric_daily.sql'
 // The migration just before this one, whichever it is, so that a number
 // another work fills in later does not move the test.
 const BEFORE =
@@ -42,11 +42,11 @@ const line = (extra: Record<string, unknown> = {}) => ({
   ...extra,
 })
 
-test('F40-AC17: Given the tables before 0066, When the metrics tables are added, Then everything that was there is unchanged', async () => {
+test('F40-AC17: Given the tables before 0064, When the metrics tables are added, Then everything that was there is unchanged', async () => {
   expect(await existingState()).toEqual(before)
 })
 
-test('F40-AC15: Given migration 0066, When the columns of the daily table are listed, Then there is none that could hold an address, a person or a cookie', async () => {
+test('F40-AC15: Given migration 0064, When the columns of the daily table are listed, Then there is none that could hold an address, a person or a cookie', async () => {
   const columns = (
     await db.all<{ name: string }>(sql`PRAGMA table_info('metric_daily')`)
   ).map((column) => column.name)

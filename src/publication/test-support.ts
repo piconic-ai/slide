@@ -8,7 +8,6 @@ import {
   authVerification,
 } from '../db/auth-schema'
 import type { EmailAddress } from '../mail/address'
-import { EMAIL_CRYPTO_OFF } from '../db/email-cipher'
 import { readOutbox } from '../mail/outbox-store'
 import {
   accounts,
@@ -123,15 +122,11 @@ export async function seedPerson(db: D1Database, id: string, login = id) {
 
 /** Invites an address, as the operator does. */
 export const invite = (db: D1Database, email: string) =>
-  addInvite(
-    db,
-    {
-      email: email as EmailAddress,
-      invitedBy: 'test@operator.example',
-      now: 1,
-    },
-    EMAIL_CRYPTO_OFF,
-  )
+  addInvite(db, {
+    email: email as EmailAddress,
+    invitedBy: 'test@operator.example',
+    now: 1,
+  })
 
 /**
  * Signs in through the login page, reading the code from the outbox; returns
