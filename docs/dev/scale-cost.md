@@ -332,8 +332,8 @@ node scripts/load/run.mjs post-talk-uploads --origin http://localhost:8811 --coo
 
 | 順 | 問い合わせ | 読む行 | 使う画面 | 計画で見えたこと | 扱い |
 | ---: | --- | ---: | --- | --- | --- |
-| 1 | 新着の一覧(`listPublicDecks`、`src/share/store.ts`) | 40,000 | トップページ | `SCAN deployments`。全部の版を読み、一時的な B 木で並べ替える | **索引を足す**(0068) |
-| 2 | フォローしている人の新着(同じ問い合わせに `followedBy`) | 20,600 | トップページ(ログイン後) | 同じ | **索引を足す**(0068) |
+| 1 | 新着の一覧(`listPublicDecks`、`src/share/store.ts`) | 40,000 | トップページ | `SCAN deployments`。全部の版を読み、一時的な B 木で並べ替える | **索引を足す**(0066) |
+| 2 | フォローしている人の新着(同じ問い合わせに `followedBy`) | 20,600 | トップページ(ログイン後) | 同じ | **索引を足す**(0066) |
 | 3 | このスライドを引用している人の一覧と件数(`readCitedBy`、`src/citations/store.ts`) | 20,003、20,002 | スライドのページ | `SEARCH decks USING INDEX decks_deleted_at (deleted_at=?)`。引用の有無を、スライドごとの `OR EXISTS` で確かめるので、引用の索引から始められず、全部のスライドを読む | 索引では減らない([下](#索引で減らせないもの)) |
 | 4 | 引用の組の一覧と件数(`pairs`、`src/citations/pair-store.ts`) | 15,048〜15,167 | トップページ、人のページ、その一覧 | `CO-ROUTINE pair_links`、`SCAN c`。引用のすべてを副問い合わせにまとめてから結ぶ | 索引では減らない |
 | 5 | コミュニティのフォロワーの数 | 203 | コミュニティのページ | 100 人のフォローの行を数える。索引は使われている | 直さない(数える行の数のとおり) |
@@ -341,7 +341,7 @@ node scripts/load/run.mjs post-talk-uploads --origin http://localhost:8811 --coo
 
 ### 足した索引
 
-`migrations/0068_deployments_ready_at.sql` に、1 つだけ足した。
+`migrations/0066_deployments_ready_at.sql` に、1 つだけ足した。
 
 ```sql
 CREATE INDEX deployments_ready_at ON deployments (ready_at);
@@ -361,7 +361,7 @@ CREATE INDEX deployments_ready_at ON deployments (ready_at);
 
 索引で増えるものは、書く行である。1 回のアップロードで、D1 の書く行が 2 行増えた(23 → 25)。1 行 $1 ÷ 100 万のうち、含まれる 5,000 万行の中に収まる。
 
-migration は 1 つ(0068)で、割り当てのもう 1 つ(0069)は使わなかった。空いた番号は、統合の作業で、後ろの migration(`0070_mcp_scope.sql`)を 0069 に付け替えて詰めた。
+migration は 1 つ(`0066_deployments_ready_at.sql`)で、割り当てのもう 1 つは使わなかった。空いた番号は、統合の作業で、後ろの migration を付け替えて詰めた(番号の対応は [第四スコープの統合の記録](scope4-integration.md#migration) にある)。
 
 ### 索引で減らせないもの
 
@@ -385,7 +385,7 @@ migration は 1 つ(0068)で、割り当てのもう 1 つ(0069)は使わなか�
 
 ### SQL を書く場所
 
-乗り換えを小さくするため、SQL を書く場所を保つ。D-145 は「`src/db/` の外に SQL を書かない」と書くが、いまの決まりは、ファイル名が表す層に沿っている。**SQL は、`src/db/` ではなく、機能ごとの `*-store.ts`(と `store.ts`)に書く。** `src/db/` には、表の定義(`schema.ts`、`auth-schema.ts`)と、メールアドレスの暗号化の読み書きの口がある。
+乗り換えを小さくするため、SQL を書く場所を保つ。D-145 は「`src/db/` の外に SQL を書かない」と書くが、いまの決まりは、ファイル名が表す層に沿っている。**SQL は、`src/db/` ではなく、機能ごとの `*-store.ts`(と `store.ts`)に書く。** `src/db/` には、表の定義(`schema.ts`、`auth-schema.ts`、`invitation-schema.ts`)がある。
 
 - 層のテスト(`scripts/layers.test.mjs`)は、純粋なファイル、`*-pages.ts`、`*-client.ts`、`*-schema.ts` が、`drizzle-orm`、D1 と R2 の handle に触れないことを守る。`*-routes.ts` と `api.ts` と `middleware.ts` は、何も検査されない(アーキテクチャの文書の「名前による抜け道」)。
 - そのため、store と schema の外で D1 に触れているファイルが、3 つある(`src/auth/login-routes.ts`、`src/auth/owner-session.ts`、`src/uploads/api.ts`)。`scripts/db-access.test.mjs` が、この一覧を固定する(COST-AC12)。新しいファイルが store の外で D1 に触れると、テストが失敗する。一覧は減らすだけにする。
