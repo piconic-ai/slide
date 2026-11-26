@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { readZipDirectory, unpackEntry } from '../drops/zip'
 import { MAX_ZIP_BYTES, MAX_ZIP_FILES, planZip } from './zip-plan'
-import { ZipStreamError, zipStream, type OpenFile } from './zip-stream'
+import {
+  PREFETCH_MAX_BYTES,
+  ZipStreamError,
+  zipStream,
+  type OpenFile,
+} from './zip-stream'
 
 const encoder = new TextEncoder()
 const streamOf = (chunks: readonly Uint8Array[]) =>
@@ -247,6 +252,28 @@ describe('zipStream', () => {
       drain(zipStream(plan, opener(files), { onEnd: () => ended++ })),
     ).resolves.toBeDefined()
     expect(ended).toBe(2)
+  })
+
+  it('Given a large file among small ones, When the first is written, Then only the small ones are opened early', async () => {
+    const plan = planZip(
+      [
+        { path: 'a', size: 10 },
+        { path: 'big', size: PREFETCH_MAX_BYTES + 1 },
+        { path: 'c', size: 10 },
+        { path: 'd', size: 10 },
+      ],
+      0,
+    )
+    if (!plan.ok) throw new Error('refused')
+    const opened: string[] = []
+    const open: OpenFile = async (entry) => {
+      opened.push(entry.path)
+      return streamOf([new Uint8Array(entry.size)])
+    }
+    const reader = zipStream(plan, open, { prefetch: 3 }).getReader()
+    await reader.read()
+    expect(opened.sort()).toEqual(['a', 'c', 'd'])
+    await reader.cancel()
   })
 
   it('Given a name that tries to climb out, When the zip is read back, Then no entry names a place outside the folder', async () => {

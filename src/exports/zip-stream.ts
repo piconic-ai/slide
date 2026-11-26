@@ -21,12 +21,18 @@ export type OpenFile = (
   entry: PlannedEntry,
 ) => Promise<ReadableStream<Uint8Array> | null>
 
+/**
+ * Only files up to this size are opened ahead of their turn. A file opened
+ * early may hold bytes until the writer reaches it; capping what is opened
+ * early keeps that to a few MiB however large the upload limits are set.
+ */
+export const PREFETCH_MAX_BYTES = 1024 * 1024
+
 export type ZipStreamOptions = Readonly<{
   /**
-   * How many files are opened ahead of the one being written, to hide the
-   * time a read from R2 takes. Each is a read that holds a connection
-   * (a Worker may wait on six at once) and, at most, the chunk it is
-   * given until the writer catches up.
+   * How many files after the one being written may be opened early, to hide
+   * the time a read from R2 takes (only those of PREFETCH_MAX_BYTES or less).
+   * Each is a read that holds a connection (a Worker may wait on six at once).
    */
   prefetch?: number
   /** Called once when the stream ends, fails or is cancelled. */
@@ -98,7 +104,11 @@ export function zipStream(
     controller: ReadableStreamDefaultController<Uint8Array>,
     entry: PlannedEntry,
   ) => {
-    for (let ahead = 0; ahead <= prefetch; ahead++) start(next + ahead)
+    start(next)
+    for (let ahead = 1; ahead <= prefetch; ahead++) {
+      const later = plan.entries[next + ahead]
+      if (later && later.size <= PREFETCH_MAX_BYTES) start(next + ahead)
+    }
     const opened = await opening.get(next)!
     opening.delete(next)
     if (!opened.ok) throw opened.error
