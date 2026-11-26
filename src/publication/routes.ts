@@ -5,6 +5,7 @@ import { currentOwner, requireOwner } from '../auth/owner-middleware'
 import type { Owner } from '../auth/owner-session'
 import { accountTitles, renderPage, signInPrompt } from '../decks/pages'
 import { langOf } from '../site/lang'
+import { recordPublished } from '../metrics/published-routes'
 import { resolveDeck } from '../decks/store'
 import { readHandle } from '../share/store'
 import { isOwnOrigin } from '../uploads/start-request'
@@ -126,6 +127,12 @@ publicationApi.post(
     })
     if (result.kind === 'not_found')
       return c.json({ error: 'Deck not found' }, 404)
+    if (result.kind === 'applied' && body.data.action === 'publish')
+      await recordPublished(c, {
+        deckId: deck.id,
+        deploymentId: body.data.deploymentId,
+        at: now(),
+      })
     const [payload, status] = respond(result)
     return c.json(payload, status)
   },
@@ -183,6 +190,12 @@ publicationForms.post('/:deck/publication', csrf(), async (c) => {
     now: now(),
   })
   if (result.kind === 'not_found') return c.text('Deck not found', 404)
+  if (result.kind === 'applied' && body.data.action === 'publish')
+    await recordPublished(c, {
+      deckId: deck.id,
+      deploymentId: body.data.deploymentId,
+      at: now(),
+    })
   // The viewer's notice publishes from there and returns there when it worked,
   // or when the version it asked for is already public (a second press);
   // any other refusal is explained on the deck page.

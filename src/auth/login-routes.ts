@@ -36,6 +36,7 @@ import { clientKey } from '../site/rate-limit-policy'
 import { langOf } from '../site/lang'
 import type { Lang } from '../site/i18n'
 import { dayTimeFormats } from '../share/dates'
+import { recordFrom } from '../metrics/record-routes'
 
 type C = Context<{ Bindings: Env }>
 
@@ -199,8 +200,10 @@ loginRoutes.post('/login', csrf(), async (c) => {
     async onCode(to, code) {
       try {
         // The same work either way; only an invited address is mailed.
-        if (await isInvited(c.env.DB, to, emailCryptoOf(c.env)))
+        if (await isInvited(c.env.DB, to, emailCryptoOf(c.env))) {
           await mailer(loginCodeMail(to, code, lang))
+          recordFrom(c, { name: 'login_code_sent' })
+        }
       } catch (error) {
         console.error(
           JSON.stringify({
@@ -258,6 +261,7 @@ loginRoutes.post('/login/code', csrf(), async (c) => {
   const auth = createAuth(c.env)
   if (!email || !auth) return c.redirect(`/login${loginQuery(carry)}`, 303)
   const retry = async (status: number) => {
+    recordFrom(c, { name: 'login_code_entered', outcome: 'rejected' })
     // No code left to try (used up, expired, or never asked for) reads the
     // same for every address.
     const left = await triesLeft(c.env.DB, emailCryptoOf(c.env), email)
@@ -321,6 +325,7 @@ loginRoutes.post('/login/code', csrf(), async (c) => {
   if (!response.ok) return retry(400)
   for (const cookie of response.headers.getSetCookie())
     c.header('Set-Cookie', cookie, { append: true })
+  recordFrom(c, { name: 'login_code_entered', outcome: 'accepted' })
   // The welcome page sends someone who already has a handle on at once.
   return c.redirect(`/welcome${loginQuery(carry)}`, 303)
 })

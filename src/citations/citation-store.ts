@@ -6,9 +6,12 @@ export { LINK_SCAN_BYTES }
 /**
  * Reads the links a deployment's HTML files make to share URLs and keeps
  * them. Citations only add to what readers see, so a storage error leaves
- * them out instead of failing the upload.
+ * them out instead of failing the upload. Answers how many were kept.
  */
-export async function recordCitations(env: Env, deploymentId: string) {
+export async function recordCitations(
+  env: Env,
+  deploymentId: string,
+): Promise<number> {
   try {
     const keys = await listHtmlObjects(env.DB, deploymentId)
     const perFile = await Promise.all(
@@ -27,6 +30,7 @@ export async function recordCitations(env: Env, deploymentId: string) {
       await readDeploymentDeck(env.DB, deploymentId),
     )
     await saveCitations(env.DB, deploymentId, found)
+    return found.length
   } catch (error) {
     console.error(
       JSON.stringify({
@@ -35,5 +39,6 @@ export async function recordCitations(env: Env, deploymentId: string) {
         name: error instanceof Error ? error.name : 'unknown',
       }),
     )
+    return 0
   }
 }

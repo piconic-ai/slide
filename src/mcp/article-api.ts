@@ -11,6 +11,7 @@ import {
   type LinkRefusal,
 } from '../links/link'
 import { addLink, listLinks, removeLink } from '../links/store'
+import { record } from '../metrics/record-routes'
 import { readCalendarsForEventSoon } from '../feeds/reader-routes'
 import {
   draftView,
@@ -149,6 +150,8 @@ export async function addRelatedLink(
     now: now(),
   })
   if (result === 'missing') return toolError('unknown_slide')
+  if (result === 'added')
+    record(env, { name: 'related_link_added', deckId: deck.id })
   if (result === 'duplicate')
     return refusalResult(
       'link_duplicate',

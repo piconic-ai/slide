@@ -79,6 +79,7 @@ import { readSuspension } from '../publication/suspension-store'
 import { alternateLinks, LANG_PARAM, langOfTag } from '../site/i18n'
 import { z } from 'zod'
 import type { DeckSlug } from '../decks/deck-id'
+import { recordFrom } from '../metrics/record-routes'
 import { langOf } from '../site/lang'
 
 export const shareRoutes = new Hono<{
@@ -624,6 +625,14 @@ shareRoutes.get('*', async (c, next) => {
     c.header('X-Robots-Tag', 'noindex')
   }
   c.header('Link', alternateLinks(c.env.PUBLIC_ORIGIN, url))
+  // Readers' views only: the author looking at their own slides is no use.
+  if (!preview && viewer !== shared.ownerUserId)
+    recordFrom(c, {
+      name: 'deck_opened',
+      via: 'page',
+      deckId: shared.deckId,
+      referrer: c.req.header('Referer'),
+    })
   return c.html(
     viewerPage(
       {

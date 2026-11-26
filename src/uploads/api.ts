@@ -79,6 +79,8 @@ import {
   type UploadAttempt,
 } from './start-request'
 import { readSuspension } from '../publication/suspension-store'
+import { record } from '../metrics/record-routes'
+import { refusalClassOf } from '../metrics/refusal'
 
 const api = new Hono<{ Bindings: Env }>()
 type UploadContext = Context<{ Bindings: Env }>
@@ -542,7 +544,10 @@ export async function startUpload(c: UploadScope, start: UploadStart) {
     target.kind === 'version'
       ? (await uploadingOwner(c, target.deck.id)) === ownerUserId
       : await isActiveAuthor(c, ownerUserId)
-  if (!allowed) failClosedDeck()
+  if (!allowed) {
+    record(c.env, { name: 'upload_refused', reason: 'not_allowed' })
+    failClosedDeck()
+  }
   // Invalid configuration fails every start, including replays.
   const limits = uploadLimits(c)
   const digest = await digestUploadInventory(inventory)
@@ -567,18 +572,32 @@ export async function startUpload(c: UploadScope, start: UploadStart) {
   const credential = `${crypto.randomUUID()}.${crypto.randomUUID()}`
   const tokenHash = await sha256(new TextEncoder().encode(credential))
   const created = now()
-  const deck = existing
-    ? await resumedDeck(c, start, existing, tokenHash, limits, created)
-    : await startedDeck(c, db, start, limits, {
-        id,
-        key,
-        digest,
-        ownerUserId,
-        source: start.source,
-        inventory,
-        tokenHash,
-        created,
-      })
+  const deck = await (
+    existing
+      ? resumedDeck(c, start, existing, tokenHash, limits, created)
+      : startedDeck(c, db, start, limits, {
+          id,
+          key,
+          digest,
+          ownerUserId,
+          source: start.source,
+          inventory,
+          tokenHash,
+          created,
+        })
+  ).then(
+    (opened) => {
+      // A replay of a start is not a second start.
+      if (!existing)
+        record(c.env, { name: 'upload_started', source: start.source })
+      return opened
+    },
+    (error: unknown) => {
+      const reason = refusalClassOf(error)
+      if (reason) record(c.env, { name: 'upload_refused', reason })
+      throw error
+    },
+  )
   if (existing?.state !== 'ready') {
     const [first, ...rest] = inventory.files.map((file, index) =>
       db
@@ -686,12 +705,14 @@ const requireAuthor: MiddlewareHandler<{
 }> = async (c, next) => {
   const owner = await currentOwner(c)
   if (!owner) {
-    if (await hasSignIn(c))
+    if (await hasSignIn(c)) {
+      record(c.env, { name: 'upload_refused', reason: 'not_allowed' })
       fail(
         403,
         'Putting slides here is by invitation for now',
         'invitation_only',
       )
+    }
     return c.json({ error: 'Sign in as the owner' }, 401)
   }
   c.set('owner', owner)
@@ -967,7 +988,7 @@ api.post('/:id/finalize', async (c) => {
   }
   const entryText = await readEntryText(c, row.id)
   // Before the deployment is ready, so a retried finalize records them too.
-  await recordCitations(c.env, row.id)
+  const cited = await recordCitations(c.env, row.id)
   const db = drizzle(c.env.DB)
   const result = await db
     .update(deployments)
@@ -1004,6 +1025,16 @@ api.post('/:id/finalize', async (c) => {
     )
     .run()
   const ready = await readDeployment(c, row.id)
+  // Only the request that made the version ready counts it.
+  if (ready?.state === 'ready' && result.meta.changes) {
+    if (row.deck_id)
+      record(c.env, {
+        name: 'upload_finished',
+        source: row.source,
+        deckId: row.deck_id,
+      })
+    if (cited > 0) record(c.env, { name: 'citation_made' })
+  }
   // A concurrent finalize may have won; its result is this one's too.
   if (ready?.state === 'ready') return c.json(await receipt(c, ready))
   if (!result.meta.changes)
