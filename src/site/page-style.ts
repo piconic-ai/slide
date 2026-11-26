@@ -1940,6 +1940,41 @@ export const pageStyle = html`<style>
     color: var(--muted-foreground);
     font-size: 13px;
   }
+  /* The slides of "Export your data": a group each, not a table. */
+  .export-slides {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border-top: 1px solid var(--border);
+  }
+  .export-slide {
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .export-slide p {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+  .export-slide-name {
+    font-weight: 600;
+  }
+  .export-slide-state {
+    color: var(--muted-foreground);
+    font-size: 13px;
+  }
+  .export-pages {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 16px;
+    margin-top: 16px;
+  }
+  .export-pages a,
+  .export-help {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
   /* The author's slides, one row each. */
   .deck-rows {
     list-style: none;

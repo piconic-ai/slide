@@ -109,6 +109,11 @@ const AUTHOR_SIDE = [
   'src/decks/own-decks.ts',
   // Whether the author may still change a slide's URL name.
   'src/decks/rename-store.ts',
+  // The owner's own export: a hidden slide is theirs to take out (F35-AC6).
+  'src/exports/account-export-store.ts',
+  'src/exports/slide-rows-store.ts',
+  'src/exports/slide-rows.ts',
+  'src/exports/test-upload.ts',
   'src/publication/state.ts',
   'src/publication/store.ts',
   'src/publication/test-support.ts',

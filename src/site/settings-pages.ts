@@ -13,8 +13,10 @@ import {
   type DeviceRow,
 } from './settings-account-frame'
 import { settingsBlocksFrame } from './settings-blocks-frame'
-import type { DownloadLink } from './download-links'
-import { settingsExportFrame } from './settings-export-frame'
+import {
+  settingsExportFrame,
+  type DataExportView,
+} from './settings-export-frame'
 import {
   settingsCommunitiesFrame,
   type ManagedCommunity,
@@ -97,8 +99,8 @@ type SettingsOwner = Readonly<{
   muted: readonly { handle: string }[]
   optOuts: readonly NotificationKind[]
   agents: AgentSettings
-  /** What the person can take out of the service; none until work E fills it. */
-  dataExport?: readonly DownloadLink[]
+  /** What the person can take out of the service; none shows no such place. */
+  dataExport?: DataExportView
 }>
 
 const mutesSection = (owner: SettingsOwner, lang: Lang) => {
@@ -176,7 +178,7 @@ const languageSection = (lang: Lang, url: URL) =>
 const leaveSection = (owner: SettingsOwner, lang: Lang) =>
   html`<section class="panel" id="leave">
     <h2>${text[lang].leave}</h2>
-    ${accountDeletion(owner.login, lang)}
+    ${accountDeletion(owner.login, lang, owner.dataExport ? { exportHref: '/settings#export' } : {})}
   </section>`
 
 /**
@@ -199,7 +201,7 @@ export const settingsBody = (owner: SettingsOwner, lang: Lang, url: URL) =>
       },
       lang,
     )}
-    ${settingsExportFrame(owner.dataExport ?? [], lang)}
+    ${settingsExportFrame(owner.dataExport ?? null, lang, url)}
     ${settingsAgentFrame(lang, owner.agents)}
     ${settingsCommunitiesFrame(owner.managed, lang)}
     ${settingsBlocksFrame(owner.blocked, lang)} ${mutesSection(owner, lang)}

@@ -66,7 +66,7 @@ beforeEach(() => {
   revision = 0
 })
 
-test('F03-AC141: Given a slide with a received version, When its page opens, Then the frames come in the order title, publication, share URL, article, related links, events presented at, new version, deletion', async () => {
+test('F03-AC141: Given a slide with a received version, When its page opens, Then the frames come in the order title, publication, share URL, article, related links, events presented at, new version, downloads, deletion', async () => {
   await seedDeployment(db, 'talk')
   const body = await page()
   const order = [...body.matchAll(/data-deck-frame="([a-z-]+)"/g)].map(
@@ -80,6 +80,7 @@ test('F03-AC141: Given a slide with a received version, When its page opens, The
     'links',
     'events',
     'replace',
+    'downloads',
     'delete',
   ])
   expect(body.indexOf('<h1')).toBeLessThan(

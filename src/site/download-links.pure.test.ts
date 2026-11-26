@@ -3,6 +3,7 @@ import { downloadFrame } from '../decks/download-frame'
 import { downloadLinks } from './download-links'
 import { settingsExportFrame } from './settings-export-frame'
 
+const url = new URL('https://slide.example/settings')
 const zip = { label: 'Published version (zip)', href: '/slides/talk/zip' }
 const info = { label: 'Slide information (JSON)', href: '/slides/talk/info' }
 
@@ -32,7 +33,7 @@ test.each(['ja', 'en'] as const)(
   'Given no links, When the places are drawn in %s, Then neither shows anything',
   (lang) => {
     expect(downloadFrame([], lang)).toBe('')
-    expect(settingsExportFrame([], lang)).toBe('')
+    expect(settingsExportFrame(null, lang, url)).toBe('')
   },
 )
 
@@ -45,7 +46,13 @@ test.each([
     const deck = String(await downloadFrame([zip], lang))
     expect(deck).toContain(`<h2>${deckHeading}</h2>`)
     expect(deck).toContain(zip.href)
-    const settings = String(await settingsExportFrame([zip, info], lang))
+    const settings = String(
+      await settingsExportFrame(
+        { account: [zip, info], slides: [], page: 1, lastPage: 1 },
+        lang,
+        url,
+      ),
+    )
     expect(settings).toContain(`<h2>${settingsHeading}</h2>`)
     expect(settings).toContain(info.href)
   },

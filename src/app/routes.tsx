@@ -46,6 +46,7 @@ import { notificationRoutes } from '../notifications/routes'
 import { isHomeAssetPath } from '../site/home-assets'
 import { homeRoutes } from '../site/home-routes'
 import { faceRoutes } from '../profile/face-routes'
+import { exportRoutes } from '../exports/export-routes'
 import { carrySessionRenewal } from '../auth/renewal-middleware'
 import { settingsRoutes } from '../site/settings-routes'
 import { mcpRoutes } from '../mcp/routes'
@@ -156,6 +157,7 @@ app.route('/', homeRoutes)
 app.route('/', startRoutes)
 app.route('/', settingsRoutes)
 app.route('/', faceRoutes)
+app.route('/', exportRoutes)
 app.route('/', embedRoutes)
 app.route('/', mcpRoutes)
 app.route(MOCK_FEED_BASE, mockFeedRoutes)
