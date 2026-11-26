@@ -39,14 +39,20 @@ const PERCENT = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 0,
 })
 
-/** A cell: the number, right-aligned by the table, and the share beside it. */
-const cellText = (cell: Cell, unit: Row['unit']): string => {
-  if (cell.value === null) return '—'
+/**
+ * A cell: the number, right-aligned by the table, and the share beside it in
+ * parentheses. Each is kept whole, so that a narrow column wraps between the
+ * number and its share and never inside a number.
+ */
+const cellText = (cell: Cell, unit: Row['unit']): ReturnType<typeof html> => {
+  if (cell.value === null) return html`<span class="n">—</span>`
   const value = (unit === 'minutes' ? TENTHS : WHOLE).format(cell.value)
-  const withUnit = unit === 'minutes' ? `${value} 分` : value
+  // A no-break space, so that the unit stays with the number.
+  const number = unit === 'minutes' ? `${value}\u00a0分` : value
   return cell.share === null
-    ? withUnit
-    : `${withUnit} (${PERCENT.format(cell.share)})`
+    ? html`<span class="n">${number}</span>`
+    : html`<span class="n">${number}</span>
+        <span class="n">(${PERCENT.format(cell.share)})</span>`
 }
 
 const rowOf = (row: Row) =>
@@ -77,7 +83,15 @@ const tableOf = (table: MetricsTable) =>
                 ${group.heading}
               </th>
             </tr>
-            ${group.rows.map(rowOf)}
+            ${
+              group.rows.length === 0
+                ? html`<tr>
+                    <td colspan="${table.weeks.length + 1}">
+                      この 12 週に、記録はありません。
+                    </td>
+                  </tr>`
+                : group.rows.map(rowOf)
+            }
           </tbody>`,
       )}
     </table>

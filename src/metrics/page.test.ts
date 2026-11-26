@@ -110,11 +110,13 @@ test('F40-AC18, F40-AC19: Given twelve weeks of counts in D1, When the operator 
   const page = (await response.text()).replace(/\s+/g, ' ')
   expect(page).toContain('<h2>週ごとの数</h2>')
   // The newest week: 12 sent and 11 accepted, which is 92%.
-  expect(page).toContain('<td>12</td>')
-  expect(page).toContain('<td>11 (92%)</td>')
+  expect(page).toContain('<span class="n">12</span>')
+  expect(page).toContain(
+    '<span class="n">11</span> <span class="n">(92%)</span>',
+  )
   // The oldest: 1 sent and none accepted.
-  expect(page).toContain('<td>1</td>')
-  expect(page).toContain('<td>0 (0%)</td>')
+  expect(page).toContain('<span class="n">1</span>')
+  expect(page).toContain('<span class="n">0</span> <span class="n">(0%)</span>')
   expect(page).toContain(`最後に写した日: ${dayOf(NOW - 86400)}`)
   // Everything is set, so there is no note.
   expect(page).not.toContain('未設定')
@@ -276,7 +278,7 @@ test('F40-AC22: Given no dataset bound, When the page is opened, Then it says AN
   expect(page).toContain('<code>ANALYTICS</code>')
   expect(page).not.toContain('<code>ANALYTICS_READ_TOKEN</code>')
   expect(page).toContain('<code>docs/dev/metrics-setup.md</code>')
-  expect(page).toContain('<td>12</td>')
+  expect(page).toContain('<span class="n">12</span>')
 })
 
 test('F40-AC23: Given no read token, When the page is opened, Then it says the token and, if it is the one missing, the account, and the CSV still comes', async () => {

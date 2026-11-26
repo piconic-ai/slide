@@ -178,7 +178,7 @@ export const operatorDocument = (
           }
           .metrics-table th,
           .metrics-table td {
-            padding: 6px 12px 6px 0;
+            padding: 6px 8px 6px 0;
             border-bottom: 1px solid var(--border);
             font-size: 14px;
             line-height: 1.6;
@@ -193,16 +193,22 @@ export const operatorDocument = (
           }
           .metrics-table thead th:first-child,
           .metrics-table tbody th[scope='row'] {
-            min-width: 16em;
+            min-width: 12em;
             text-align: left;
           }
           .metrics-table tbody th[scope='row'] {
             font-weight: 400;
           }
+          .metrics-table .n {
+            white-space: nowrap;
+          }
           .metrics-table td {
             text-align: right;
-            white-space: nowrap;
             font-variant-numeric: tabular-nums;
+          }
+          .metrics-table td[colspan] {
+            color: var(--muted-foreground);
+            text-align: left;
           }
           .metrics-table .group-row th {
             padding-top: 20px;

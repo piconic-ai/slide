@@ -37,6 +37,9 @@ const frame = (
 const draw = async (weekly: MetricsFrameView, email = 'op@example.com') =>
   String(await metricsPage({ operator: { email }, weekly }))
 
+const flatten = (text: string) =>
+  text.replace(/[ \t\r\n]+/g, ' ').replace(/> </g, '><')
+
 /** The page's text with every run of white space made one space. */
 const flat = async (weekly: MetricsFrameView) =>
   (await draw(weekly)).replace(/\s+/g, ' ')
@@ -83,22 +86,28 @@ test('F40-AC19: Given logins, When drawn, Then the count and its share are side 
       total({ event: 'upload_finished', events: 1 }),
     ]),
   )
-  expect(page).toContain('<td>8 (80%)</td>')
-  expect(page).toContain('<td>1 (33%)</td>')
-  expect(page).toContain('<td>10</td>')
+  expect(flatten(page)).toContain(
+    '<td><span class="n">8</span><span class="n">(80%)</span></td>',
+  )
+  expect(flatten(page)).toContain(
+    '<td><span class="n">1</span><span class="n">(33%)</span></td>',
+  )
+  expect(flatten(page)).toContain('<td><span class="n">10</span></td>')
 })
 
 test('F40-AC7: Given a wait, When drawn, Then it is in minutes, and a week with none shows a dash', async () => {
   const page = await draw(
     frame([total({ event: 'deck_published', events: 2, valueSum: 1230 })]),
   )
-  expect(page).toContain('<td>10.3 分</td>')
-  expect(page).toContain('<td>—</td>')
+  expect(flatten(page)).toContain(
+    '<td><span class="n">10.3\u00a0分</span></td>',
+  )
+  expect(flatten(page)).toContain('<td><span class="n">—</span></td>')
 })
 
 test('F40-AC19: Given thousands, When drawn, Then the numbers carry separators', async () => {
   const page = await draw(frame([total({ events: 12345 })]))
-  expect(page).toContain('<td>12,345</td>')
+  expect(flatten(page)).toContain('<td><span class="n">12,345</span></td>')
 })
 
 test('F40-AC20: Given the page, When drawn, Then it links to the CSV as a download, in plain words and not as a button', async () => {
@@ -169,4 +178,11 @@ test('F40-AC25: Given the page, When drawn, Then no inline width is set on the t
   const page = await draw(frame())
   expect(page).not.toMatch(/<table[^>]*style=/)
   expect(page).toContain('class="table-scroll"')
+})
+
+test('F40-AC18: Given a group with no row, such as the errors of a quiet fortnight, When drawn, Then it says there is nothing instead of showing a bare heading', async () => {
+  const page = (await draw(frame())).replace(/\s+/g, ' ')
+  const group = page.slice(page.indexOf('壊れていないか'))
+  expect(group).toContain('この 12 週に、記録はありません。')
+  expect(group).not.toContain('scope="row"')
 })
