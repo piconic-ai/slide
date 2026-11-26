@@ -8,6 +8,8 @@ import { siteHeader } from './header'
 import { HOME_ASSET_PATHS } from './home-assets'
 import { HomeDropFrame } from './home-drop-frame'
 import { homeText } from './home-text'
+import { timelineStyle } from './home-timeline-style'
+import { loginPrompt } from './login-prompt'
 import { LANGS, type Lang } from './i18n'
 import { pageStyle } from './page-style'
 import { pageScripts } from './shell'
@@ -19,8 +21,8 @@ const topUrl = new URL('/', 'https://slide.invalid')
 /**
  * The top page explains nothing: it begins with the place to drop slides,
  * and what dropping does says what the service is for. Under it, one row of
- * tabs holds the lists: recent slides, recent communities, the people the
- * visitor follows and the communities they follow (F03-AC158).
+ * tabs holds the lists: every public slide, and the slides of the people and
+ * communities the visitor follows (F34-AC1).
  */
 const homePage = (lang: Lang) => (
   <html lang={lang}>
@@ -28,6 +30,7 @@ const homePage = (lang: Lang) => (
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{`${homeText[lang].title} - ${SERVICE_NAME}`}</title>
     {pageStyle}
+    {timelineStyle}
     {pageScripts}
     {/* The lists are fetched by script. Where none runs, the tabs and their
         placeholders would stay for lists that never come. */}
@@ -36,6 +39,10 @@ const homePage = (lang: Lang) => (
     </noscript>
     <body>
       {siteHeader(lang)}
+      {/* The follow buttons of the carousels open these for a visitor who is
+          not signed in; they stay inert until /share.js opens a copy. */}
+      {raw(String(loginPrompt('follow', 'top', lang)))}
+      {raw(String(loginPrompt('follow-community', 'top', lang)))}
       <main bf-region="page">
         <div className="page page-wide home" data-member="no">
           <HomeDropFrame lang={lang} />
