@@ -331,6 +331,12 @@ test('F03-AC71: Given the viewer of slides that send their own frame to the orig
         return blocked
       })
       const frame = page.frameLocator('iframe#deck')
+      // A press made while the deck is still loading can be lost with the
+      // document it was made on, so the press waits for the deck to be loaded.
+      const deck = await (
+        await page.locator('iframe#deck').elementHandle()
+      )?.contentFrame()
+      await deck?.waitForLoadState('load', SETTLE)
       await frame.locator(`#${button}`).click(SETTLE)
       await expect
         .poll(() => violations.jsonValue(), SETTLE)
