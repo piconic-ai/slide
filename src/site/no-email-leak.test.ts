@@ -1,15 +1,41 @@
 import { createHash } from 'node:crypto'
-import { afterAll, beforeAll, expect, test } from 'vitest'
+import { afterAll, afterEach, beforeAll, expect, test, vi } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
+import { CRON_TASKS, runScheduled } from '../app/cron-routes'
+import { ALERT_URGENCY, noticeOf, runbookLink } from '../alerts/notice'
+import type { AlertKind } from '../alerts/notice'
+import { cronFailedNotice, maintenanceNotice } from '../alerts/notice'
+import { notifierOf } from '../alerts/notify-routes'
+import { HELP_CATALOG } from '../help/default-catalog'
+import { ACCESS_TOKEN_HEADER } from '../operator/access'
+import {
+  accessTeam,
+  AUDIENCE,
+  OPERATOR_ORIGIN,
+  TEAM,
+} from '../operator/test-support'
+import { signIn } from '../publication/test-support'
 import { applyMigrations } from '../db/test-migrations'
 import { gravatarHash } from '../profile/gravatar'
 import { callTool, connectAgent, mcpClient } from '../mcp/test-connect'
 import { emailOf, TEST_ORIGIN, testEnv } from '../publication/test-support'
 import { seedIntegration } from './test-integration'
 
+const team = await accessTeam()
+vi.mock('../operator/access-client', () => ({ accessKeys: () => team.keys }))
+
 const platform = await getPlatformProxy<Env>({ persist: false })
-const env = testEnv(platform.env) as unknown as Env
+// The counts and the Worker's origins are taken over by the test: what is
+// written to the dataset is kept to be read.
+const written: unknown[] = []
+const env = {
+  ...testEnv(platform.env),
+  OPERATOR_ORIGIN,
+  ACCESS_TEAM_DOMAIN: TEAM,
+  ACCESS_AUD: AUDIENCE,
+  ANALYTICS: { writeDataPoint: (point: unknown) => written.push(point) },
+} as unknown as Env
 let owner = ''
 let bob = ''
 
@@ -18,15 +44,16 @@ beforeAll(async () => {
   ;({ owner, bob } = await seedIntegration(env))
 })
 afterAll(() => platform.dispose())
+afterEach(() => vi.restoreAllMocks())
 
 /**
  * What must never appear: each address as typed and as it is stored, and its
  * MD5 and SHA-256 in hexadecimal (what Gravatar and other services take an
  * address by), however the address is spelled.
  */
-async function secrets() {
+async function secretsOf(logins: readonly string[]) {
   const found: Array<[string, string]> = []
-  for (const login of ['owner', 'bob']) {
+  for (const login of logins) {
     const email = emailOf(login)
     for (const spelled of [email, email.toUpperCase()]) {
       found.push([`${login} address`, spelled.toLowerCase()])
@@ -48,11 +75,15 @@ async function secrets() {
   return found
 }
 
-const forbidden = await secrets()
+const forbidden = await secretsOf(['owner', 'bob'])
 
-function expectNoSecrets(label: string, body: string) {
+function expectNoSecrets(
+  label: string,
+  body: string,
+  secrets: readonly (readonly [string, string])[] = forbidden,
+) {
   const text = body.toLowerCase()
-  for (const [what, secret] of forbidden)
+  for (const [what, secret] of secrets)
     expect(text.includes(secret.toLowerCase()), `${label} shows ${what}`).toBe(
       false,
     )
@@ -151,4 +182,113 @@ test('F28-AC54: Given a connected agent, When it calls the tools, Then no answer
   ]
   expectNoSecrets('mcp', JSON.stringify(answers))
   await client.close()
+})
+
+// The fourth scope's places an address could leak to: the pages it added, the
+// exports (which hold only what is the author's own), the counts, the logs, the
+// notices and the operator's pages.
+
+const SCOPE4_PATHS = [
+  '/privacy/external',
+  '/help/bot',
+  '/help?q=zzzz-no-such-word',
+  ...HELP_CATALOG.map((entry) => entry.path),
+  '/slides/talk/export/slide.json',
+  '/slides/talk/export/article.md',
+]
+
+test('F28-AC54: Given the pages of the fourth scope, When a signed-in author opens them, Then neither any address nor its hash is in a body or a header', async () => {
+  for (const path of SCOPE4_PATHS) {
+    const response = await get(path, owner)
+    expect([200, 404], path).toContain(response.status)
+    const headers = [...response.headers]
+      .map(([name, value]) => `${name}: ${value}`)
+      .join('\n')
+    expectNoSecrets(`${path} headers`, headers)
+    expectNoSecrets(path, await response.text())
+  }
+})
+
+test('F40-AC15: Given the pages of the service opened by each person, When the counts written are read, Then not one holds an address or its hash', async () => {
+  written.length = 0
+  for (const cookie of [owner, bob, ''])
+    for (const path of [...paths, ...SCOPE4_PATHS])
+      await (await get(path, cookie)).arrayBuffer()
+  expect(written.length).toBeGreaterThan(5)
+  expectNoSecrets('counts', JSON.stringify(written))
+})
+
+const WEBHOOK =
+  'https://discord.com/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwx'
+
+test('F39-AC9: Given the service run through sign-in, errors, every cron task and every kind of alert, When what it logged and sent is read, Then no address, no hash and no person’s name is in it', async () => {
+  const lines: string[] = []
+  vi.spyOn(console, 'log').mockImplementation((text) =>
+    lines.push(String(text)),
+  )
+  vi.spyOn(console, 'error').mockImplementation((text) =>
+    lines.push(String(text)),
+  )
+  const sent: string[] = []
+  const send = (async (_url: unknown, init?: RequestInit) => {
+    sent.push(String(init?.body))
+    return new Response(null, { status: 204 })
+  }) as typeof fetch
+  const live = { ...env, DISCORD_WEBHOOK_URL: WEBHOOK } as unknown as Env
+  // A sign-in, one that is refused, and a page that is not there.
+  await signIn(env, 'dave', { id: '5555' })
+  await signIn(env, 'erin', { id: '6666', invited: false })
+  await get('/@nobody/none', owner)
+  await get('/slides/none/export/slide.json', owner)
+  await get('/mcp/files/none', '')
+  // Every cron task at every hour, with the webhook set.
+  for (let hour = 0; hour < 24; hour += 1) {
+    const waited: Promise<unknown>[] = []
+    runScheduled(
+      CRON_TASKS,
+      {
+        scheduledTime: Date.UTC(2026, 10, 26, hour, 17),
+        cron: '17 * * * *',
+        noRetry() {},
+      },
+      live,
+      {
+        waitUntil: (promise: Promise<unknown>) => waited.push(promise),
+        passThroughOnException() {},
+        props: {},
+      } as unknown as ExecutionContext,
+      notifierOf(live, { send }),
+    )
+    await Promise.all(waited)
+  }
+  // Every kind of alert, at once or the next day.
+  const notifier = notifierOf(live, { send })
+  for (const kind of Object.keys(ALERT_URGENCY) as AlertKind[])
+    await notifier(
+      kind === 'cron_failed'
+        ? cronFailedNotice('backup', 2, runbookLink(kind))
+        : kind === 'maintenance'
+          ? maintenanceNotice('started', 2, runbookLink(kind))
+          : noticeOf(kind, 2, runbookLink(kind)),
+    )
+  expect(sent.length).toBeGreaterThan(3)
+  const people = await secretsOf(['owner', 'bob', 'dave', 'erin'])
+  expectNoSecrets('logs', lines.join('\n'), people)
+  expectNoSecrets('webhook bodies', sent.join('\n'), people)
+  // Nor a person's display name, which is no one else's to read in a log.
+  for (const name of ['Owner Name', 'Bob Builder'])
+    expect(lines.join('\n') + sent.join('\n')).not.toContain(name)
+})
+
+test('F40-AC15: Given the operator’s pages, When an operator opens them, Then the invitations and the people are not named in them', async () => {
+  for (const path of ['/operations', '/metrics', '/metrics.csv']) {
+    const response = await server.fetch(
+      new Request(`${OPERATOR_ORIGIN}${path}`, {
+        headers: { [ACCESS_TOKEN_HEADER]: await team.sign() },
+      }),
+      env,
+    )
+    expect(response.status, path).toBe(200)
+    expectNoSecrets(path, await response.text())
+  }
 })
