@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { HTTPException } from 'hono/http-exception'
 import { authRoutes } from '../auth/routes'
 import { loginRoutes } from '../auth/login-routes'
 import { welcomeFirst } from '../auth/welcome-middleware'
@@ -29,6 +30,8 @@ import {
   GOODBYE_PATH,
   goodbyePage,
 } from '../site/goodbye-page'
+import { helpArticleOfReferrer } from '../metrics/help-referrer'
+import { recordFrom } from '../metrics/record-routes'
 import { shareRoutes } from '../share/routes'
 import { eventRoutes } from '../events/routes'
 import { communityForms } from '../communities/routes'
@@ -94,9 +97,26 @@ app.use(
   // Last, so that the band is put in the page before the headers of the others.
   noticeBand(),
 )
-app.notFound(notFound)
+// Each error page shown is counted by the route that answered (F40-AC14).
+app.notFound((c) => {
+  recordFrom(c, {
+    name: 'screen_error',
+    kind: 'not_found',
+    screen: c.req.routePath,
+  })
+  return notFound(c)
+})
 app.onError((error, c) => {
-  if (!(error instanceof SuspendedOwnerError)) return onError(error, c)
+  if (!(error instanceof SuspendedOwnerError)) {
+    // A deliberate HTTP error keeps its own answer and is no fault.
+    if (!(error instanceof HTTPException))
+      recordFrom(c, {
+        name: 'screen_error',
+        kind: 'server_error',
+        screen: c.req.routePath,
+      })
+    return onError(error, c)
+  }
   c.header('Cache-Control', 'no-store')
   c.header('Referrer-Policy', 'no-referrer')
   if (c.req.path.startsWith('/api/'))
@@ -117,11 +137,18 @@ app.get('/robots.txt', robotsTxt)
 // The terms, the privacy policy, its page of destinations, the contact point and
 // the help stay readable during maintenance.
 for (const kind of legalKinds)
-  app.get(legalPath(kind), (c) =>
-    c.html(legalPage(kind, langOf(c), new URL(c.req.url)), 200, {
+  app.get(legalPath(kind), (c) => {
+    // Someone who came to the contact page from a help article did not find
+    // the answer there (F40-AC13).
+    const article =
+      kind === 'contact'
+        ? helpArticleOfReferrer(c.req.header('Referer'), c.env.PUBLIC_ORIGIN)
+        : null
+    if (article) recordFrom(c, { name: 'help_to_contact', article })
+    return c.html(legalPage(kind, langOf(c), new URL(c.req.url)), 200, {
       'Content-Security-Policy': LEGAL_PAGE_POLICY,
-    }),
-  )
+    })
+  })
 // The page after leaving the service; it reads nothing and changes nothing.
 app.get(GOODBYE_PATH, (c) =>
   c.html(goodbyePage(langOf(c), new URL(c.req.url)), 200, {

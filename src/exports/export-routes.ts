@@ -1,6 +1,8 @@
 // The routes that hand a signed-in person their own data (F35). Every route
 // answers only the person whose session it is, for their own slides and
 // account; a slide of someone else is answered as a slide that is not there.
+import { recordFrom } from '../metrics/record-routes'
+import type { ExportKind } from '../metrics/events'
 import { Hono, type Context } from 'hono'
 import { readArticle } from '../articles/store'
 import { currentOwner } from '../auth/owner-middleware'
@@ -179,15 +181,22 @@ exportRoutes.get('/slides/:deck/export/:file', async (c) => {
   if (owner instanceof Response) return owner
   const deck = await readExportDeck(c.env.DB, owner.userId, c.req.param('deck'))
   if (!deck || file === null) return slideNotFound(c)
+  const answered = (what: ExportKind, response: Response | Promise<Response>) =>
+    Promise.resolve(response).then((made) => {
+      // A HEAD reads nothing out, so it is no download.
+      if (made.ok && c.req.method === 'GET')
+        recordFrom(c, { name: 'export_downloaded', what })
+      return made
+    })
   switch (file) {
     case 'published.zip':
-      return zipOf(c, owner, deck, 'published')
+      return answered('slide', zipOf(c, owner, deck, 'published'))
     case 'prepared.zip':
-      return zipOf(c, owner, deck, 'prepared')
+      return answered('slide', zipOf(c, owner, deck, 'prepared'))
     case 'article.md':
-      return articleOf(c, deck)
+      return answered('article', articleOf(c, deck))
     case 'slide.json':
-      return infoOf(c, owner, deck)
+      return answered('info', infoOf(c, owner, deck))
   }
 })
 
@@ -201,6 +210,7 @@ exportRoutes.get('/account/export/account.json', async (c) => {
     email: emailCryptoOf(c.env),
   })
   if (!info) return slideNotFound(c)
+  recordFrom(c, { name: 'export_downloaded', what: 'account' })
   return new Response(jsonText(info), {
     headers: downloadHeaders({
       contentType: 'application/json; charset=utf-8',
@@ -214,6 +224,7 @@ exportRoutes.get('/account/export/picture', async (c) => {
   if (owner instanceof Response) return owner
   const picture = await readPictureObject(c.env.UPLOADS, owner.userId)
   if (!picture) return slideNotFound(c)
+  recordFrom(c, { name: 'export_downloaded', what: 'picture' })
   return new Response(picture.body, {
     headers: downloadHeaders({
       // The service keeps only PNGs it made itself (F28-AC93).

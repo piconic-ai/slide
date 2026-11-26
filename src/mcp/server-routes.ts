@@ -44,6 +44,7 @@ import {
   type ToolResult,
 } from './tools'
 import { outcomeOf, recordToolUse, type ToolName } from './tool-use'
+import { record } from '../metrics/record-routes'
 
 /** The article's limit counts characters; the argument allows for UTF-16. */
 const MAX_ARGUMENT_CHARS = MAX_ARTICLE_CHARS * 2 + 1000
@@ -83,6 +84,9 @@ const guarded =
     } catch {
       // Counting never changes what the agent is told.
     }
+    // The write to Analytics Engine is made here, a routes file: `tool-use.ts`
+    // is in the pure layer and may not reach the binding (F40-AC9).
+    record(session.env, { name: 'mcp_tool_called', tool })
     return result
   }
 

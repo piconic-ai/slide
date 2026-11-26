@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { HELP_BOT_PAGE_POLICY, helpBotPage } from '../site/help-bot-page'
 import { alternateLinks } from '../site/i18n'
+import { recordFrom } from '../metrics/record-routes'
 import { langOf } from '../site/lang'
 import { isHelpAim } from './aims'
 import { findArticle } from './catalog'
@@ -49,6 +50,9 @@ helpRoutes.get(HELP_PATH, async (c) => {
       pageHeaders(c.env.PUBLIC_ORIGIN, url, HELP_SEARCH_PAGE_POLICY),
     )
   const hits = searchHelp(await searchIndex(), query, lang)
+  // Only the words that found nothing are kept, to see what is missing.
+  if (hits.length === 0)
+    recordFrom(c, { name: 'help_search_empty', term: query.shown })
   // A page of results is no page to list: it is not given alternates either.
   return c.html(helpSearchPage(lang, url, query, hits), 200, {
     'Content-Security-Policy': HELP_SEARCH_PAGE_POLICY,
@@ -84,6 +88,10 @@ helpRoutes.get(`${HELP_PATH}/:aim/:slug`, async (c) => {
     c.req.param('slug'),
   )
   if (!entry) return c.notFound()
+  recordFrom(c, {
+    name: 'help_article_viewed',
+    article: `${c.req.param('aim')}/${c.req.param('slug')}`,
+  })
   const url = new URL(c.req.url)
   return c.html(
     await helpArticlePage(langOf(c), url, entry, HELP_CATALOG),

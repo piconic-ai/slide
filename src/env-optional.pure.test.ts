@@ -8,7 +8,6 @@ import { expect, test } from 'vitest'
 const none: Pick<
   Env,
   | 'UPLOADS_BACKUP'
-  | 'ANALYTICS'
   | 'ANALYTICS_ACCOUNT_ID'
   | 'ANALYTICS_READ_TOKEN'
   | 'DISCORD_WEBHOOK_URL'

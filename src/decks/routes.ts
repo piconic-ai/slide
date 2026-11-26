@@ -25,6 +25,7 @@ import { canRenameDeck, renameDeck } from './rename-store'
 import { listDeckSlugs, resolveDeck } from './store'
 import { slideDownloadLinks } from '../exports/links'
 import { exportVersions } from '../exports/versions'
+import { recordFrom } from '../metrics/record-routes'
 import { langOf } from '../site/lang'
 import { kindedOf, parseLinkInput, parseLinkRefusal } from '../links/link'
 import { addLink, listLinks, removeLink, setLinkKind } from '../links/store'
@@ -246,6 +247,8 @@ deckForms.post('/:deck/links', csrf(), requireOwner, async (c) => {
     link: parsed.link,
     now: now(),
   })
+  if (result === 'added')
+    recordFrom(c, { name: 'related_link_added', deckId: deck.id })
   if (result === 'added' && parsed.link.kind === 'event')
     await readCalendarsForEventSoon(c.env, waitUntilOf(c), parsed.link.event)
   if (result === 'missing')

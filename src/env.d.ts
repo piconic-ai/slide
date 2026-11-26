@@ -34,9 +34,10 @@ interface Env {
   //
   // Backup bucket for the stored slide files (work B).
   UPLOADS_BACKUP?: R2Bucket
-  // Usage counts (work A). The dataset to write; a secret token and the
-  // account id to read it back through the SQL API.
-  ANALYTICS?: AnalyticsEngineDataset
+  // Usage counts (work A). The dataset to write is the binding ANALYTICS,
+  // declared in worker-configuration.d.ts since wrangler.jsonc names it; it
+  // is still read as possibly absent (src/metrics). A secret token and the
+  // account id read it back through the SQL API.
   ANALYTICS_ACCOUNT_ID?: string
   ANALYTICS_READ_TOKEN?: string
   // Alerts (work M). The Discord webhook URL is a secret; the next-day mail

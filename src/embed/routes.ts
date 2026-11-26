@@ -5,6 +5,7 @@ import { readProfile } from '../profile/store'
 import { UNAVAILABLE_POLICY, unavailablePage } from '../share/pages'
 import { parseSharePath, profilePath, sharePath } from '../share/path'
 import { readSharedDeployment } from '../share/store'
+import { recordFrom } from '../metrics/record-routes'
 import { langOf } from '../site/lang'
 import { EMBED_PREFIX, embedCodeOf } from './code'
 import {
@@ -51,6 +52,12 @@ embedRoutes.get(`${EMBED_PREFIX}/*`, async (c) => {
   const page = path.kind === 'page' ? path.page : undefined
   c.header('Content-Security-Policy', embedPolicy(contentOrigin))
   c.set('framedByAnyone', true)
+  recordFrom(c, {
+    name: 'deck_opened',
+    via: 'embed',
+    deckId: shared.deckId,
+    referrer: c.req.header('Referer'),
+  })
   return c.html(
     embedPage(
       {
@@ -101,6 +108,7 @@ embedRoutes.get(OEMBED_PATH, async (c) => {
     target.slug,
   )
   if (!shared) return notFound()
+  recordFrom(c, { name: 'oembed_served' })
   const author = await readProfile(c.env.DB, shared.ownerUserId)
   const title = shared.title ?? target.slug
   const shareUrl = new URL(sharePath(target.handle, target.slug), origin).href
