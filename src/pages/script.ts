@@ -3,6 +3,7 @@ import {
   OFFLINE_MESSAGE,
   STORED_AT_PLACEHOLDER,
 } from '../offline/limits'
+import { READING_SOURCE } from './reading'
 
 /** Where a slide loads the script that tells the viewer its page. */
 export const PAGE_SCRIPT_PATH = '/_preview/pages.js'
@@ -48,16 +49,8 @@ export const pageScript = (viewerOrigin: string) => `(() => {
   Object.defineProperty(window, running, { value: true })
   if (parent === window || parent !== top) return
   ${STORED_AT_PLACEHOLDER}
-  const numberOf = (text) => {
-    const spelled = /^([1-9][0-9]{0,3})$/.exec(text)
-    return spelled ? Number(spelled[1]) : null
-  }
-  const pageOf = () => {
-    const query = new URLSearchParams(location.search).get('slide')
-    if (query !== null) return numberOf(query)
-    if (location.hash === '' || location.hash === '#') return 1
-    return numberOf(location.hash.slice(1))
-  }
+  ${READING_SOURCE}
+  const pageOf = () => pageIn(location.search, location.hash)
   let told = 0
   const tell = () => {
     const page = pageOf()

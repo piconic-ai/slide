@@ -133,6 +133,16 @@ async function decks(): Promise<Record<string, Record<string, string>>> {
         '<button id="odd">odd</button></body>',
       ),
     },
+    // Hand-written slides that only name tools, in the title and the text:
+    // a name is no sign of a tool (F03-AC196).
+    named: {
+      'index.html': page(inline)
+        .replace('<title>t</title>', '<title>reveal.js 入門</title>')
+        .replace(
+          '発表のスライド',
+          'reveal.js・Slidev・suraido.js で作るスライド',
+        ),
+    },
     // An inline script its own policy refuses: violations are seen.
     refused: {
       'index.html': page(policy("script-src 'self'") + '<script>1</script>'),
@@ -288,6 +298,18 @@ test.each([
   },
   30000,
 )
+
+test('F03-AC196: Given slides that only name a tool in their title and text, and keep the page in the fragment from 1, When they are opened at /3 and turned, Then page 3 is told and the address follows from 1', async () => {
+  await withPage(async (page) => {
+    // openAtThree waits for the viewer to be told page 3: not read from 0.
+    const { deck } = await openAtThree(page, 'named')
+    expect(await deck.locator('#title').textContent()).toContain('reveal.js')
+    await deck.locator('#push').dispatchEvent('click')
+    await page.waitForURL((url) => url.pathname === '/@owner/named/2')
+    await deck.locator('#hash').dispatchEvent('click')
+    await page.waitForURL((url) => url.pathname === '/@owner/named/4')
+  })
+}, 30000)
 
 test('F03-AC145: Given slides whose policy refuses an inline script of theirs, When they are opened, Then the violation is seen, as the checks above rely on', async () => {
   await withPage(async (page) => {

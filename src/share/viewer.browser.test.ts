@@ -1687,7 +1687,7 @@ test('F03-AC17, F25-AC1: Given the viewer of public slides, When the reader pres
   })
 }, 30000)
 
-test('F03-AC150, F03-AC16: Given slides that tell no page, as a piece of HTML the page script cannot go into, opened at /3, When the reader opens the share menu, Then copying the page’s link is not offered and the posts carry the share URL without a page', async () => {
+test('F03-AC197, F03-AC16: Given slides that tell no page, as a piece of HTML the page script cannot go into, opened at /3, When the reader opens the share menu, Then copying the page’s link is not offered and the posts carry the share URL without a page', async () => {
   await seedPage('untold', 8, '<h1 id="title">Untold</h1>')
   await withContext({ locale: 'ja-JP' }, async (context) => {
     const page = await context.newPage()
