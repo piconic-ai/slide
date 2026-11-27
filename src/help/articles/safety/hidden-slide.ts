@@ -43,7 +43,7 @@ export default defineArticle({
         </ul>
         <h2>非表示にされる基準</h2>
         <p>
-          運営は、利用規約に反すると判断したとき、スライドを非表示にしたり削除したりできます。急を要するときは、前もって知らせずに行います。規約の定めは、<a
+          運営は、利用規約に反する、またはそのおそれがあると判断したとき、スライドを非表示にしたり削除したりできます。前もって知らせずに行うことがあります。規約の定めは、<a
             href="${legalHref('terms', TERMS_HIDING)}"
             >「${TERMS_HIDING}」</a
           >です。何が規約に反するかは、<a
@@ -95,8 +95,8 @@ export default defineArticle({
         </ul>
         <h2>What a slide can be hidden for</h2>
         <p>
-          When the operator judges that the Terms of Service were broken, it may
-          hide or delete slides. When it is urgent, it does so without telling
+          When the operator judges that the Terms of Service were broken, or may
+          have been, it may hide or delete slides. It may do so without telling
           you beforehand. The Terms of Service set this out in the article on
           hiding and suspension (<a href="${legalHref('terms', TERMS_HIDING)}"
             >Terms of Service</a

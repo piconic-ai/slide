@@ -2,10 +2,11 @@ import type { ArticleText } from '../document'
 
 /**
  * The text of the Privacy Policy: the first edition, enacted on 2026-11-27.
- * The wording is the operator's. At the operator's request the draft of
- * 2026-11-26 was put into the polite form and its slips were corrected;
- * any other change of wording is the operator's to decide. The same text,
- * as Markdown, is `../handed-over/privacy.md`, and a test compares the two.
+ * The wording is the operator's. The draft of 2026-11-26 was put into the
+ * polite form, its slips were corrected, and the operator's decisions of
+ * 2026-11-27 on the open points were written in; any other change of
+ * wording is the operator's to decide. The same text, as Markdown, is
+ * `../handed-over/privacy.md`, and a test compares the two.
  * How to replace it: docs/dev/f34-legal-pages.md.
  */
 export const privacy = {
@@ -47,7 +48,7 @@ export const privacy = {
         kind: 'plain',
         paragraphs: ['運営者は、次のときにプライバシー情報を取得します。'],
         items: [
-          '登録とログインのとき: メールアドレスなど、登録とログインに必要な情報',
+          '登録とログインのとき: メールアドレス、ログイン中の端末を見分けるための端末の大まかな名前など、登録とログインに必要な情報',
           '登録者が入力したり操作したりしたとき: プロフィール、コンテンツ、本サービスの機能を使った記録',
           '利用者が本サービスを使ったとき: 履歴情報',
           '問い合わせを受けたとき: 問い合わせの内容と連絡先',
@@ -116,6 +117,10 @@ export const privacy = {
               '事業の譲渡に伴って引き継ぐとき',
             ],
           },
+          {
+            text: '運営者は、顔写真を登録していない登録者の既定の画像を表示するために、メールアドレスから作ったハッシュ値を、Automattic Inc.(Gravatar、米国)に提供します。登録者は、登録のときに、この提供に同意したものとします。登録者は、設定でこの提供をいつでも止められます。',
+            items: [],
+          },
         ],
       },
     },
@@ -126,7 +131,7 @@ export const privacy = {
         kind: 'plain',
         paragraphs: [
           '本サービスがプライバシー情報を送る先と、送る情報と目的は、本サービス上の「外部への送信」のページに示します。',
-          '登録者が外部のプログラムをつないだときは、そのプログラムに、登録者が選んだ操作に必要な情報が渡ります。コンテンツを開くと、作者が組み込んだ外部のサービスに、読者の IP アドレスなどが送られることがあります。この送信は、利用規約第 7 条のとおりそのコンテンツを登録した登録者の責任であり、同ページの表には含みません。',
+          '登録者が外部のプログラムをつないだときは、そのプログラムに、登録者が選んだ操作に必要な情報が渡ります。コンテンツを開くと、作者が組み込んだ外部のサービスに、読者の IP アドレスなどが送られることがあります。この送信は運営者が行うものではなく、利用規約第 7 条のとおり、そのコンテンツを登録した登録者の責任です。外部への送信のページにも載せません。',
         ],
         items: [],
       },
@@ -159,7 +164,7 @@ export const privacy = {
         kind: 'clauses',
         clauses: [
           {
-            text: 'アカウントの情報とコンテンツは、退会するか登録者が消すまで残します。消した後も、バックアップに最大 30 日残ります。',
+            text: 'アカウントの情報とコンテンツは、退会するか登録者が消すまで残します。消した後も、バックアップに最大 35 日残ります。',
             items: [],
           },
           {
@@ -167,11 +172,15 @@ export const privacy = {
             items: [],
           },
           {
-            text: '問い合わせは、対応を終えてから 1 年残します。',
+            text: '問い合わせは、対応と記録に必要な間残します。',
             items: [],
           },
           {
             text: '利用規約に反した行いの記録は、再発を防ぐために必要な間残します。',
+            items: [],
+          },
+          {
+            text: '通報の記録と、使っていたハンドルをほかの人が取れないようにする記録(90 日)は、退会の後も残します。',
             items: [],
           },
         ],
@@ -196,7 +205,7 @@ export const privacy = {
             items: [],
           },
           {
-            text: '個人情報が漏れたおそれがあるときは、個人情報の保護に関する法律及び関連するガイドラインに従って、関わる本人と個人情報保護委員会に知らせると共に、当該委員会の指示に従い、再発の防止に努めます。',
+            text: '個人情報が漏れた、またはそのおそれがあるときは、個人情報の保護に関する法律と関連するガイドラインに従って、関わる本人と個人情報保護委員会に知らせ、再発の防止に努めます。',
             items: [],
           },
         ],

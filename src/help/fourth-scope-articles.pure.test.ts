@@ -201,7 +201,9 @@ describe('the articles of safety and terms follow the terms of service in their 
 
   test('F36-AC34: Given the articles on hiding and on the appeal, When they say what is done and how to object, Then they use the terms’ words and send the reader to the contact page', async () => {
     const hidden = await render('safety/hidden-slide', 'ja')
-    expect(hidden.body).toContain('規約に反すると判断したとき')
+    expect(hidden.body).toContain(
+      '規約に反する、またはそのおそれがあると判断したとき',
+    )
     expect(hidden.body).toContain('href="/help/safety/appeal"')
     const appeal = await render('safety/appeal', 'ja')
     expect(appeal.lead).toContain('異議を申し立てます')

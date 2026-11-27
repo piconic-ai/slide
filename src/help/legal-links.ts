@@ -64,11 +64,11 @@ export const PROHIBITED_ITEMS_EN = [
   'Publishing sexual or violent content, or other content that makes others uncomfortable',
   'Impersonating someone, or falsely claiming a relationship with a person or an organization',
   'Sending a program that harms a user’s device or information, or collecting a user’s information without telling them',
-  'Advertising, soliciting, spam, or any other use that does not fit the purpose of the service',
+  'Posts made only to advertise or solicit, spam, or any other use that does not fit the purpose of the service',
   'Collecting the service’s information in bulk by automatic means without the operator’s permission',
   'Getting around the limits or the protections of the service, putting excessive load on it, or otherwise getting in the way of its operation',
   'Helping anyone do any of the above',
-  'Anything else the operator judges inappropriate',
+  'Anything else the operator judges inappropriate in line with the items above',
 ] as const
 
 /** Whether the text is still shown as a draft; the help says so while it is. */
