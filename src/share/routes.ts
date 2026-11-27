@@ -77,7 +77,8 @@ import {
 } from '../profile/communities-store'
 import { readSuspension } from '../publication/suspension-store'
 import { alternateLinks, LANG_PARAM, langOfTag } from '../site/i18n'
-import { CONTENT_ORIGIN_HEADER } from '../offline/limits'
+import { destinationOf } from '../offline/fetch-metadata'
+import { CONTENT_ORIGIN_HEADER, REPLAYED_DEST_HEADER } from '../offline/limits'
 import { z } from 'zod'
 import type { DeckSlug } from '../decks/deck-id'
 import { recordFrom } from '../metrics/record-routes'
@@ -409,13 +410,18 @@ type DeckPath = Extract<SharePath, { kind: 'deck' | 'page' }>
  * Whether the request is the author opening the page to read it. The page
  * holds a one-time token, and making it writes a row, so a HEAD, a page
  * loaded ahead of time, and any request that is not a document load are
- * answered as they are for readers.
+ * answered as they are for readers. A document load the viewer's worker asks
+ * for counts (see destinationOf): it is the author's browser opening the page.
  */
 const readsADocument = (request: {
   method: string
   header(name: string): string | undefined
 }) => {
-  const dest = request.header('Sec-Fetch-Dest')
+  const dest = destinationOf({
+    dest: request.header('Sec-Fetch-Dest'),
+    site: request.header('Sec-Fetch-Site'),
+    replayed: request.header(REPLAYED_DEST_HEADER),
+  })
   return (
     request.method === 'GET' &&
     request.header('Sec-Purpose') === undefined &&

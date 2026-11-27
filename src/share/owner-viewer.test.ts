@@ -376,6 +376,39 @@ test('F02-AC25: Given requests that are not the author reading the page, When th
   expect(await orm.$count(previewLaunches)).toBe(1)
 })
 
+test("F02-AC29, AC25: Given the author's move to a newer version asked for by the viewer's worker, When the service answers, Then it is the author's view, and only for a request the worker can have made", async () => {
+  await seedPublic(db, 'talk', 1, 'Talk')
+  const next = await seedDeployment(db, 'talk')
+  const ask = (headers: Record<string, string>) =>
+    server.fetch(
+      new Request(`${TEST_ORIGIN}/@owner/talk?v=${next}`, {
+        headers: { Cookie: owner, ...headers },
+      }),
+      env,
+    )
+  const worker = {
+    'Sec-Fetch-Dest': 'empty',
+    'Sec-Fetch-Site': 'same-origin',
+    'X-Slide-Replayed-Dest': 'document',
+  }
+  // A script's fetch, another site, and a frame are answered as readers are.
+  for (const headers of [
+    { ...worker, 'X-Slide-Replayed-Dest': '' },
+    { ...worker, 'Sec-Fetch-Site': 'cross-site' },
+    { ...worker, 'Sec-Fetch-Dest': 'iframe' },
+    { ...worker, 'Sec-Purpose': 'prefetch' },
+  ]) {
+    await (await ask(headers)).text()
+    expect(await orm.$count(previewLaunches)).toBe(0)
+  }
+  const r = await ask(worker)
+  expect(r.status).toBe(200)
+  expect(r.headers.get('Cache-Control')).toContain('no-store')
+  const { action } = await launchOf(r)
+  expect(action).toContain(originOf(next))
+  expect(await orm.$count(previewLaunches)).toBe(1)
+})
+
 test('F02-AC25: Given an author who opens the viewer again and again, When many tokens are unused, Then only the newest few are kept', async () => {
   await seedDeck(db, 'talk')
   await seedDeployment(db, 'talk')

@@ -2,6 +2,7 @@ import {
   CONTENT_ORIGIN_HEADER,
   EVICT_CACHE,
   isVersionOrigin,
+  REPLAYED_DEST_HEADER,
   SHELL_SCRIPT_PATH,
   STATIC_CACHE,
   STORED_AT_HEADER,
@@ -119,6 +120,20 @@ async function forgetIfSuperseded(
 }
 
 /**
+ * The request the service is asked with for a move to a share URL. A move to
+ * the page itself names what it was for (see REPLAYED_DEST_HEADER), so the
+ * service answers the author as it does without a worker: with their own
+ * view of a version only they may open (F02-AC18, AC29, AC36). A move inside
+ * a frame is asked as it is.
+ */
+export function replayOf(request: Request): Request {
+  if (request.destination !== 'document') return request
+  const headers = new Headers(request.headers)
+  headers.set(REPLAYED_DEST_HEADER, 'document')
+  return new Request(request, { headers })
+}
+
+/**
  * Answers a move to a share URL (D-91 to D-93): the service first, always.
  * What it sends is shown as it is; the viewer is the service's own page, made
  * for this reader, and is never kept. Only when the service does not answer
@@ -134,7 +149,7 @@ export async function respondViewer(
   const key = `${deps.origin}${recordPath(new URL(request.url).pathname)}`
   let answer: Response
   try {
-    answer = await deps.ask(request)
+    answer = await deps.ask(replayOf(request))
   } catch {
     return (await keptShell(deps, key).catch(() => null)) ?? Response.error()
   }

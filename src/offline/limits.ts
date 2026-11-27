@@ -23,6 +23,14 @@ export const MANAGEMENT_EVICT_PATH = '/_offline/evict'
 export const WORKER_ASSET_PATH = '/offline-sw.js'
 export const CLIENT_ASSET_PATH = '/offline-client.js'
 
+/**
+ * The header in which the viewer's worker names what a navigation was for,
+ * when it asks the service for it. A request a worker makes reaches the
+ * service as `Sec-Fetch-Dest: empty` in every browser, as a script's fetch
+ * does, so without it the service cannot tell the author opening the page.
+ */
+export const REPLAYED_DEST_HEADER = 'X-Slide-Replayed-Dest'
+
 /** The header that carries when a stored response was last fetched (ms since the epoch). */
 export const STORED_AT_HEADER = 'X-Slide-Stored-At'
 

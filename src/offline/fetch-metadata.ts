@@ -16,3 +16,25 @@ export function mayAnswerEviction(
     return false
   return true
 }
+
+/**
+ * What a request was made for: its `Sec-Fetch-Dest`, or, for a navigation the
+ * viewer's worker asked the service for, what the worker says the navigation
+ * was for. The worker is only believed where a worker's own request is the
+ * one that can carry the header: `empty`, from the same origin. Another site
+ * cannot send it with the reader's cookie (it is not a safelisted header),
+ * and only a document is named: nothing else is answered differently.
+ */
+export function destinationOf(
+  request: Readonly<{
+    dest: string | undefined
+    site: string | undefined
+    replayed: string | undefined
+  }>,
+): string | undefined {
+  const fromWorker =
+    request.dest === 'empty' &&
+    request.site === 'same-origin' &&
+    request.replayed === 'document'
+  return fromWorker ? 'document' : request.dest
+}

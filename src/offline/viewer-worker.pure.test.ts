@@ -3,6 +3,7 @@ import {
   CONTENT_ORIGIN_HEADER,
   EVICT_CACHE,
   OFFLINE_MAX_AGE_MS,
+  REPLAYED_DEST_HEADER,
   SHELL_SCRIPT_PATH,
   STATIC_CACHE,
   STORED_AT_HEADER,
@@ -13,6 +14,7 @@ import {
   installScript,
   isShellScript,
   isViewerNavigation,
+  replayOf,
   respondScript,
   respondViewer,
   type ViewerWorkerDeps,
@@ -429,5 +431,44 @@ describe("the shell's script", () => {
 
   test("Given nothing kept and no connection, Then the failure is the browser's own", async () => {
     expect((await respondScript(w.deps, askScript())).type).toBe('error')
+  })
+})
+
+describe('what the service is asked with', () => {
+  const moveFor = (destination: string) => {
+    const request = new Request(`${ORIGIN}/@a/talk?v=1`, {
+      headers: { 'Accept-Language': 'ja' },
+    })
+    Object.defineProperty(request, 'destination', { value: destination })
+    return request
+  }
+
+  test('F02-AC29: Given a move to the page itself, When the service is asked, Then the request says it is for a document, and is otherwise the same', async () => {
+    const w = world()
+    const asked: Request[] = []
+    w.state.service = (request) => (asked.push(request), viewerPage())
+    await respondViewer(w.deps, moveFor('document'))
+    expect(asked).toHaveLength(1)
+    expect(asked[0]?.headers.get(REPLAYED_DEST_HEADER)).toBe('document')
+    expect(asked[0]?.url).toBe(`${ORIGIN}/@a/talk?v=1`)
+    expect(asked[0]?.method).toBe('GET')
+    expect(asked[0]?.headers.get('Accept-Language')).toBe('ja')
+  })
+
+  test.each(['iframe', 'frame', 'embed', 'object', ''])(
+    'F02-AC25: Given a move that is not to the page itself (%s), When the service is asked, Then the request is the same one, naming nothing',
+    (destination) => {
+      const request = moveFor(destination)
+      expect(replayOf(request)).toBe(request)
+      expect(request.headers.has(REPLAYED_DEST_HEADER)).toBe(false)
+    },
+  )
+
+  test('F02-AC25: Given a move that already names a destination, When the service is asked, Then the worker says what it saw', () => {
+    const request = new Request(`${ORIGIN}/@a/talk`, {
+      headers: { [REPLAYED_DEST_HEADER]: 'iframe' },
+    })
+    Object.defineProperty(request, 'destination', { value: 'document' })
+    expect(replayOf(request).headers.get(REPLAYED_DEST_HEADER)).toBe('document')
   })
 })
