@@ -1,8 +1,8 @@
 # suraido.js fixture
 
 A real output of [suraido.js](https://github.com/L4Ph/suraido), used by
-`src/preview/real-tools.browser.test.ts` (#694). The tests record what the
-service does with it now; the spec has not decided what it should do.
+`src/preview/real-tools.browser.test.ts` (#694). The tests check that a page
+number in the address opens that page and follows the reader (F03-AC184 to F03-AC186).
 
 - Source: `src/index.tsx` (five pages, each with a word of its own), made from
   the `create-suraido@0.4.2` template without its web font, which is fetched

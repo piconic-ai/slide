@@ -117,38 +117,19 @@ const TOOLS = [
 ]
 
 /**
- * Tools whose way of keeping the page the service's rules do not cover
- * (#694, open question 2). Their tests record what happens now; they do not
- * say what should happen. `apart` lists output files left out of the upload.
- */
-const RECORDED: {
-  slug: string
-  dir: string
-  apart: string[]
-  seen: Observed
-}[] = [
-  // suraido.js counts pages from 0 in the fragment (#3 is the fourth page),
-  // and writes it with history.replaceState as the reader turns pages.
-  {
-    slug: 'suraido',
-    dir: 'suraido',
-    apart: [],
-    seen: {
-      opened: ['delta'],
-      openedFrame: '/#3',
-      turned: ['echo'],
-      turnedFrame: '/#4',
-      address: '/@owner/suraido/4',
-    },
-  },
-]
-
-/**
  * reveal.js outputs, each as a slide of its own (the variants of
  * scripts/fixtures/tools/revealjs). They differ in how the page initializes
  * reveal.js: its defaults, which do not write the address; `hash: true`,
  * which writes it from 0; `hashOneBasedIndex: true`, which counts from 1.
  */
+const SURAIDO = [
+  { slug: 'suraido', dir: 'suraido', apart: [] },
+  // The same output without the class of its built-in layout (<Pad>): its
+  // own elements carry no class of its name, as slides that write plain HTML
+  // do not (the bundle's one word of it is changed; nothing else is).
+  { slug: 'suraido-plain', dir: 'suraido', apart: [], plain: true },
+]
+
 const SLIDEV = [
   // `_redirects` is left out of the upload until the service takes a build
   // with it as it is (#710); it is no part of what is checked here.
@@ -177,13 +158,25 @@ const REVEAL = [
   },
 ]
 
-/** What a reader sees of slides of one of these tools, opened at page 3. */
-type Observed = {
-  opened: string[]
-  openedFrame: string
-  turned: string[]
-  turnedFrame: string
-  address: string
+/** The files of a tool's built output, as they are put up. */
+async function builtOf(tool: {
+  dir?: string
+  dist?: string
+  apart?: string[]
+  plain?: boolean
+}) {
+  const dir = tool.dist ? `revealjs/${tool.dist}` : `${tool.dir}/dist`
+  const built = await readBuilt(join(TOOLS_DIR, dir))
+  for (const path of tool.apart ?? []) built.delete(path)
+  if (tool.plain) {
+    for (const [path, bytes] of built)
+      if (path.endsWith('.js'))
+        built.set(
+          path,
+          Buffer.from(bytes.toString().replaceAll('suraido-pad', 'pad-plain')),
+        )
+  }
+  return built
 }
 
 let browser: Browser
@@ -196,13 +189,11 @@ beforeAll(async () => {
   await signIn(env)
   for (const [index, tool] of [
     ...TOOLS,
-    ...RECORDED,
+    ...SURAIDO,
     ...REVEAL,
     ...SLIDEV,
   ].entries()) {
-    const dir = 'dist' in tool ? `revealjs/${tool.dist}` : `${tool.dir}/dist`
-    const built = await readBuilt(join(TOOLS_DIR, dir))
-    for (const path of 'apart' in tool ? tool.apart : []) built.delete(path)
+    const built = await builtOf(tool)
     const id = await seedPublic(db, tool.slug, index + 1, tool.slug)
     inventories.set(tool.slug, await store(id, built))
   }
@@ -245,7 +236,7 @@ async function withPage(use: (page: Page) => Promise<void>) {
   }
 }
 
-test.each([...TOOLS, ...RECORDED, ...REVEAL, ...SLIDEV])(
+test.each([...TOOLS, ...SURAIDO, ...REVEAL, ...SLIDEV])(
   'F22-AC6: Given the $slug fixture, When it is read as an upload, Then it is within the limits of one version',
   ({ slug }) => {
     const inventory = inventories.get(slug)!
@@ -372,6 +363,35 @@ test('F03-AC191, F03-AC192: Given the real output of Slidev, When the reader ope
     await page.waitForURL((url) => url.pathname === '/@owner/slidev/3')
   })
 }, 60000)
+
+test.each(['suraido', 'suraido-plain'])(
+  'F03-AC184, F03-AC185, F03-AC186: Given the real output of suraido.js (%s), When the reader opens /@owner/<slug>/3, turns to page 4 and back to page 1, Then page 3 shows with the address at 3, then /4, then no number',
+  async (slug) => {
+    await withPage(async (page) => {
+      await page.goto(`${TEST_ORIGIN}/@owner/${slug}/3`)
+      const deck = page.frameLocator('iframe#deck')
+      await expect
+        .poll(() => wordsShown(deck), { timeout: 20000 })
+        .toEqual(['charlie'])
+      // Settled: the slides were recognised and moved on to page 3, if they
+      // showed another first (the address is not the slides' to change).
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+      expect(await wordsShown(deck)).toEqual(['charlie'])
+      expect(addressOf(page)).toBe(`/@owner/${slug}/3`)
+      await pressInDeck(page, 'ArrowRight')
+      await expect
+        .poll(() => wordsShown(deck), { timeout: 20000 })
+        .toEqual(['delta'])
+      await page.waitForURL((url) => url.pathname === `/@owner/${slug}/4`)
+      for (let back = 0; back < 3; back++) await pressInDeck(page, 'ArrowLeft')
+      await expect
+        .poll(() => wordsShown(deck), { timeout: 20000 })
+        .toEqual(['alpha'])
+      await page.waitForURL((url) => url.pathname === `/@owner/${slug}`)
+    })
+  },
+  60000,
+)
 
 /** The page of each slide of the vertical fixtures, by the word it shows. */
 const PAGE_OF_WORD: Record<string, number> = {
@@ -545,44 +565,6 @@ test('F03-AC190: Given the real output of reveal.js whose page 3 shows its lines
 
 const RECORD_NOTE =
   'A record of what happens now, not an expectation: the spec has not decided how these slides should behave (#694, open question 2)'
-
-test.each(RECORDED)(
-  `${RECORD_NOTE}. Given the real output of $slug, When the reader opens /@owner/$slug/3 and presses the right arrow once, Then the slides and addresses are as recorded`,
-  async ({ slug, seen }) => {
-    await withPage(async (page) => {
-      await page.goto(`${TEST_ORIGIN}/@owner/${slug}/3`)
-      const deck = page.frameLocator('iframe#deck')
-      await expect
-        .poll(() => wordsShown(deck), { timeout: 20000 })
-        .not.toEqual([])
-      // Let the slides settle where they redirect themselves.
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-      expect({
-        opened: await wordsShown(deck),
-        openedFrame: frameAt(page),
-      }).toEqual({ opened: seen.opened, openedFrame: seen.openedFrame })
-      // A key as the reader presses it: the frame holds the focus. An event
-      // sent to the frame would reach tools that listen twice, twice.
-      await page.locator('iframe#deck').focus()
-      await page
-        .frames()
-        .find((frame) => frame.url().includes('.content.example'))!
-        .evaluate(() => window.focus())
-      await page.keyboard.press('ArrowRight')
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-      expect({
-        turned: await wordsShown(deck),
-        turnedFrame: frameAt(page),
-        address: new URL(page.url()).pathname,
-      }).toEqual({
-        turned: seen.turned,
-        turnedFrame: seen.turnedFrame,
-        address: seen.address,
-      })
-    })
-  },
-  60000,
-)
 
 test(`${RECORD_NOTE}. Given Slidev's output as built, When it is read as an upload, Then \`_redirects\` is refused as a file type, and the rest is within the limits of one version (F22-AC6)`, async () => {
   const built = await readBuilt(join(TOOLS_DIR, 'slidev', 'dist'))

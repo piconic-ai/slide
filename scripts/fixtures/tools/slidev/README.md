@@ -1,8 +1,8 @@
 # Slidev fixture
 
 A real output of [Slidev](https://sli.dev), used by
-`src/preview/real-tools.browser.test.ts` (#694). The tests record what the
-service does with it now; the spec has not decided what it should do.
+`src/preview/real-tools.browser.test.ts` (#694). The tests check that a page
+number in the address opens that page and follows the reader (F03-AC191 and F03-AC192).
 
 - Source: `slides.md` (five pages, each with a word of its own).
 - Tool and version: `@slidev/cli@53.2.0` with `@slidev/theme-default@0.25.0`,

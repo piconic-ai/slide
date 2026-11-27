@@ -202,7 +202,7 @@ iOS Safari・Android Chrome の実機と、本番の Cloudflare 経由での表�
 
 ### ツールごとの読み替え
 
-reveal.js の読み替え(縦のスライドを含む。#709)と、Slidev の読み替え(#711。下の「Slidev」)を実装した。suraido.js は未実装である。以降は、実装した部分と、実装の前に調べたことを分けて書く。
+reveal.js の読み替え(縦のスライドを含む。#709)と、Slidev の読み替え(#711。下の「Slidev」)と、suraido.js の読み替え(#713。下の「suraido.js」)を実装した。以降は、実装した部分と、実装の前に調べたことを分けて書く。
 
 #### 実装したもの(reveal.js)
 
@@ -222,6 +222,14 @@ reveal.js の読み替え(縦のスライドを含む。#709)と、Slidev の読
 - 開くとき: Slidev の router は path を読み、`/` を `/1` に送り、fragment を捨てる。そこで、渡されたページ(`#3`)があり、path が `/` のときだけ、`history.replaceState` で path を `/3` にする(network の要求は起きない)。`?` 以降は残す。
 - 表示中のページ: path の `/N`(1 始まり)。`/` は 1。`/presenter/3`、`/overview`、`/entry` などは何も伝えない。fragment が `#/` で始まるとき(`routerMode: hash`)も、何も伝えない(仕様の未決事項。これまでどおり読む)。
 - **確かめて、止まっていること(#711 の「確認」)**: Slidev は、めくると枠の path を `/4` に書き換える。版の origin の `/4` にファイルはないので、枠が `/4` のまま文書として読み込まれると 404 になる。実物(ローカルの Worker、公開した版)で viewer を開き、2 回めくったあと、viewer を読み込み直し、履歴を戻り、進めた結果: **Chromium では、履歴を戻る(`page.goBack()`)と、枠が `/4` を文書として読み込み、404(`Not found`)になる**(進めても `/5` で 404)。viewer の読み込み直しは、枠が `/#5` から開き直されるので、404 にならない。Firefox では、読み込み直し、戻る、進むのどれでも 404 にならない。WebKit は、手元の実行が終わらず、確かめられていない。仕様の「作らないこと」に関わる(どの path でも `index.html` を返すと、転送の再現になる)ので、足さない。**2026-11-28 に、依頼者が、制限として受け入れると決めた**。ヘルプの「ページ番号の決まりを知る」(`sharing/page-numbers`)に、事実のまま書いた。viewer 側で、履歴の移動後に枠が 404 にならないようにすることは、別の issue([#723](https://github.com/piconic-ai/slide/issues/723))で扱う。
+
+#### 実装したもの(suraido.js)
+
+- 判定(実行時): ビルドした `index.html` に印がない(`<div id="root">` と、名前に hash の付いた script と CSS だけ)ので、動き出した後に判定する。deck 自身が実行時に設定する、次の 2 つがそろったとき、suraido.js の出力と判定する。(1) root の inline style に `--suraido-scale` がある(deck が、window に合わせて大きさを決める `fit()` で書く)。(2) root の CSS のカスタムプロパティ `--suraido-fg` と `--suraido-bg` が空でない(テーマの CSS。`getComputedStyle`)。片方だけでは判定しない(テーマの CSS にその名前が書いてあるだけの手書きのスライド、script が `--suraido-scale` だけを書く手書きのスライドを読み替えない。F03-AC195。`page-script.browser.test.ts`)。スライド自身の要素は見ない: 組み込みの layout(`<Pad>`。class `suraido-pad`)を使わず、通常の HTML だけを返すスライドには、suraido.js の名前の class も `data-suraido-*` の属性もないため、判定の条件にすると、そのスライドが読み替えられない(#724 の Pullfrog の指摘。実物の bundle から `suraido-pad` を変えた出力で再現し、テストに足した。`suraido-plain`)。
+- 判定する時点: `MutationObserver`(DOM が足されるたびと、root の style が変わるたび)、document の `load` event(capture。CSS の `<link>` が読み終わったとき)、window の `load` の 3 つで試す。判定できたら、observer をやめる。
+- 開くとき: suraido.js は、起動のときと `hashchange` のときに、fragment を 0 始まりの番号として読む(`#2` が 3 ページ目)。判定できたとき、渡されたページ(`#3`)があり、fragment が、そのページを 0 始まりで書いたもの(`#2`)でなければ、`location.replace` で fragment を `#2` に直す。`hashchange` が起き、suraido.js が 3 ページ目へ移る。
+- 表示中のページ: fragment の `#N`(0 または 1〜9998)に 1 を足す。`#0` は 1 ページ目で、アドレスバーはページ番号のない形になる(F03-AC186)。名前を付けたページ(`#intro`)とステップ(`#2.1`)は、何も伝えない(仕様の未決事項。これまでどおり)。
+- 見え方の実測(Chromium、実物の出力、ローカルの Worker。CSS と bundle の読み込みを 0〜900ms 遅らせた 4 通り): 判定が済むまで、suraido.js は渡された `#3` を 0 始まりで読み、4 ページ目を作る。DOM の上では、4 ページ目の文字が、**4〜16ms の間**だけ出て、そのあと 3 ページ目に直る(CSS が先に読まれ、bundle が遅いときが 16ms で、1 フレームに当たる。描画されたかは、DOM の記録だけでは確かめていない)。viewer へ伝えた番号は、どの通りでも `[3]` だけで、アドレスバーは 1 度も `/4` にならなかった(判定の前の通知は、渡された `#3` を 1 始まりで読んだ値で、正しい)。Firefox・WebKit でも、開く、めくる、1 ページ目へ戻る(`/3` → `/4` → 番号なし)が、期待どおりに動いた。
 
 #### 実装の前に調べたこと
 
@@ -248,7 +256,7 @@ reveal.js の読み替え(縦のスライドを含む。#709)と、Slidev の読
 - ページの画像の撮影は、版の origin を最上位の文書として開く。埋め込みの枠では、スライドの親(埋め込みのページ)が最上位の文書でない。いまの script は、どちらでも何もしない(`parent === window || parent !== top`)。F03-AC194 と F03-AC198 には、そこでも、開くときの読み替えが要る(ページを伝えることは、これまでどおりしない)。
 - 読み替えが入る前に撮ったページの画像は、ずれたページを写している。撮り直すには、撮影の cache の key に入る版(`src/covers/shot.ts` の `PAGE_SHOT_REVISION`)を上げる。
 - Slidev は、めくると枠の path を `/4` に書き換える。版の origin の `/4` にファイルはないので、枠がその URL のまま文書を読み込み直すと 404 になる。viewer を読み込み直したときや、履歴を戻ったときに、ブラウザが枠の URL を復元するかを、3 つのブラウザで確かめる。
-- #703、#706、#707 が足したテスト(`src/preview/real-tools.browser.test.ts` の `RECORDED`)は、上の表の動きを「現状の記録」として固定している。読み替えを足す PR で、そのツールの行を、受け入れ条件の ID を持つ、期待を確かめるテストに置き換える(reveal.js の行は、#709 で置き換えた)。
+- #703、#706、#707 が足したテスト(`src/preview/real-tools.browser.test.ts` の `RECORDED`)は、上の表の動きを「現状の記録」として固定している。読み替えを足す PR で、そのツールの行を、受け入れ条件の ID を持つ、期待を確かめるテストに置き換える(reveal.js の行は #709 で、Slidev の行は #711 で、suraido.js の行は #713 で置き換え、`RECORDED` はなくなった)。
 
 ## 外部との通信
 

@@ -151,6 +151,40 @@ export const pageScript = (viewerOrigin: string) => `(() => {
     observer.disconnect()
   })
   startSlidev()
+  // suraido.js. Nothing in its built index.html says what made it, so it is
+  // recognised once it runs, by what the deck itself sets: it writes its
+  // scale to the root's own style as --suraido-scale when it fits itself to
+  // the window, and its theme gives the root --suraido-fg and --suraido-bg.
+  // Both are needed: a stylesheet or a script may name one by chance, and a
+  // slide's own elements carry no mark of its name unless it uses the
+  // built-in layout, so they are not looked at. It reads the fragment as a
+  // number from 0 on start and on hashchange, so once it is recognised the
+  // page asked for is put there, as a number from 0.
+  const isSuraido = () => {
+    const root = document.documentElement
+    if (root.style.getPropertyValue('--suraido-scale').trim() === '') return false
+    const style = getComputedStyle(root)
+    return style.getPropertyValue('--suraido-fg').trim() !== '' && style.getPropertyValue('--suraido-bg').trim() !== ''
+  }
+  const startSuraido = () => {
+    if (tool || !isSuraido()) return
+    tool = { pageOf: () => suraidoPageIn(location.hash) }
+    if (requested !== null && suraidoPageIn(location.hash) !== requested)
+      location.replace(location.pathname + location.search + suraidoHashOf(requested))
+    tell()
+  }
+  const suraidoWatch = new MutationObserver(() => {
+    startSuraido()
+    if (tool) suraidoWatch.disconnect()
+  })
+  // The scale is written to the root's style, which is no change of its children.
+  suraidoWatch.observe(document, { childList: true, subtree: true, attributes: true, attributeFilter: ['style'] })
+  // A stylesheet that loads after the page was built sets the properties.
+  document.addEventListener('load', startSuraido, true)
+  addEventListener('load', () => {
+    startSuraido()
+    suraidoWatch.disconnect()
+  })
   addEventListener('hashchange', tell)
   addEventListener('popstate', tell)
   tell()

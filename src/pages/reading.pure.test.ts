@@ -10,9 +10,13 @@ const {
   slideOfPage,
   slidevPageIn,
   slidevPathOf,
+  suraidoPageIn,
+  suraidoHashOf,
 } = new Function(
-  `${READING_SOURCE}; return { numberOf, pageIn, requestedIn, pageOfSlide, slideOfPage, slidevPageIn, slidevPathOf }`,
+  `${READING_SOURCE}; return { numberOf, pageIn, requestedIn, pageOfSlide, slideOfPage, slidevPageIn, slidevPathOf, suraidoPageIn, suraidoHashOf }`,
 )() as {
+  suraidoPageIn: (hash: string) => number | null
+  suraidoHashOf: (page: number) => string
   slidevPageIn: (pathname: string, hash: string) => number | null
   slidevPathOf: (page: number) => string
   numberOf: (text: string) => number | null
@@ -214,4 +218,44 @@ describe('slidevPageIn and slidevPathOf: Slidev keeps the page in the path', () 
   it('F03-AC191: Given a page asked for, When its path is made, Then it is the path Slidev reads', () => {
     expect(slidevPathOf(3)).toBe('/3')
   })
+})
+
+describe('suraidoPageIn and suraidoHashOf: suraido.js counts from 0 in the fragment', () => {
+  it.each([
+    ['#0', 1],
+    ['#2', 3],
+    ['#3', 4],
+    ['#9998', 9999],
+  ])(
+    'F03-AC184, F03-AC185, F03-AC186: Given the fragment %j, When it is read, Then the page is %j',
+    (hash, page) => {
+      expect(suraidoPageIn(hash)).toBe(page)
+    },
+  )
+
+  it.each([
+    '',
+    '#',
+    '#9999',
+    '#10000',
+    '#02',
+    '#-1',
+    '#1.5',
+    '#2.1',
+    '#intro',
+    '#/2',
+    '#2 ',
+  ])(
+    'Given the fragment %j (a name, a step, or no page), When it is read, Then nothing is told',
+    (hash) => {
+      expect(suraidoPageIn(hash)).toBeNull()
+    },
+  )
+
+  it.each([1, 3, 4, 9999])(
+    'F03-AC184: Given page %i, When its fragment is made, Then reading it gives the page back',
+    (page) => {
+      expect(suraidoPageIn(suraidoHashOf(page))).toBe(page)
+    },
+  )
 })
