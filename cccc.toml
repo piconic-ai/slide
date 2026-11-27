@@ -1,4 +1,8 @@
 languages = ["es", "python"]
 max-cognitive = 15
 table = true
-exclude = ["dist/**", "public/components/**"]
+exclude = [
+  "dist/**",
+  "public/components/**",
+  "scripts/fixtures/tools/*/dist/**",
+]

@@ -11,6 +11,7 @@
     "docs/",
     "**/*.md",
     "**/*.mdx",
-    ".pedit/"
+    ".pedit/",
+    "scripts/fixtures/tools/*/dist/"
   ]
 }
