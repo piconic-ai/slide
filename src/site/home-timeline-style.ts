@@ -76,7 +76,7 @@ export const timelineStyle = html`<style>
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-top: 8px;
+    margin-top: 0;
   }
   /* The link to the viewer: a 44px target around a 36px round icon. */
   .icon-link {
