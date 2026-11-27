@@ -57,22 +57,32 @@ function showBand() {
 }
 
 let listening = false
+let current: {
+  frameOf: () => { frame: HTMLIFrameElement; origin: string } | null
+  onState: (origin: string) => void
+} | null = null
 
-/** Listens once for the frame's words and the band's button; the page they are about is found as they come. */
+/**
+ * Listens once for the frame's words and the band's button. The page they are
+ * about, and what is done with them, are those of the latest call: the router
+ * mounts the next viewer in the same document, and it must not be heard with
+ * the first one's frame and state.
+ */
 function listen(
   frameOf: () => { frame: HTMLIFrameElement; origin: string } | null,
   onState: (origin: string) => void,
 ) {
+  current = { frameOf, onState }
   if (listening) return
   listening = true
   addEventListener('message', (event) => {
-    const slides = frameOf()
+    const slides = current?.frameOf()
     if (!slides || event.source !== slides.frame.contentWindow) return
     if (event.origin !== slides.origin) return
     const data = event.data as { type?: unknown; state?: unknown } | null
     if (data?.type === OFFLINE_MESSAGE.stored) showBand()
     else if (data?.type === OFFLINE_MESSAGE.state && data.state === 'stored')
-      onState(slides.origin)
+      current?.onState(slides.origin)
   })
   document.addEventListener('click', (event) => {
     if (

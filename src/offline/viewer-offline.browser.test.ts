@@ -480,6 +480,30 @@ test('F37-AC9: Given a viewer opened once, When the frame says it is stored agai
   })
 })
 
+test('F37-AC6: Given a viewer opened once, When the router mounts the same deck again in the same document, Then its shell is written again for the new frame', async () => {
+  await withContext(async (context) => {
+    const page = await openKept(context)
+    const before = (await recordsOf(page)).find((r) => r.key === KEY('talk'))
+    expect(before).toBeDefined()
+    // What the router does for a page it moves to: a new frame, and the
+    // viewer's script started again for it, in the document that stays.
+    // A string, so the test runner leaves the page's own import alone.
+    await page.evaluate(`(async () => {
+      const old = document.querySelector('iframe#deck')
+      old.replaceWith(old.cloneNode(false))
+      const offline = await import('/offline-client.js')
+      offline.startViewer(document)
+    })()`)
+    await expect
+      .poll(
+        async () =>
+          (await recordsOf(page)).find((r) => r.key === KEY('talk'))?.storedAt,
+        { timeout: 30_000 },
+      )
+      .toBeGreaterThan(before?.storedAt ?? Infinity)
+  })
+})
+
 test('F37-AC9: Given a viewer opened once, When the service answers 403 for the deck, Then the deck is forgotten and nothing stored shows', async () => {
   await withContext(async (context) => {
     const page = await openKept(context)
