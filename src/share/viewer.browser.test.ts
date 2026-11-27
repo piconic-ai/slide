@@ -536,10 +536,25 @@ test('F24-AC9: Given the viewer’s script starts after the deck has loaded, Whe
   )
 }, 20000)
 
+/**
+ * Opens the viewer of the talk and says so when the service did not answer
+ * it. A viewer that failed to read its data (a 500) has no frame, and a wait
+ * for the frame's content would run to the end of the test's time; the
+ * status says what happened at once.
+ */
+async function openTalk(page: Page) {
+  const response = await page.goto(`${TEST_ORIGIN}/@owner/talk`)
+  const status = response?.status()
+  if (status !== 200)
+    throw new Error(
+      `The viewer answered ${status}: ${(await response?.text())?.slice(0, 200)}`,
+    )
+}
+
 test('F24-AC10: Given a deck that asks the viewer to open a path itself, When the viewer hears it, Then the viewer stays where it is', async () => {
   await withContext({}, async (context) => {
     const page = await context.newPage()
-    await page.goto(`${TEST_ORIGIN}/@owner/talk`)
+    await openTalk(page)
     const title = page.frameLocator('iframe').locator('#title')
     await expect.poll(() => title.textContent()).toBe('Deck')
     await title.evaluate(() => {
@@ -560,7 +575,7 @@ test.each([
   async (_, link) => {
     await withContext({}, async (context) => {
       const page = await context.newPage()
-      await page.goto(`${TEST_ORIGIN}/@owner/talk`)
+      await openTalk(page)
       const frame = page.frameLocator('iframe')
       await expect
         .poll(() => frame.locator('#probes').textContent())
