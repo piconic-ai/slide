@@ -254,7 +254,7 @@ async function waitForHeader(page: Page) {
     .toBe(1)
 }
 
-test('F03-AC49, F03-AC50: Given a signed-in author, When they move between the top page, the profile, the slides, a slide, settings and help by links, Then no page is loaded whole and the header is the same element throughout', async () => {
+test('F03-AC49, F03-AC50: Given a signed-in author, When they move between the profile, the slides, a slide, settings and help by links, Then only a move to the top page loads a page whole (F44-AC31), and the header is the same element throughout the others', async () => {
   await withPage(ownerSession, async (page, _context, errors) => {
     await page.goto(`${TEST_ORIGIN}/`)
     await waitForHeader(page)
@@ -270,6 +270,14 @@ test('F03-AC49, F03-AC50: Given a signed-in author, When they move between the t
     for (const [expected, move] of walk) {
       await move()
       await expect.poll(() => path(page), SETTLE).toBe(expected)
+      if (expected === '/') {
+        // The top page alone may frame the embed pages, so it is loaded
+        // whole, under its own policy (F44-AC31); then the walk goes on.
+        await waitForHeader(page)
+        expect((await kept(page)).document).toBe(false)
+        await mark(page)
+        continue
+      }
       expect(await kept(page)).toEqual({
         document: true,
         header: true,
@@ -700,7 +708,8 @@ test('F03-AC68: Given moves between the top page and the page of the slides, Whe
       await choose.click()
       await chooser
     }
-    expect((await kept(page)).document).toBe(true)
+    // The moves to the top are page loads (F44-AC31), the others are not.
+    expect((await kept(page)).document).toBe(false)
   })
 }, 60000)
 
@@ -943,3 +952,35 @@ test('F03-AC72: Given an author’s slides that are not public, When they follow
     expect(launches).toHaveLength(1)
   })
 }, 60000)
+
+test.each(['/help', '/terms', '/contact'])(
+  'F44-AC31: Given the page %s, When the reader moves to the top page and back, Then the move to the top loads the page whole, under the top policy that frames the embed pages, and the move away does not load a page',
+  async (from) => {
+    await withPage(ownerSession, async (page) => {
+      await page.goto(`${TEST_ORIGIN}${from}`)
+      await waitForHeader(page)
+      await mark(page)
+      await follow(page, 'a.brand')
+      await expect.poll(() => path(page), SETTLE).toBe('/')
+      await waitForHeader(page)
+      // A page load: the mark of the document before it is gone.
+      expect((await kept(page)).document).toBe(false)
+      // The top page's own policy is the one in force.
+      const policy = await page.evaluate(async () =>
+        (await fetch(location.href, { method: 'HEAD' })).headers.get(
+          'Content-Security-Policy',
+        ),
+      )
+      expect(policy).toContain(`frame-src ${TEST_ORIGIN}/embed/`)
+      await mark(page)
+      await follow(page, ".site-footer a[href='/terms']")
+      await expect.poll(() => path(page), SETTLE).toBe('/terms')
+      expect(await kept(page)).toEqual({
+        document: true,
+        header: true,
+        navigations: 1,
+      })
+    })
+  },
+  30000,
+)

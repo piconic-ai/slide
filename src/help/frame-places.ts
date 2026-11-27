@@ -1,6 +1,6 @@
 import type { Lang } from '../site/i18n'
 import type { HelpAim } from './aims'
-import { helpArticlePath } from './paths'
+import { helpAimPath, helpArticlePath } from './paths'
 
 /**
  * Where the service sends a reader to an article of the help from a screen
@@ -51,18 +51,6 @@ export const FRAME_HELP = {
     slug: 'before-leaving',
     ja: '退会する前にデータを残す方法(ヘルプ)',
     en: 'How to save your data before you leave (help)',
-  },
-  'deck-download': {
-    aim: 'account',
-    slug: 'export-slide',
-    ja: 'zip の受け取り方(ヘルプ)',
-    en: 'How to take the zip (help)',
-  },
-  'deck-replace': {
-    aim: 'slides',
-    slug: 'replace',
-    ja: '差し替え方(ヘルプ)',
-    en: 'How to replace slides (help)',
   },
   'deck-hidden': {
     aim: 'safety',
@@ -143,4 +131,54 @@ export type FramePlace = keyof typeof FRAME_HELP
 export const frameHelpTarget = (place: FramePlace, lang: Lang) => {
   const entry = FRAME_HELP[place]
   return { href: helpArticlePath(entry.aim, entry.slug), label: entry[lang] }
+}
+
+/**
+ * Where the `?` mark in the top right corner of a block leads. A block holds
+ * one mark. It leads to an article, or, with no slug, to the list of an aim's
+ * articles. The label is what a screen reader says for the mark.
+ */
+export const FRAME_MARKS = {
+  'deck-slide': {
+    aim: 'slides',
+    ja: 'スライドについてのヘルプ',
+    en: 'Help on slides',
+  },
+  'deck-article': {
+    aim: 'articles',
+    ja: '記事についてのヘルプ',
+    en: 'Help on the article',
+  },
+  'deck-links': {
+    aim: 'articles',
+    slug: 'related-links',
+    ja: '関連リンクについてのヘルプ',
+    en: 'Help on related links',
+  },
+  'deck-download': {
+    aim: 'account',
+    slug: 'export-slide',
+    ja: 'ダウンロードについてのヘルプ',
+    en: 'Help on downloading',
+  },
+} as const satisfies Readonly<
+  Record<
+    string,
+    Readonly<{ aim: HelpAim; slug?: string } & Record<Lang, string>>
+  >
+>
+
+export type FrameMark = keyof typeof FRAME_MARKS
+
+/** Where a mark leads and what it says in a language. */
+export const frameMarkTarget = (mark: FrameMark, lang: Lang) => {
+  const entry: Readonly<{ aim: HelpAim; slug?: string }> &
+    Record<Lang, string> = FRAME_MARKS[mark]
+  return {
+    href:
+      entry.slug === undefined
+        ? helpAimPath(entry.aim)
+        : helpArticlePath(entry.aim, entry.slug),
+    label: entry[lang],
+  }
 }

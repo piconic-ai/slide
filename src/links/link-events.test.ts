@@ -93,7 +93,7 @@ test('F29-AC3: Given a Luma site address, When the author adds it without choosi
   expect(await allEvents()).toEqual([])
 })
 
-test('F27-AC83: Given the four kinds, When the author adds a link of each by choosing it, Then each is saved with the chosen kind', async () => {
+test('F27-AC87: Given the four kinds, When the author adds a link of each by choosing it, Then each is saved with the chosen kind', async () => {
   await seedPublic(db, 'talk', 100, 'Talk')
   for (const kind of ['video', 'article', 'event', 'other'])
     expect(
@@ -102,7 +102,7 @@ test('F27-AC83: Given the four kinds, When the author adds a link of each by cho
   expect(await kindsOf()).toEqual(['video', 'article', 'event', 'other'])
 })
 
-test('F29-AC4: Given an event address, When the author chooses another kind for it, Then it is that kind and in no event', async () => {
+test('F29-AC28: Given an event address, When the author chooses another kind for it, Then it is that kind and in no event', async () => {
   await seedPublic(db, 'talk', 100, 'Talk')
   await add({
     kind: 'article',
@@ -113,7 +113,7 @@ test('F29-AC4: Given an event address, When the author chooses another kind for 
   expect(await ties()).toEqual([])
 })
 
-test('F29-AC4: Given an address of no known event shape, When the author chooses the kind event, Then it has the event of its host and path', async () => {
+test('F29-AC28: Given an address of no known event shape, When the author chooses the kind event, Then it has the event of its host and path', async () => {
   await seedPublic(db, 'talk', 100, 'Talk')
   await add({ kind: 'event', url: 'https://peatix.com/event/123/view?x=1' })
   expect(await kindsOf()).toEqual(['event'])
@@ -279,7 +279,7 @@ test('F29-AC11: Given a link in an event, When its kind is changed away from eve
   expect(await ties()).toEqual([])
 })
 
-test('F27-AC84: Given a link, When its kind is changed to event and back to other, Then each kind is the one listed', async () => {
+test('F27-AC88: Given a link, When its kind is changed to event and back to other, Then each kind is the one listed', async () => {
   await seedPublic(db, 'talk', 100, 'Talk')
   await add({
     kind: 'other',
@@ -306,7 +306,7 @@ test('F27-AC84: Given a link, When its kind is changed to event and back to othe
   expect(await ties()).toEqual([])
 })
 
-test("F27-AC84: Given another author's link, When its kind is changed or it is removed, Then nothing changes", async () => {
+test("F27-AC88: Given another author's link, When its kind is changed or it is removed, Then nothing changes", async () => {
   await seedPublic(db, 'talk', 100, 'Talk')
   await add({ url: 'https://luma.com/x1' })
   const [link] = await listLinks(db, 'talk')

@@ -1,5 +1,18 @@
 # Changelog
 
+## [v0.4.1](https://github.com/piconic-ai/slide/compare/v0.4.0...v0.4.1) - 2026-11-26
+
+- docs: タイムラインのスライドを、カードの中でめくれるようにする仕様(F44-AC27〜30、F25-AC12) by @kfly8 in https://github.com/piconic-ai/slide/pull/648
+- 初回のリリースの結果を記録する(deploy.md) by @kfly8 in https://github.com/piconic-ai/slide/pull/647
+- docs: 埋め込みの合図を ?t=compact にし、タイムラインの記録と CSP を仕様に決める by @kfly8 in https://github.com/piconic-ai/slide/pull/653
+- 初回のリリースの記録の誤りを直す(成功の run は通知を送らない) by @kfly8 in https://github.com/piconic-ai/slide/pull/652
+- 手で反映する例外(移行前の手順)を外す by @kfly8 in https://github.com/piconic-ai/slide/pull/654
+- Monitors のアラートを実際の構成に合わせて書き、メンテナンス中の 5xx の通知を記す by @kfly8 in https://github.com/piconic-ai/slide/pull/657
+- feat: 埋め込みに、下の行のない形(?t=compact)を足す by @kfly8 in https://github.com/piconic-ai/slide/pull/655
+- スライド管理の枠のヘルプを ? マークにし、関連リンクの種類を URL だけで決める by @kfly8 in https://github.com/piconic-ai/slide/pull/656
+- feat: タイムラインのカードを、表紙を押すとその中でめくれるようにする by @kfly8 in https://github.com/piconic-ai/slide/pull/660
+- スマホの viewer で全画面ボタンを出す(F03-AC183) by @kfly8 in https://github.com/piconic-ai/slide/pull/658
+
 ## [v0.4.0](https://github.com/piconic-ai/slide/compare/v0.3.0...v0.4.0) - 2026-11-26
 
 - 第四スコープ P0: 仕様を書く(F34〜F42) by @kfly8 in https://github.com/piconic-ai/slide/pull/504

@@ -648,6 +648,50 @@ test.each([
   20000,
 )
 
+test.each([
+  [390, 844],
+  [844, 390],
+])(
+  'F03-AC183: Given a %ix%i browser that cannot fullscreen an iframe, When the reader presses full screen, Then the deck fills the window and the exit button or Escape restores it',
+  async (width, height) => {
+    await withContext({ viewport: { width, height } }, async (context) => {
+      await context.addInitScript(() => {
+        Object.defineProperty(Element.prototype, 'requestFullscreen', {
+          value: undefined,
+          configurable: true,
+        })
+      })
+      const page = await context.newPage()
+      await page.goto(`${TEST_ORIGIN}/@owner/talk`)
+      const button = page.locator('[data-fullscreen]')
+      const exit = page.locator('[data-fullscreen-exit]')
+      await expect.poll(() => button.isVisible()).toBe(true)
+      expect(await exit.isVisible()).toBe(false)
+      const fills = () =>
+        page.evaluate(() => {
+          const box = document.querySelector('iframe')!.getBoundingClientRect()
+          return (
+            box.x === 0 &&
+            box.y === 0 &&
+            box.width === window.innerWidth &&
+            box.height === window.innerHeight
+          )
+        })
+      await button.click()
+      expect(await fills()).toBe(true)
+      expect(await exit.isVisible()).toBe(true)
+      await exit.click()
+      expect(await fills()).toBe(false)
+      expect(await exit.isVisible()).toBe(false)
+      await button.click()
+      expect(await fills()).toBe(true)
+      await page.keyboard.press('Escape')
+      expect(await fills()).toBe(false)
+    })
+  },
+  20000,
+)
+
 let pagedDeck: Promise<string> | undefined
 const seedPaged = () =>
   (pagedDeck ??= seedPage(

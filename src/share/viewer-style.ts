@@ -103,6 +103,39 @@ export const viewerStyle = html`<style>
     max-height: none;
     border-radius: 0;
   }
+  /*
+   * Where the browser has no Fullscreen API for an iframe (iPhone Safari),
+   * the deck fills the window instead, with a button of its own to leave.
+   */
+  .stage > iframe[data-pseudo-fullscreen]:not(:fullscreen),
+  .viewer-layout .stage > iframe[data-pseudo-fullscreen]:not(:fullscreen) {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    aspect-ratio: auto;
+    border-radius: 0;
+  }
+  .fullscreen-exit {
+    position: fixed;
+    top: max(8px, env(safe-area-inset-top));
+    right: max(8px, env(safe-area-inset-right));
+    z-index: 1001;
+    min-height: 44px;
+    padding: 0 16px;
+    border: 0;
+    border-radius: 22px;
+    background: var(--primary);
+    color: var(--primary-foreground);
+    font: inherit;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .fullscreen-exit[hidden] {
+    display: none;
+  }
   /* The title and author on the left, the three actions on the right. */
   .viewer-head {
     display: flex;
