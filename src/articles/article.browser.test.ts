@@ -466,6 +466,11 @@ test('F26-AC88, F26-AC83: Given two tabs editing the same draft, When the stale 
   await b.page.getByRole('button', { name: 'ビューアーで見る' }).click()
   await b.page.getByRole('button', { name: '編集に戻る' }).click()
   await expect.poll(() => box(b.page).inputValue()).toContain('from B')
+  // The box comes back with the HTML, but the warning is written by the
+  // deferred page script: wait for it before moving the clock on.
+  await expect
+    .poll(() => status(b.page).innerText(), { timeout: 10_000 })
+    .toContain('別のタブで更新されています')
   await b.page.clock.fastForward(6_000)
   expect(await status(b.page).innerText()).toContain(
     '別のタブで更新されています',
