@@ -176,6 +176,13 @@ const REVEAL = [
     acs: 'F03-AC187, F03-AC188, F03-AC189',
   },
   { slug: 'revealjs-fragments', dist: 'dist-fragments', acs: 'F03-AC190' },
+  // Slides one above the other: [1, 3, 1] and [2, 1, 2] slides per column.
+  { slug: 'revealjs-vertical', dist: 'dist-vertical', acs: 'F03-AC199' },
+  {
+    slug: 'revealjs-vertical-edges',
+    dist: 'dist-vertical-edges',
+    acs: 'F03-AC199',
+  },
 ]
 
 /** What a reader sees of slides of one of these tools, opened at page 3. */
@@ -322,7 +329,7 @@ const revealShown = (deck: FrameLocator) =>
     // The theme sets capitals.
     .then((text) => text.toLowerCase())
 
-test.each(REVEAL.filter(({ slug }) => slug !== 'revealjs-fragments'))(
+test.each(REVEAL.filter((_, index) => index < 3))(
   '$acs: Given the real output of reveal.js ($slug), When the reader opens /@owner/$slug/3 and turns a page, Then page 3 shows, the address stays at 3, and it becomes /4 after the turn',
   async ({ slug }) => {
     await withPage(async (page) => {
@@ -342,6 +349,137 @@ test.each(REVEAL.filter(({ slug }) => slug !== 'revealjs-fragments'))(
       await page.waitForURL((url) => url.pathname === `/@owner/${slug}/4`)
       await pressInDeck(page, 'ArrowLeft')
       await page.waitForURL((url) => url.pathname === `/@owner/${slug}/3`)
+    })
+  },
+  60000,
+)
+
+/** The page of each slide of the vertical fixtures, by the word it shows. */
+const PAGE_OF_WORD: Record<string, number> = {
+  alpha: 1,
+  bravo: 2,
+  charlie: 3,
+  delta: 4,
+  echo: 5,
+}
+const WORD_OF_PAGE = Object.keys(PAGE_OF_WORD)
+
+/** Opens the slides at a page and waits for the slide that should show. */
+async function openRevealAt(page: Page, slug: string, at: number) {
+  await page.goto(`${TEST_ORIGIN}/@owner/${slug}/${at}`)
+  const deck = page.frameLocator('iframe#deck')
+  await expect
+    .poll(() => revealShown(deck), { timeout: 20000 })
+    .toContain(WORD_OF_PAGE[at - 1])
+  // Settle: the slides are not moved on after they show the page.
+  await new Promise((resolve) => setTimeout(resolve, 800))
+  expect(await revealShown(deck)).toContain(WORD_OF_PAGE[at - 1])
+  return deck
+}
+
+// Page 1 is column 1, pages 2 to 4 are the three slides of column 2 from the
+// top, page 5 is column 3 (F03-AC199).
+test.each([
+  [1, 'alpha'],
+  [2, 'bravo'],
+  [3, 'charlie'],
+  [4, 'delta'],
+  [5, 'echo'],
+])(
+  'F03-AC199: Given the real output of reveal.js with a column of three slides, When the reader opens /@owner/revealjs-vertical/%i, Then the slide of that place in reading order shows (%s) and the address stays',
+  async (at, word) => {
+    await withPage(async (page) => {
+      const deck = await openRevealAt(page, 'revealjs-vertical', at)
+      expect(await revealShown(deck)).toContain(word)
+      // The first page has no number in the address.
+      expect(addressOf(page)).toBe(
+        at === 1
+          ? '/@owner/revealjs-vertical'
+          : `/@owner/revealjs-vertical/${at}`,
+      )
+    })
+  },
+  60000,
+)
+
+test('F03-AC200: Given the slides opened at the middle of the column, When the reader goes down, Then the address becomes /4', async () => {
+  await withPage(async (page) => {
+    const deck = await openRevealAt(page, 'revealjs-vertical', 3)
+    await pressInDeck(page, 'ArrowDown')
+    await expect
+      .poll(() => revealShown(deck), { timeout: 20000 })
+      .toContain('delta')
+    await page.waitForURL(
+      (url) => url.pathname === '/@owner/revealjs-vertical/4',
+    )
+  })
+}, 60000)
+
+test.each([
+  ['the top of the column (page 2)', 2],
+  ['the bottom of the column (page 4)', 4],
+])(
+  'F03-AC201: Given the slides opened at %s, When the reader goes right, Then the address becomes /5, past the slides of the column',
+  async (_where, at) => {
+    await withPage(async (page) => {
+      const deck = await openRevealAt(page, 'revealjs-vertical', at)
+      await pressInDeck(page, 'ArrowRight')
+      await expect
+        .poll(() => revealShown(deck), { timeout: 20000 })
+        .toContain('echo')
+      await page.waitForURL(
+        (url) => url.pathname === '/@owner/revealjs-vertical/5',
+      )
+    })
+  },
+  60000,
+)
+
+test.each([
+  [
+    'revealjs-vertical',
+    [
+      'ArrowRight',
+      'ArrowDown',
+      'ArrowDown',
+      'ArrowUp',
+      'ArrowRight',
+      'ArrowLeft',
+      'ArrowLeft',
+      'ArrowUp',
+    ],
+  ],
+  [
+    'revealjs-vertical-edges',
+    [
+      'ArrowDown',
+      'ArrowRight',
+      'ArrowRight',
+      'ArrowDown',
+      'ArrowUp',
+      'ArrowLeft',
+      'ArrowLeft',
+      'ArrowUp',
+    ],
+  ],
+])(
+  'F03-AC199, F03-AC200, F03-AC201: Given the slides %s opened at page 1, When the reader goes right, down, up and left, Then after every key the address names the place of the slide that shows, in reading order',
+  async (slug, keys) => {
+    await withPage(async (page) => {
+      const deck = await openRevealAt(page, slug, 1)
+      for (const key of keys) {
+        await pressInDeck(page, key)
+        await new Promise((resolve) => setTimeout(resolve, 900))
+        const shown = await revealShown(deck)
+        const word = WORD_OF_PAGE.find((candidate) =>
+          shown.includes(candidate),
+        )!
+        const expected =
+          PAGE_OF_WORD[word] === 1
+            ? `/@owner/${slug}`
+            : `/@owner/${slug}/${PAGE_OF_WORD[word]}`
+        expect(addressOf(page), `after ${key}, ${word} shows`).toBe(expected)
+      }
     })
   },
   60000,

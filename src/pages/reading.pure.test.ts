@@ -129,3 +129,43 @@ describe('pageOfSlide and slideOfPage: reveal.js slides in reading order', () =>
     expect(pageOfSlide([], 0, 0)).toBeNull()
   })
 })
+
+describe('pageOfSlide and slideOfPage: slides one above the other', () => {
+  // Column 1 holds one slide, column 2 three, column 3 one.
+  const columns = [1, 3, 1]
+
+  it.each([
+    [0, 0, 1],
+    [1, 0, 2],
+    [1, 1, 3],
+    [1, 2, 4],
+    [2, 0, 5],
+  ])(
+    'F03-AC199: Given columns of 1, 3 and 1 slides, When slide %i/%i is on show, Then its page is %i, and that page opens it',
+    (h, v, page) => {
+      expect(pageOfSlide(columns, h, v)).toBe(page)
+      expect(slideOfPage(columns, page)).toEqual({ h, v })
+    },
+  )
+
+  it('F03-AC201: Given the bottom of the column, When the page of the next column is asked, Then the numbers do not skip', () => {
+    expect(pageOfSlide(columns, 1, 2)).toBe(4)
+    expect(pageOfSlide(columns, 2, 0)).toBe(5)
+  })
+
+  it('Given every place of a deck, When pages are taken in order, Then each page is used once and opens its own place', () => {
+    const shape = [2, 1, 3, 1]
+    const pages: number[] = []
+    for (const [h, below] of shape.entries())
+      for (let v = 0; v < below; v++) pages.push(pageOfSlide(shape, h, v)!)
+    expect(pages).toEqual([1, 2, 3, 4, 5, 6, 7])
+    for (const page of pages)
+      expect(
+        pageOfSlide(
+          shape,
+          slideOfPage(shape, page)!.h,
+          slideOfPage(shape, page)!.v,
+        ),
+      ).toBe(page)
+  })
+})
