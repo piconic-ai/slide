@@ -117,7 +117,7 @@ export default defineArticle({
             For the first ${n.newAuthorDays} days after you register, you can
             start up to ${n.newAuthorPerDay} new slides in any
             ${n.newAuthorWindowHours} hours (<a href="/help/slides/daily-limit"
-              >When it says “You can’t put up any more today”</a
+              >When it says “You can't put up any more today”</a
             >).
           </li>
           <li>

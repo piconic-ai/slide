@@ -11,15 +11,16 @@ import { plainText } from './search'
 const numbers = helpNumbers()
 
 /** One article's lead and body in one language, as plain text and as markup. */
-const render = async (key: string, lang: Lang) => {
+const render = async (
+  key: string,
+  lang: Lang,
+  given: ReturnType<typeof helpNumbers> = numbers,
+) => {
   const [aim, slug] = key.split('/') as [HelpAim, string]
   const entry = findArticle(HELP_CATALOG, aim, slug)
   if (!entry) throw new Error(`no article ${key}`)
   const text = entry.article[lang]
-  const [lead, body] = await Promise.all([
-    text.lead(numbers),
-    text.body(numbers),
-  ])
+  const [lead, body] = await Promise.all([text.lead(given), text.body(given)])
   return {
     related: entry.article.related,
     lead: plainText(String(lead)),
@@ -161,5 +162,70 @@ describe('the article on connecting an AI agent', () => {
     const en = await render('agent/connect', 'en')
     expect(en.body).toContain('press “Publish”.')
     expect(en.body).toContain('press “Publish this version”')
+  })
+})
+
+describe('the wording of the articles that was read through', () => {
+  test.each([
+    [1, '1 day'],
+    [2, '2 days'],
+  ])(
+    'F36-AC11: Given the days the code keeps are %i, When the offline article is read in English, Then the unit follows the number',
+    async (days, shown) => {
+      const en = await render('sharing/read-offline', 'en', {
+        ...numbers,
+        offlineDays: days,
+      })
+      expect(en.lead).toContain(`${shown} without a connection`)
+      expect(en.body).toContain(`it has been ${shown} since`)
+      expect(en.body).toContain(`older than ${shown},`)
+      expect(en.body).not.toMatch(/\b[2-9] day\b/u)
+    },
+  )
+
+  test('F36-AC9: Given the article on the limit of new slides, When its English is read, Then the screen’s apostrophe is the only one, and the time is said to be at the end of the message', async () => {
+    const entry = findArticle(HELP_CATALOG, 'slides', 'daily-limit')!
+    expect(entry.article.en.title).toContain("You can't put up any more today")
+    expect(entry.article.en.title).not.toContain('can’t')
+    const en = await render('slides/daily-limit', 'en')
+    expect(en.body).not.toContain('can’t put up')
+    expect(en.body).toContain('at the end of the message')
+    const ja = await render('slides/daily-limit', 'ja')
+    expect(ja.body).toContain('と出た文章の終わりにある日時')
+    expect(ja.body).not.toContain('の下に出ている')
+  })
+
+  test('F36-AC9: Given the article on blocking, When it says what the blocked person sees, Then it is their view of your profile, as the Japanese says', async () => {
+    const en = await render('safety/block-user', 'en')
+    expect(en.body).toContain('When they open your profile')
+    expect(en.body).not.toContain('On your profile, their')
+  })
+
+  test('F36-AC9: Given every article in Japanese, When it is read, Then the browser is ブラウザ, not ブラウザー', async () => {
+    for (const entry of HELP_CATALOG) {
+      const ja = await render(entry.key, 'ja')
+      expect(`${ja.lead}${ja.body}`, entry.key).not.toContain('ブラウザー')
+    }
+  })
+
+  test('F36-AC9: Given the article on pages in an article, When it speaks of the slides of the article, Then it does not say 自分のこのスライド', async () => {
+    const ja = await render('articles/embed-page', 'ja')
+    expect(ja.body).not.toContain('自分のこのスライド')
+    expect(ja.body).toContain('この記事のスライド')
+  })
+
+  test('F36-AC9: Given the article on what an agent can do, When sign-up is invite-only, Then it says who can put slides up this way, and when sign-up is open it says nothing of an invitation', async () => {
+    const ja = await render('agent/capabilities', 'ja')
+    expect(ja.body).toContain('運営が登録したメールアドレスの人だけです')
+    expect(ja.body).not.toContain('招待制も同じです')
+    const en = await render('agent/capabilities', 'en')
+    expect(en.body).toContain(
+      'only people whose email address the operators registered',
+    )
+    const open = helpNumbers('open')
+    for (const lang of LANGS) {
+      const text = await render('agent/capabilities', lang, open)
+      expect(`${text.lead}${text.body}`).not.toMatch(/招待|invit/iu)
+    }
   })
 })

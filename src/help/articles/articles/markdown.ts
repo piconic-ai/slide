@@ -29,7 +29,7 @@ export default defineArticle({
     title: 'Know what you can write in an article',
     lead: () =>
       html`An article can use CommonMark, tables, strikethrough and autolinks.`,
-    body: (n) =>
+    body: () =>
       html`<ul>
         <li>
           CommonMark (headings, paragraphs, lists, quotes, code, links and so

@@ -88,8 +88,9 @@ export default defineArticle({
           </li>
           <li>Community follows stay as they are.</li>
           <li>
-            They are not told. On your profile, their “Follow” cannot be
-            pressed, and it only says “You can’t follow this person.”
+            They are not told that you blocked them. When they open your
+            profile, their “Follow” cannot be pressed, and it only says “You
+            can’t follow this person.”
           </li>
         </ul>
         <h2>How to unblock</h2>

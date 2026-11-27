@@ -59,7 +59,7 @@ export default defineArticle({
           ${n.newAuthorWindowHours} hours. Putting a new version on a slide you
           already have does not count. When you reach the limit, it says “You
           can't put up any more today” (<a href="/help/slides/daily-limit"
-            >When it says “You can’t put up any more today”</a
+            >When it says “You can't put up any more today”</a
           >).
         </p>`,
   },
