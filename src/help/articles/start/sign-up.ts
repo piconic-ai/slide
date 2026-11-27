@@ -4,7 +4,7 @@ import { defineArticle } from '../../article'
 export default defineArticle({
   order: 15,
   form: 'howto',
-  related: ['start/sign-in', 'start/code-not-arrived', 'safety/terms'],
+  related: ['start/sign-in', 'start/code-not-arrived', 'slides/daily-limit'],
   ja: {
     title: '登録する',
     lead: (n) =>
@@ -33,7 +33,18 @@ export default defineArticle({
         <h2>知っておくこと</h2>
         <ul>
           <li>
-            ハンドルはあとから変えられません。決めるまで、ほかの画面へは進めません。
+            ハンドルは、自分ではあとから変えられません。変える必要があるときは、運営に頼めます(<a
+              href="/help/community/ask-us"
+              >ハンドルの変更などを運営に頼む</a
+            >)。決めるまで、ほかの画面へは進めません。
+          </li>
+          <li>
+            登録から ${n.newAuthorDays}
+            日のあいだは、新しく置き始められるスライドは、直近
+            ${n.newAuthorWindowHours} 時間に ${n.newAuthorPerDay} 本までです(<a
+              href="/help/slides/daily-limit"
+              >「今日はこれ以上置けません」と出たとき</a
+            >)。
           </li>
           <li>
             同意しないときは、「登録せずに終了する」を押すと、入力したメールアドレスを削除します。
@@ -97,8 +108,17 @@ export default defineArticle({
         <h2>Good to know</h2>
         <ul>
           <li>
-            The handle cannot be changed later, and you cannot go to other pages
-            until you have chosen.
+            You cannot change the handle yourself later, but you can ask the
+            operator to (<a href="/help/community/ask-us"
+              >Ask us to change a handle and more</a
+            >). You cannot go to other pages until you have chosen.
+          </li>
+          <li>
+            For the first ${n.newAuthorDays} days after you register, you can
+            start up to ${n.newAuthorPerDay} new slides in any
+            ${n.newAuthorWindowHours} hours (<a href="/help/slides/daily-limit"
+              >When it says “You can’t put up any more today”</a
+            >).
           </li>
           <li>
             If you do not agree, press “Leave without signing up” and the email

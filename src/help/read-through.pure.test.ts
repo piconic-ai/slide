@@ -80,3 +80,41 @@ describe('the limit on new slides of a new account', () => {
     expect(en.body).toContain('does not count')
   })
 })
+
+describe('the sign-up article and the article on asking the operator', () => {
+  const limits = parseNewAuthorLimits({})
+
+  test('F36-AC52: Given the sign-up article in each language, When it is read, Then it states the limit of a new account with the code’s numbers and leads to the article on it', async () => {
+    for (const lang of LANGS) {
+      const { body, bodyHtml } = await render('start/sign-up', lang)
+      for (const figure of [
+        limits.days,
+        limits.perDay,
+        numbers.newAuthorWindowHours,
+      ])
+        expect(body, lang).toContain(String(figure))
+      expect(bodyHtml).toContain('href="/help/slides/daily-limit"')
+    }
+  })
+
+  test('F36-AC52: Given the sign-up article, When it says the handle cannot be changed, Then it says you cannot yourself and that the operator can be asked, with the link', async () => {
+    const ja = await render('start/sign-up', 'ja')
+    expect(ja.body).toContain('自分ではあとから変えられません')
+    expect(ja.body).toContain('運営に頼めます')
+    expect(ja.bodyHtml).toContain('href="/help/community/ask-us"')
+    const en = await render('start/sign-up', 'en')
+    expect(en.body).toContain('cannot change the handle yourself')
+    expect(en.body).toContain('ask the operator')
+    expect(en.bodyHtml).toContain('href="/help/community/ask-us"')
+  })
+
+  test('F36-AC52: Given the article on asking the operator, When it speaks of a handle, Then it says whose: your own, or that of a community you manage', async () => {
+    const ja = await render('community/ask-us', 'ja')
+    expect(ja.body).toContain(
+      '自分のハンドルか、自分が管理者のコミュニティのハンドル',
+    )
+    const en = await render('community/ask-us', 'en')
+    expect(en.body).toContain('your own handle')
+    expect(en.body).toContain('a community you manage')
+  })
+})

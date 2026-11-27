@@ -15,8 +15,9 @@ export default defineArticle({
     body: (n) =>
       html`<ul>
         <li>
-          ハンドルの変更。前のハンドルは ${n.handleHoldDays}
-          日の間だれも使えず、その間、前の URL は新しい URL へ移ります。
+          ハンドルの変更(自分のハンドルか、自分が管理者のコミュニティのハンドル)。前のハンドルは
+          ${n.handleHoldDays} 日の間だれも使えず、その間、前の URL は新しい URL
+          へ移ります。
         </li>
         <li>
           管理者の移し替え(グループの主催者でない人が作っていたときなど)。
@@ -32,8 +33,9 @@ export default defineArticle({
     body: (n) =>
       html`<ul>
         <li>
-          A new handle. No one can take the old one for ${n.handleHoldDays}
-          days, and meanwhile its URL moves to the new one.
+          A new handle, for your own handle or for the handle of a community you
+          manage. No one can take the old one for ${n.handleHoldDays} days, and
+          meanwhile its URL moves to the new one.
         </li>
         <li>
           Moving the admins (when someone who does not run the group made it,
