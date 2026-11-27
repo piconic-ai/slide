@@ -22,16 +22,16 @@ export default defineArticle({
         <li>
           できたスライドを「置いて」と頼むと、エージェントが
           スライドの編集の画面の URL
-          を返します。そのページで表示を確かめて、「公開する」を押します。
+          を返します。そのページで表示を確かめて、「公開する」を押します。すでに公開しているスライドに新しい版を置いたときは、「この版を公開する」を押すと、その版に入れ替わります。
         </li>
       </ol>`,
   },
   en: {
     title: 'Connect an AI agent',
-    lead: (n) =>
+    lead: () =>
       html`From an AI agent that supports MCP, such as Claude Code, you can put
       slides up without leaving the conversation.`,
-    body: (n) =>
+    body: () =>
       html`<ol>
         <li>
           Register the “MCP server URL” in “Settings”, under “Put slides up from
@@ -43,7 +43,9 @@ export default defineArticle({
         </li>
         <li>
           Ask the agent to put the finished slides up. It returns the URL of an
-          edit page. Check the slides there and press “Publish this version”.
+          edit page. Check the slides there and press “Publish”. If you put a
+          new version on slides that are already public, press “Publish this
+          version” to swap it in.
         </li>
       </ol>`,
   },

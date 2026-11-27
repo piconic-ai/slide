@@ -152,3 +152,14 @@ describe('the article on the information we keep', () => {
     expect(searchTermOf('zip')).toBe('zip')
   })
 })
+
+describe('the article on connecting an AI agent', () => {
+  test('F36-AC54: Given the article in each language, When it tells how to publish what the agent put up, Then it names the button of a first publish and the button of a new version', async () => {
+    const ja = await render('agent/connect', 'ja')
+    expect(ja.body).toContain('「公開する」を押します')
+    expect(ja.body).toContain('「この版を公開する」')
+    const en = await render('agent/connect', 'en')
+    expect(en.body).toContain('press “Publish”.')
+    expect(en.body).toContain('press “Publish this version”')
+  })
+})
