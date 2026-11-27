@@ -1,5 +1,30 @@
 # Changelog
 
+## [v0.4.6](https://github.com/piconic-ai/slide/compare/v0.4.5...v0.4.6) - 2026-11-27
+
+- fix: F37-AC4 の保存依頼を、返信が来るまで尋ね直す by @kfly8 in https://github.com/piconic-ai/slide/pull/688
+- fix: write the viewer's shell once and expose when its list is idle by @kfly8 in https://github.com/piconic-ai/slide/pull/689
+- fix: 同時 start で名前の取り合いに負けた start を upload_busy にしない (F42-AC17 の flaky) by @kfly8 in https://github.com/piconic-ai/slide/pull/692
+- test: F03-AC75 が落ちたとき、動いた行と状態を出す by @kfly8 in https://github.com/piconic-ai/slide/pull/696
+- 検証用スライドを examples から移し、ページ送りと引用先を合わせる by @kfly8 in https://github.com/piconic-ai/slide/pull/695
+- fix: 想定外のエラーのログに、原因(cause)を足す by @kfly8 in https://github.com/piconic-ai/slide/pull/697
+- fix: wait for the stale warning in F26-AC88 before moving the clock by @kfly8 in https://github.com/piconic-ai/slide/pull/691
+- トップページのカードを、表紙とアイコン付きの作者だけにする by @kfly8 in https://github.com/piconic-ai/slide/pull/701
+- Bump pullfrog/pullfrog from 0.1.138 to 0.1.143 by @dependabot[bot] in https://github.com/piconic-ai/slide/pull/704
+- fix: 遅れて始まった start を、枠が埋まっているのに busy にしない (F42-AC17 の flaky、#666) by @kfly8 in https://github.com/piconic-ai/slide/pull/698
+- test: F24-AC10 は、viewer が 200 を返さないとき、状態を添えてすぐ失敗する by @kfly8 in https://github.com/piconic-ai/slide/pull/715
+- test: say the offline state when a withdrawn deck's shell stays by @kfly8 in https://github.com/piconic-ai/slide/pull/720
+- test: F33-AC11 の timeout は、Request を保持して、signal の中止を調べる by @kfly8 in https://github.com/piconic-ai/slide/pull/722
+- 仕様: ツールごとのページの読み替えと、配信設定ファイルを受け取りで無視すること(#694 の結論) by @kfly8 in https://github.com/piconic-ai/slide/pull/708
+- peitho の実物の出力で、ページ番号つきの URL を確かめる by @kfly8 in https://github.com/piconic-ai/slide/pull/699
+- Marp の実物の出力で、ページ番号つきの URL を確かめる by @kfly8 in https://github.com/piconic-ai/slide/pull/700
+- Slidev の実物の出力で、いまの動きを記録する(期待ではない) by @kfly8 in https://github.com/piconic-ai/slide/pull/703
+- suraido.js の実物の出力で、いまの動きを記録する(期待ではない) by @kfly8 in https://github.com/piconic-ai/slide/pull/706
+- reveal.js の実物の出力で、いまの動きを記録する(期待ではない) by @kfly8 in https://github.com/piconic-ai/slide/pull/707
+- ビルドの出力の _redirects と _headers を、断らずに無いものとして受け取る by @kfly8 in https://github.com/piconic-ai/slide/pull/714
+- reveal.js のスライドで、ページ番号つきの URL を働かせる(読み替えの土台つき) by @kfly8 in https://github.com/piconic-ai/slide/pull/716
+- reveal.js の縦のスライドを、読む順の通し番号のページにする by @kfly8 in https://github.com/piconic-ai/slide/pull/717
+
 ## [v0.4.5](https://github.com/piconic-ai/slide/compare/v0.4.4...v0.4.5) - 2026-11-27
 
 - dev-loop: main に追いついていなくても、通った branch は merge してよい by @kfly8 in https://github.com/piconic-ai/slide/pull/685
