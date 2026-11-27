@@ -51,4 +51,12 @@ export const READING_SOURCE = `
     return spelled ? Number(spelled[1]) : null
   }
   const slidevPathOf = (page) => '/' + page
+
+  // suraido.js: the page is the fragment, counted from 0 (#2 is the third
+  // page, #0 the first). A name (#intro) or a step (#2.1) tells no page.
+  const suraidoPageIn = (hash) => {
+    const spelled = /^#(0|[1-9][0-9]{0,3})$/.exec(hash)
+    return spelled && Number(spelled[1]) < 9999 ? Number(spelled[1]) + 1 : null
+  }
+  const suraidoHashOf = (page) => '#' + (page - 1)
 `

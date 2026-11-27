@@ -151,6 +151,37 @@ export const pageScript = (viewerOrigin: string) => `(() => {
     observer.disconnect()
   })
   startSlidev()
+  // suraido.js. Nothing in its built index.html says what made it, so it is
+  // recognised once it runs: the page has elements whose class starts with
+  // suraido- (or that carry data-suraido-keep), and the theme's custom
+  // properties (--suraido-fg and --suraido-bg) are set on the root. One of
+  // the two alone is not enough: a stylesheet may name a property by chance.
+  // It reads the fragment as a number from 0 on start and on hashchange, so
+  // once it is recognised the page asked for is put there, as a number from 0.
+  const isSuraido = () => {
+    const marked = document.querySelector('[class^="suraido-"], [class*=" suraido-"], [data-suraido-keep]')
+    if (!marked) return false
+    const style = getComputedStyle(document.documentElement)
+    return style.getPropertyValue('--suraido-fg').trim() !== '' && style.getPropertyValue('--suraido-bg').trim() !== ''
+  }
+  const startSuraido = () => {
+    if (tool || !isSuraido()) return
+    tool = { pageOf: () => suraidoPageIn(location.hash) }
+    if (requested !== null && suraidoPageIn(location.hash) !== requested)
+      location.replace(location.pathname + location.search + suraidoHashOf(requested))
+    tell()
+  }
+  const suraidoWatch = new MutationObserver(() => {
+    startSuraido()
+    if (tool) suraidoWatch.disconnect()
+  })
+  suraidoWatch.observe(document, { childList: true, subtree: true })
+  // A stylesheet that loads after the page was built sets the properties.
+  document.addEventListener('load', startSuraido, true)
+  addEventListener('load', () => {
+    startSuraido()
+    suraidoWatch.disconnect()
+  })
   addEventListener('hashchange', tell)
   addEventListener('popstate', tell)
   tell()

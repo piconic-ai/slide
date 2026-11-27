@@ -143,6 +143,20 @@ async function decks(): Promise<Record<string, Record<string, string>>> {
           'reveal.js・Slidev・suraido.js で作るスライド',
         ),
     },
+    // Hand-written slides with one of suraido.js's signs and not the other:
+    // the theme's custom properties only, or a class of its name only. Neither
+    // is suraido.js, so the fragment is read from 1 as usual (F03-AC195).
+    'suraido-css': {
+      'index.html': page(
+        '<style>:root{--suraido-fg:#111;--suraido-bg:#fff}</style>' + inline,
+      ),
+    },
+    'suraido-class': {
+      'index.html': page(inline).replace(
+        '<h1 id="title">',
+        '<h1 class="suraido-pad" id="title">',
+      ),
+    },
     // An inline script its own policy refuses: violations are seen.
     refused: {
       'index.html': page(policy("script-src 'self'") + '<script>1</script>'),
@@ -310,6 +324,22 @@ test('F03-AC196: Given slides that only name a tool in their title and text, and
     await page.waitForURL((url) => url.pathname === '/@owner/named/4')
   })
 }, 30000)
+
+test.each(['suraido-css', 'suraido-class'])(
+  'F03-AC195: Given hand-written slides (%s) with only one sign of suraido.js, and the fragment from 1, When they are opened at /3 and turned, Then they are not read as suraido.js: page 3 is told, and the address follows from 1',
+  async (slug) => {
+    await withPage(async (page) => {
+      const { deck } = await openAtThree(page, slug)
+      await deck.locator('#push').dispatchEvent('click')
+      await page.waitForURL((url) => url.pathname === `/@owner/${slug}/2`)
+      await deck.locator('#hash').dispatchEvent('click')
+      await page.waitForURL((url) => url.pathname === `/@owner/${slug}/4`)
+      // Not moved on to page 2 of suraido.js's count either.
+      expect(await deck.locator('#said').textContent()).toBe('pushed 1')
+    })
+  },
+  30000,
+)
 
 test('F03-AC145: Given slides whose policy refuses an inline script of theirs, When they are opened, Then the violation is seen, as the checks above rely on', async () => {
   await withPage(async (page) => {
