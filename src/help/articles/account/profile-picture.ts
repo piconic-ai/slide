@@ -22,8 +22,11 @@ export default defineArticle({
             に届きません。スクリプトが動かないブラウザでは、変えられません。
           </li>
           <li>
-            メールアドレスの Gravatar の画像。「Gravatar
-            の画像を使う」を切ると、使いません。
+            メールアドレスの Gravatar
+            の画像。取るとき、メールアドレスから作った値(ハッシュ)を Gravatar
+            を運営する Automattic(米国)に送ります(<a href="/privacy/external"
+              >外部への送信</a
+            >)。「Gravatar の画像を使う」を切ると、使いません。
           </li>
           <li>どちらもなければ、名前の頭文字。</li>
         </ol>
@@ -49,8 +52,11 @@ export default defineArticle({
             turned off.
           </li>
           <li>
-            The Gravatar picture of your email address. Turn off “Use my
-            Gravatar picture” to not use it.
+            The Gravatar picture of your email address. To get it, a value made
+            from the address (a hash) is sent to Automattic (United States),
+            which runs Gravatar (<a href="/privacy/external"
+              >Transmissions to outside services</a
+            >, in Japanese). Turn off “Use my Gravatar picture” to not use it.
           </li>
           <li>Failing both, the initial of your name.</li>
         </ol>

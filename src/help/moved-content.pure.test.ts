@@ -419,7 +419,7 @@ describe('what the help said before, now in its articles', () => {
       'アップロードした画像。',
       'Gravatar の画像',
       '名前の頭文字',
-      'メールアドレスは、ほかの人には見えません',
+      'メールアドレスは、ほかの利用者には見えません',
     ])
     // The order of the pictures, in the body of the article on the picture.
     const entry = findArticle(HELP_CATALOG, 'account', 'profile-picture')
@@ -437,7 +437,7 @@ describe('what the help said before, now in its articles', () => {
       'An image you upload',
       'Gravatar picture',
       'initial',
-      'Nobody else can see your email address',
+      'Other users cannot see your email address',
     ])
   })
 

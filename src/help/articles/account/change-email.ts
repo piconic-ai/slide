@@ -16,7 +16,7 @@ export default defineArticle({
           >からご連絡ください。個別に対応します。
         </p>
         <p>
-          メールアドレスは、自分の「設定」の「アカウント」にだけ出ます。ほかの人には見えません。
+          メールアドレスは、自分の「設定」の「アカウント」にだけ出ます。ほかの利用者には見えません(運営は、招待の一覧で、招待したアドレスを読みます)。
         </p>`,
   },
   en: {
@@ -29,7 +29,8 @@ export default defineArticle({
         </p>
         <p>
           Your email address is shown only on your own “Settings”, under
-          “Account”. Nobody else can see it.
+          “Account”. Other users cannot see it (the operator reads the addresses
+          it invited, in its invitation list).
         </p>`,
   },
 })
