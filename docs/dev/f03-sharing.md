@@ -180,7 +180,7 @@ iOS Safari・Android Chrome の実機と、本番の Cloudflare 経由での表�
 - script は fragment の番号(`#6`)をページ番号として読み(query に `slide` があれば、そちらを先に読む。peitho の viewer は `?slide=6` に書くため。F03-AC174)、変わるたびに `postMessage` で viewer に `{ type: 'slide:page', page }` を送る。fragment がなければ 1 ページ目とする。見出しの名前や別のツールの綴りなど、ページ番号として読めない fragment のときは何も送らない(1 ページ目と決めつけると、読者のアドレスが見ていたページから外れるため)。`#6` は Marp の綴り、`?slide=6` は peitho の綴りである。ツールは History API でも fragment を変え、そのときは event が出ないので、`pushState` と `replaceState` を包んで拾う。送る相手は管理 origin だけで、スライド自身の最上位の文書だけが送る。viewer の script が後から読み込まれると、それより前の知らせは届かないので、viewer は受け取る準備ができたときに `{ type: 'slide:page-request' }` で尋ね、script は表示中のページをもう一度送る。
 - viewer(`public/share.js`)は、本体の枠の、その版の origin からの知らせだけを受け取る。下に小さく並べたほかのスライドの枠からの知らせと、1 から 9999 の整数でない番号は無視する。受け取ると、アドレスバーと、共有メニューの「いま見ているページの URL」と投稿のリンクを `/@handle/slug/6` に合わせる(1 ページ目は番号なし)。読者が共有する URL が、見ていたページを開く。スライド全体の共有 URL(「URL をコピー」)は変えない。
 - ページ番号はスライドの自己申告で、表示の補助にだけ使う。安全の判定には使わない。
-- ページを伝えない(query の `slide` や fragment がページ番号の形でない、または差し込めなかった)スライドは、これまでと同じに動く。Marp(`@marp-team/marp-cli` 4.5.1)で作ったスライドでは、矢印キーでめくるたびに番号が届くことを手元で確かめた。総ページ数と、Reveal.js のように fragment の形が違うツールには、まだ対応していない。ツールごとの読み替えは、作ると決めた(2026-11-27。未実装。[ツールごとの読み替え](#ツールごとの読み替え))。
+- ページを伝えない(query の `slide` や fragment がページ番号の形でない、または差し込めなかった)スライドは、これまでと同じに動く。Marp(`@marp-team/marp-cli` 4.5.1)で作ったスライドでは、矢印キーでめくるたびに番号が届くことを手元で確かめた。総ページ数と、Reveal.js のように fragment の形が違うツールには、まだ対応していない。ツールごとの読み替えは、作ると決めた(2026-11-27。reveal.js から作っている。[ツールごとの読み替え](#ツールごとの読み替え))。
 
 ### 差し込み
 
@@ -202,7 +202,23 @@ iOS Safari・Android Chrome の実機と、本番の Cloudflare 経由での表�
 
 ### ツールごとの読み替え
 
-未実装である。[URL を渡して読んでもらう](../features/f03-sharing.md)の F03-AC184〜F03-AC201 を作るときの出発点として、決まっていることと、実物の出力で観測したことを書く。計画は [#694](https://github.com/piconic-ai/slide/issues/694) と、そこから切った issue にある。
+reveal.js(縦のスライドのないもの)の読み替えまでを実装した(#709)。suraido.js と Slidev は未実装である。以降は、実装した部分と、実装の前に調べたことを分けて書く。
+
+#### 実装したもの(reveal.js)
+
+- 構成: ページ番号の読み書きの純粋な処理は `src/pages/reading.ts` の `READING_SOURCE`(関数の定義の文字列)に置く。差し込む script は 1 つの文字列として配るので、関数をそのまま import できないためである。`script.ts` がこの文字列を script の中に埋め込み、テストは同じ文字列を `new Function` で動かす(`src/pages/reading.pure.test.ts`)。文書やツールの API に触れる部分(`window.Reveal`、event)だけが `script.ts` に残る。Worker の中では `new Function` を使えないので、`reading.ts` は文字列を持つだけで、実行しない。
+- 判定: `window.Reveal` が、`isReady`・`getIndices`・`slide` を持つ関数として存在し、`.reveal .slides` が文書にあり、`isReady()` が真であること(ツールが公開している API と markup)。題名や本文の語は見ない(F03-AC196。`src/preview/page-script.browser.test.ts`)。差し込む script は `<head>` の先頭で動き、その時点では reveal.js の script がまだ読まれていないので、判定は reveal.js 自身の `ready` event(`.reveal` から document まで bubble する)と、`load` と、script が動いた時点の 3 つの時点で試す。1 度判定できたら、以後は同じツールとして読む。
+- 開くとき: 差し込む script が動く時点の fragment が、1 から 9999 の整数(`#3`)なら、それを「渡されたページ」として覚える。reveal.js は、起動のときに fragment を 1 度だけ、0 始まりの番号として読む(`#3` は 4 枚目)ので、`ready` の時点で、渡されたページの slide に `Reveal.slide(h, v, -1)` で移す。`hash: true`・`hashOneBasedIndex: true` の設定は見ない(`slide` の引数は設定に依らない)。移るときは、`.slides` に `no-transition` を足して、移動のアニメーションを見せない。`ready` の前は slide が描かれず、移るのは `ready` の event の中(同じ task)なので、4 枚目は見えない。
+  - 第 3 引数の `-1` は、fragment(1 つずつ出す要素)を 1 つも出していない状態を指す。省略すると、reveal.js は、後ろの slide から前の slide へ戻るときと同じに、その slide の fragment をすべて出す。`#3` で 4 枚目が先に開く場合(0 始まりの読み)がこれに当たり、3 ページ目が、fragment が出きった形で開いてしまう(F03-AC190 の fixture で再現した)。
+  - 渡されたページが slide の数を超えるときは、最後の slide に移る。
+- 表示中のページ: `Reveal.getIndices()` の横の位置を 1 始まりにしたもの。fragment(`f`)は数えない(F03-AC190)。`slidechanged` event で通知する。`hash: false`(既定)でも、`hash: true` でも、`hashOneBasedIndex` の有無でも、URL を読まずに API から読むので、同じ結果になる(F03-AC187〜F03-AC189)。
+- 縦の slide(`.slides > section` の中の `section`)を持つ出力は、まだ読み替えない(これまでどおり読む)。F03-AC199〜F03-AC201 で足す。
+- `ETag`: 差し込む script は、これまでどおり `viewerOrigin` だけを持つ 1 つの文字列で、どのスライドにも同じである。判定は script の中で行うので、`ETag` の決め方は変わらない。script の文字列が変わるので、`ETag`(`scriptHashSource`)は変わり、前の script で配った byte を `304` にしない。
+- 読み替えない出力: global の `Reveal` がない出力(`import Reveal from './reveal.mjs'` で `new Reveal().initialize()` を呼ぶ ES module)は、読み替えない。起動を呼んだ instance に、差し込む script から届く手段がないためである。そのスライドは、これまでどおり `#3` を 1 始まりの番号として通知し、reveal.js は 4 枚目を開く(確かめた: `/@owner/<slug>/3` で 4 枚目が出て、めくってもアドレスバーは `/3` のまま)。F03-AC187〜F03-AC190 は、global の API で読み込むスライド(reveal.js の starter の形)で確かめた範囲である。
+
+#### 実装の前に調べたこと
+
+[URL を渡して読んでもらう](../features/f03-sharing.md)の F03-AC184〜F03-AC201 を作るときの出発点として、決まっていることと、実物の出力で観測したことを書く。計画は [#694](https://github.com/piconic-ai/slide/issues/694) と、そこから切った issue にある。
 
 - 方針(2026-11-27、依頼者): ページの持ち方が slide の決まり(1 始まりの `#6`、peitho の `?slide=6`)と違うツールは、サービスが読み替える。作者のファイルは変えず、作者にツールの設定を求めない。ツールごとの読み取りを、ページを伝える script(`src/pages/script.ts`)に足す。[開発設計](design.md#deployment)の「manifest とページ」にある adapter の案(`ready`、`getPage`、`goToPage`、`onPageChanged`)が、ツールごとに持つ役割として近い。どのツールの出力かは、サービスが出力の手がかりで判定する。
 - 読み替えは 2 方向に要る。スライドから viewer へは、表示中のページを読むところ(`pageScript` の `pageOf`)。サービスからスライドへは、ページ番号を渡して開くところで、いまはどれも `/#6` を渡している。viewer の枠の URL(`src/share/routes.ts`。作者だけが開ける版は `/_preview/launch` の `page`)、記事のページの画像を押したときの移動(`public/share.js`)、ページの画像の撮影(`src/covers/shot.ts`)、埋め込みの枠の URL(`src/embed/routes.ts`)の 4 つである。
@@ -225,7 +241,7 @@ iOS Safari・Android Chrome の実機と、本番の Cloudflare 経由での表�
 - ページの画像の撮影は、版の origin を最上位の文書として開く。埋め込みの枠では、スライドの親(埋め込みのページ)が最上位の文書でない。いまの script は、どちらでも何もしない(`parent === window || parent !== top`)。F03-AC194 と F03-AC198 には、そこでも、開くときの読み替えが要る(ページを伝えることは、これまでどおりしない)。
 - 読み替えが入る前に撮ったページの画像は、ずれたページを写している。撮り直すには、撮影の cache の key に入る版(`src/covers/shot.ts` の `PAGE_SHOT_REVISION`)を上げる。
 - Slidev は、めくると枠の path を `/4` に書き換える。版の origin の `/4` にファイルはないので、枠がその URL のまま文書を読み込み直すと 404 になる。viewer を読み込み直したときや、履歴を戻ったときに、ブラウザが枠の URL を復元するかを、3 つのブラウザで確かめる。
-- #703、#706、#707 が足すテスト(`src/preview/real-tools.browser.test.ts` の `RECORDED`)は、上の表の動きを「現状の記録」として固定している。読み替えを足す PR で、そのツールの行を、受け入れ条件の ID を持つ、期待を確かめるテストに置き換える。
+- #703、#706、#707 が足したテスト(`src/preview/real-tools.browser.test.ts` の `RECORDED`)は、上の表の動きを「現状の記録」として固定している。読み替えを足す PR で、そのツールの行を、受け入れ条件の ID を持つ、期待を確かめるテストに置き換える(reveal.js の行は、#709 で置き換えた)。
 
 ## 外部との通信
 
