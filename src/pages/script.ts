@@ -145,12 +145,14 @@ export const pageScript = (viewerOrigin: string) => `(() => {
   const chainOf = (element) => {
     const chain = []
     for (let at = element; at instanceof Element; at = at.parentElement) {
+      const style = getComputedStyle(at)
       chain.push({
         tag: at.localName,
         role: at.getAttribute('role'),
         onclick: at.hasAttribute('onclick'),
         editable: at.isContentEditable,
-        pointer: getComputedStyle(at).cursor === 'pointer',
+        pointer: style.cursor === 'pointer',
+        scrollsX: at.scrollWidth > at.clientWidth + 1 && (style.overflowX === 'auto' || style.overflowX === 'scroll'),
       })
     }
     return chain
@@ -184,7 +186,8 @@ export const pageScript = (viewerOrigin: string) => `(() => {
     if (!began || !alone || !last) return
     const gesture = gestureOf(began, { x: last.clientX, y: last.clientY, t: event.timeStamp }, innerWidth)
     if (!gesture || zoomed() || selecting()) return
-    if (gesture.tap && tappedForItself(chainOf(began.element))) return
+    const chain = chainOf(began.element)
+    if (gesture.tap ? tappedForItself(chain) : scrollsAcross(chain)) return
     if (!mayTurn(tool, began.page, latched)) return
     setTimeout(() => {
       if (afterSettling(began.page, pageOf()) === 'send') press(gesture.turn)

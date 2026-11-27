@@ -41,11 +41,16 @@ export const GESTURE_SOURCE = `
   // Whether a tap on the element is the slides' own: it, or what holds it,
   // is a link, a button, a field, a video, or looks as if it can be pressed.
   // The chain is the element and the ones around it, as
-  // { tag, role, onclick, editable, pointer } each.
+  // { tag, role, onclick, editable, pointer, scrollsX } each.
   const tappedForItself = (chain) => chain.some((node) =>
     TAPPED_TAGS.includes(node.tag) ||
     node.role === 'button' || node.role === 'link' ||
     node.onclick || node.editable || node.pointer)
+
+  // Whether a swipe that begins on this element is meant for something that
+  // scrolls sideways, such as a wide code block: the chain's elements say so
+  // as \`scrollsX\`.
+  const scrollsAcross = (chain) => chain.some((node) => node.scrollsX === true)
 
   // What to do once the slides have had their time: send the key when the
   // page is as it was, and nothing when the slides turned it themselves

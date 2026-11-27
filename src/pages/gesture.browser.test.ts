@@ -100,6 +100,11 @@ const DECKS: Record<string, string> = {
   keys: deck(COMMON),
   // Has a touch of its own, and shows the page in the fragment.
   own: deck(COMMON + OWN_TOUCH),
+  // Has a code block that scrolls sideways, along the bottom (F03-AC207).
+  wide: deck(COMMON).replace(
+    '<script>',
+    '<div id="wide" style="position:fixed;left:0;right:0;bottom:0;height:80px;overflow-x:auto"><div style="width:2000px;height:60px"></div></div><script>',
+  ),
   // Keeps no page number in its fragment: the page is not known (F03-AC208).
   unknown: deck(
     COMMON.replace(
@@ -168,6 +173,8 @@ type Setting = {
   frame: () => Promise<{ x: number; y: number; width: number; height: number }>
   page_: () => Promise<string | null>
   clicks: () => Promise<string | null>
+  /** How far the sideways-scrolling block has scrolled. */
+  scrolled: () => Promise<number>
 }
 
 /** A phone, with the slides opened in the viewer or in an article. */
@@ -219,6 +226,8 @@ async function onPhone(
       frame,
       page_: () => inner.locator('#page').textContent(),
       clicks: () => inner.locator('#clicks').textContent(),
+      scrolled: () =>
+        inner.locator('#wide').evaluate((element) => element.scrollLeft),
     })
   } finally {
     await context.close()
@@ -343,6 +352,16 @@ test('F03-AC208: Given slides that keep no page number in their fragment, When t
     const box = await frame()
     await touch(cdp, [within(box, 0.8, 0.5)], [within(box, 0.3, 0.5)])
     await touch(cdp, [within(box, 0.9, 0.6)])
+    await new Promise((resolve) => setTimeout(resolve, SETTLED))
+    expect(await page_()).toBe('1')
+  })
+}, 60000)
+
+test('F03-AC207: Given a code block that scrolls sideways, When the reader swipes along it, Then the block scrolls and the page does not turn', async () => {
+  await onPhone('viewer', 'wide', async ({ cdp, frame, page_, scrolled }) => {
+    const box = await frame()
+    await touch(cdp, [within(box, 0.8, 0.9)], [within(box, 0.3, 0.9)])
+    await expect.poll(scrolled).toBeGreaterThan(0)
     await new Promise((resolve) => setTimeout(resolve, SETTLED))
     expect(await page_()).toBe('1')
   })

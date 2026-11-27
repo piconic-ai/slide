@@ -162,7 +162,7 @@ iOS Safari は、touch の処理が登録された場所にだけ touch を送�
 
 - **二重送りの防ぎ方。** 資料が自前の touch 操作を持つかは、解析して決めない。操作の後 80ms（`SETTLE_MS`）待ち、ページ番号が操作の前と同じならキーを送る。変わっていたら、資料が自分で送ったとみなして、その文書では以後送らない。ページ番号は、`tell` と同じ `pageOf()` で読む（fragment、または reveal.js などの adapter）。
 - **対象。** `tool === null`（reveal.js のような自前の touch を持つ既知のツールでない）で、ページ番号が分かる資料だけである。
-- **送らない操作。** リンク・ボタン・入力欄・動画・`cursor: pointer` の要素の上のタップ、縦のスワイプ、指 2 本以上、拡大中、テキスト選択中。判定の純粋な部分（`gestureOf`、`tappedForItself`、`afterSettling`、`mayTurn`、`keyOf`）は `GESTURE_SOURCE` にあり、`src/pages/gesture.pure.test.ts` が同じ text を動かして確かめる。
+- **送らない操作。** リンク・ボタン・入力欄・動画・`cursor: pointer` の要素の上のタップ、縦のスワイプ、指 2 本以上、拡大中、テキスト選択中、横にスクロールできる要素（`overflow-x` が `auto`・`scroll` で、中身が幅を超えるもの）の上で始まったスワイプ。判定の純粋な部分（`gestureOf`、`tappedForItself`、`scrollsAcross`、`afterSettling`、`mayTurn`、`keyOf`）は `GESTURE_SOURCE` にあり、`src/pages/gesture.pure.test.ts` が同じ text を動かして確かめる。
 - **埋め込みでも動く。** これまで script は、スライドが viewer の直下にないとき（`parent !== top`）に何もせず終わっていた。いまは、枠の中（`parent !== window`）なら動かし、ページを viewer に伝える部分と、viewer の問い合わせに答える部分だけを、`parent === top` のときに限る。他の site に置いた埋め込みでも、補正が動く。
 - **限界。** 遷移のアニメーションが終わってから fragment を書く資料と、touch で送るのにページ番号を外に出さない資料は、二重に進みうる。`isTrusted` を見る資料と、キーを使わない資料には効かないが、何も起きないだけである。作者が補正を止める設定は、まだない（仕様の「作らないこと」）。
 - **確認。** `src/pages/gesture.browser.test.ts` は、Chromium（Pixel 7 の模擬）で、DevTools の入力 event を使って、viewer と埋め込みで操作する。WebKit では iOS の touch 配送を再現できないので、実機の iOS Safari と Android Chrome で、デプロイ後に人が確かめる。

@@ -8,34 +8,42 @@ type Node = {
   onclick: boolean
   editable: boolean
   pointer: boolean
+  scrollsX: boolean
 }
 
 // The text the page script holds, run with plain values.
-const { gestureOf, tappedForItself, afterSettling, mayTurn, keyOf } =
-  new Function(
-    `${GESTURE_SOURCE}; return { gestureOf, tappedForItself, afterSettling, mayTurn, keyOf }`,
-  )() as {
-    gestureOf: (
-      start: Point,
-      end: Point,
-      width: number,
-    ) => { turn: 'next' | 'prev'; tap: boolean } | null
-    tappedForItself: (chain: Node[]) => boolean
-    afterSettling: (
-      before: number,
-      after: number | null,
-    ) => 'send' | 'left-to-the-slides'
-    mayTurn: (
-      tool: object | null,
-      page: number | null,
-      latched: boolean,
-    ) => boolean
-    keyOf: (turn: 'next' | 'prev') => {
-      key: string
-      code: string
-      keyCode: number
-    }
+const {
+  gestureOf,
+  tappedForItself,
+  scrollsAcross,
+  afterSettling,
+  mayTurn,
+  keyOf,
+} = new Function(
+  `${GESTURE_SOURCE}; return { gestureOf, tappedForItself, scrollsAcross, afterSettling, mayTurn, keyOf }`,
+)() as {
+  gestureOf: (
+    start: Point,
+    end: Point,
+    width: number,
+  ) => { turn: 'next' | 'prev'; tap: boolean } | null
+  tappedForItself: (chain: Node[]) => boolean
+  scrollsAcross: (chain: Node[]) => boolean
+  afterSettling: (
+    before: number,
+    after: number | null,
+  ) => 'send' | 'left-to-the-slides'
+  mayTurn: (
+    tool: object | null,
+    page: number | null,
+    latched: boolean,
+  ) => boolean
+  keyOf: (turn: 'next' | 'prev') => {
+    key: string
+    code: string
+    keyCode: number
   }
+}
 
 const at = (x: number, y: number, t = 0): Point => ({ x, y, t })
 
@@ -120,6 +128,7 @@ const node = (tag: string, more: Partial<Node> = {}): Node => ({
   onclick: false,
   editable: false,
   pointer: false,
+  scrollsX: false,
   ...more,
 })
 
@@ -150,6 +159,25 @@ describe('tappedForItself', () => {
       expect(tappedForItself(chain)).toBe(false)
     },
   )
+})
+
+describe('scrollsAcross', () => {
+  it('F03-AC207: Given a swipe that begins inside something that scrolls sideways, When it is asked, Then it is meant for that', () => {
+    expect(
+      scrollsAcross([
+        node('code'),
+        node('pre', { scrollsX: true }),
+        node('body'),
+      ]),
+    ).toBe(true)
+  })
+
+  it.each([
+    ['no chain', []],
+    ['nothing that scrolls sideways', [node('p'), node('body')]],
+  ])('F03-AC207: Given %s, When it is asked, Then it is not', (_, chain) => {
+    expect(scrollsAcross(chain)).toBe(false)
+  })
 })
 
 describe('afterSettling', () => {
