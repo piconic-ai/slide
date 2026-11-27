@@ -139,7 +139,7 @@
   - ミュート: 「ミュートするには、ログインしてください」「ログインすると、この作者のスライドを、あなたに表示される一覧から外せます。ほかの読者の画面は変わりません。」 / "Sign in to mute" "Once you sign in, you can take this author’s slides off your lists. Other readers see no change."
   - 通報: 「通報するには、ログインしてください」「ログインすると、読者をだます内容や迷惑なスライドを、運営に通報できます。通報した人がだれかは、運営の一覧にも出ません。」 / "Sign in to report" "Once you sign in, you can report slides that deceive readers or are abusive. Who reported is not shown, even in the operators’ list."
   - ボタン: 「ログインして続ける」「閉じる」 / "Sign in to continue" "Close"
-- 登録していない人がログインへ進むと、`/login` の説明に、いまは招待制であることが出る([メールのコードでログインする](f28-email-login.md))。下の未決事項は、そのまま残る。
+- 登録していない人がログインへ進むと、`/login` に進む。招待制のあいだは、説明に、招待制であることが出た([メールのコードでログインする](f28-email-login.md))。本番は、2026-11-27 から、招待制ではない。
 
 次のように決めた(2026-11-18)。
 
@@ -176,4 +176,4 @@
 
 ## 未決事項
 
-- フォローを、登録していない読者に開くか。[知らない人のスライドも、安心して開ける](f17-safe-viewing.md) の「登録していない読者のログイン」と一緒に決める。受け入れ条件の「ログインした人」は、当面、運営が登録した人を指す。
+- なし。フォローを、登録していない読者に開くかは、2026-11-27 に決めた。読者だけの登録は作らない。だれでも登録でき、登録した人が「ログインした人」である([知らない人のスライドも、安心して開ける](f17-safe-viewing.md))。

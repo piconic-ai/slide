@@ -1,7 +1,9 @@
 /**
  * Who may sign up: only the people the operator invited, or anyone with an
- * email address (F42). The setting is `OPEN_SIGNUP` and is changed with
- * `wrangler` or in Cloudflare's dashboard, never from the operator's pages.
+ * email address (F42). The setting is `OPEN_SIGNUP`; in production it is a
+ * secret, put and deleted with `wrangler`, never changed from the operator's
+ * pages. A plain value set in Cloudflare's dashboard is lost at the next
+ * release.
  */
 export type SignupMode = 'invitation' | 'open'
 
