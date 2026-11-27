@@ -139,6 +139,54 @@ test('F39-AC28: Given more expired copies than a run deletes, When the runs foll
   expect(await keysOf(backup)).toEqual([])
 })
 
+test('F39-AC28: Given more expired copies than a run deletes and no pass to run, When the hourly firings follow, Then they go within hours, not a day at a time', async () => {
+  for (const key of ['a/0', 'a/1', 'a/2']) await put(key, key)
+  await runBackup(env, FIRST)
+  for (const key of ['a/0', 'a/1', 'a/2']) await source.delete(key)
+  const found = at(27)
+  await runBackup(env, found)
+  const late = found + 31 * DAY
+  expect((await runBackup(env, late, { expireBatch: 2 })).expired).toBe(2)
+  const before = await readState(DB)
+  // The day's pass is done; the firing an hour later has no pass to run.
+  const idle = await runBackup(env, late + 60 * 60, { expireBatch: 2 })
+  expect(idle).toEqual({ copied: 0, failed: 0, expired: 1 })
+  expect(await keysOf(backup)).toEqual([])
+  // It is not a run of the pass: what the operator sees of the runs stays.
+  expect(await readState(DB)).toEqual(before)
+})
+
+test('F39-AC28: Given a backup bucket that cannot delete and no pass to run, When an expired copy is due, Then the firing changes nothing and tells nothing, and the next pass deletes it', async () => {
+  for (const key of ['a/0', 'a/1']) await put(key, key)
+  await runBackup(env, FIRST)
+  for (const key of ['a/0', 'a/1']) await source.delete(key)
+  const found = at(27)
+  await runBackup(env, found)
+  const late = found + 31 * DAY
+  expect((await runBackup(env, late, { expireBatch: 1 })).expired).toBe(1)
+  const before = await readState(DB)
+  const down = envOf({ UPLOADS_BACKUP: failing(backup, 'delete', () => true) })
+  const notify = vi.fn(async () => {})
+  const idle = await runBackup(down, late + 60 * 60, { notify })
+  expect(idle).toEqual({ copied: 0, failed: 1, expired: 0 })
+  expect(notify).not.toHaveBeenCalled()
+  expect(await readState(DB)).toEqual(before)
+  expect(await keysOf(backup)).toHaveLength(1)
+  expect(await runBackup(env, late + DAY)).toMatchObject({ expired: 1 })
+  expect(await keysOf(backup)).toEqual([])
+})
+
+test('F39-AC27: Given a copy whose source has been gone for less than 30 days and no pass to run, When the hourly firing comes, Then the copy stays', async () => {
+  await put('a/0', 'x')
+  await runBackup(env, FIRST)
+  await source.delete('a/0')
+  const found = at(27)
+  await runBackup(env, found)
+  const idle = await runBackup(env, found + 29 * DAY + 60 * 60)
+  expect(idle).toEqual({ copied: 0, failed: 0, expired: 0 })
+  expect(await keysOf(backup)).toEqual(['a/0'])
+})
+
 test('F39-AC28: Given a backup bucket that cannot delete, When an expired copy is due, Then its row stays and the next run deletes it', async () => {
   await put('a/0', 'x')
   await runBackup(env, FIRST)

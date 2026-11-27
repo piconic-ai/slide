@@ -177,12 +177,36 @@ async function attempt(tally: Tally, step: () => Promise<void>) {
 }
 
 /**
+ * What a firing with no pass to run does: it deletes expired copies that the
+ * earlier runs left, so that more of them than one run deletes are gone
+ * within hours and not a day at a time. The privacy policy states how long a
+ * copy stays (article 8), and a batch a day would not keep to it after many
+ * files were deleted at once. It records nothing and tells nothing: it is not
+ * a run of the pass, and a failure here is met again, and told, by the next
+ * one.
+ */
+async function expireLeftovers(
+  stores: Readonly<{ database: D1Database; backup: R2Bucket }>,
+  at: number,
+  limit: number,
+): Promise<BackupSummary> {
+  const tally: Tally = { copied: 0, failed: 0, expired: 0, advanced: false }
+  await attempt(tally, async () => {
+    tally.expired = await expireCopies(stores, at, limit)
+  })
+  const { copied, failed, expired } = tally
+  if (expired > 0)
+    console.log(JSON.stringify({ event: 'backup', copied, failed, expired }))
+  return { copied, failed, expired }
+}
+
+/**
  * The daily backup of the stored slide files (D-66), run at every firing of
  * the Cron Trigger. It starts the day's pass at its hour and, at any hour,
- * goes on with a pass that was not finished (D-67). Each run also deletes
- * the copies whose source has been gone for 30 days. A failure is told in
- * the next day's mail (F39-AC31). Without the backup bucket it does nothing
- * (D-08, F39-AC30).
+ * goes on with a pass that was not finished (D-67). Every firing, with a
+ * pass to run or without, also deletes the copies whose source has been gone
+ * for 30 days. A failure of a run of the pass is told in the next day's mail
+ * (F39-AC31). Without the backup bucket it does nothing (D-08, F39-AC30).
  */
 export async function runBackup(
   env: Env,
@@ -198,7 +222,13 @@ export async function runBackup(
   }
   const state = await readState(env.DB)
   const plan = planRun(state, at)
-  if (plan.kind === 'idle') return none
+  const expireBatch = options.expireBatch ?? EXPIRE_BATCH
+  if (plan.kind === 'idle')
+    return expireLeftovers(
+      { database: env.DB, backup: buckets.backup },
+      at,
+      expireBatch,
+    )
   const tally: Tally = { ...none, advanced: false }
   await attempt(tally, async () => {
     if (plan.kind === 'start') await startPass(env.DB, at)
@@ -209,7 +239,7 @@ export async function runBackup(
     tally.expired = await expireCopies(
       { database: env.DB, backup: buckets.backup },
       at,
-      options.expireBatch ?? EXPIRE_BATCH,
+      expireBatch,
     )
   })
   const count = tellCount(tally, state, at)
