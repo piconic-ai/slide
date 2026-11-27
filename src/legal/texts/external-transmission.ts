@@ -1,16 +1,19 @@
 import type { TransmissionText } from '../document'
 
 /**
- * The text of the page "External transmission", as handed over (the draft of 2026-11-26).
- * The wording is the operator's: do not correct it here. The same text, as
- * Markdown, is `../handed-over/external-transmission.md`, and a test compares the two.
+ * The text of the page "External transmission": the first edition, enacted
+ * on 2026-11-27. The wording is the operator's. At the operator's request the
+ * draft of 2026-11-26 was put into the polite form, and its lead sentence no
+ * longer calls the page a draft; any other change of wording is the
+ * operator's to decide. The same text, as Markdown, is
+ * `../handed-over/external-transmission.md`, and a test compares the two.
  * How to replace it: docs/dev/f34-legal-pages.md.
  */
 export const externalTransmission = {
   form: 'transmission',
   title: '外部への送信',
   description:
-    'プライバシーポリシー第 6 条から参照する別ページの下書きである。送り先が変わったときは、このページだけを更新する。',
+    'プライバシーポリシー第 6 条に基づき、本サービスがプライバシー情報を送る先と、送る情報と目的を示します。送り先が変わったときは、このページを更新します。',
   columns: ['送り先', '送る情報', '目的', 'その事業者のポリシー'],
   rows: [
     {
@@ -33,8 +36,8 @@ export const externalTransmission = {
       },
     },
   ],
-  // The handed-over text has no supplementary provisions, and the page needs
-  // a date to leave the draft state (F34-AC6, F34-AC7). This line is the same
-  // blank the other two texts carry; it is not part of the handed-over text.
-  history: [{ date: '(施行日)', summary: '制定' }],
+  // The Markdown copy has no supplementary provisions, and the page needs a
+  // date to leave the draft state (F34-AC6, F34-AC7). This line carries the
+  // same date as the other two texts; it is not part of the Markdown copy.
+  history: [{ date: '2026年11月27日', summary: '制定' }],
 } as const satisfies TransmissionText

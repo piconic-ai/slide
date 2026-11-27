@@ -48,7 +48,10 @@ export const MAX_FAILURES_IN_PAGE = 5
 /** A run stops starting pages after this long, in milliseconds. */
 export const RUN_DEADLINE_MS = 10 * 60 * 1000
 
-/** The most copies that are deleted in one run. */
+/**
+ * The most copies one batch deletes. A firing deletes batch after batch
+ * while it has calls and time left, with a pass to run or without.
+ */
 export const EXPIRE_BATCH = 500
 
 /** What deleting expired copies costs: the rows read, the copies, the rows. */

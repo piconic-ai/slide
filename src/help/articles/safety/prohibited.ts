@@ -31,7 +31,7 @@ export default defineArticle({
         </ol>
         <h2>これに反すると</h2>
         <p>
-          運営は、規約に反すると判断したとき、スライドを非表示にしたり、アカウントの利用を止めたりすることがあります(<a
+          運営は、規約に反する、またはそのおそれがあると判断したとき、スライドを非表示にしたり、アカウントの利用を止めたりすることがあります(<a
             href="/help/safety/hidden-slide"
             >スライドが非表示になったとき</a
           >)。納得できないときは、<a href="/help/safety/appeal"
@@ -60,8 +60,9 @@ export default defineArticle({
         </ol>
         <h2>If you break them</h2>
         <p>
-          When the operator judges that the terms were broken, it may hide
-          slides or stop an account’s use (<a href="/help/safety/hidden-slide"
+          When the operator judges that the terms were broken, or may have been,
+          it may hide slides or stop an account’s use (<a
+            href="/help/safety/hidden-slide"
             >When a slide was hidden</a
           >). If you do not agree, you can
           <a href="/help/safety/appeal">appeal a hiding or a suspension</a>.
