@@ -105,6 +105,33 @@ test('Given an unexpected error, When it is handled, Then a 500 page hides the c
   }
 })
 
+test('Given an error with a cause, When it is handled, Then the log keeps the cause bounded and the page hides it', async () => {
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+  try {
+    const app = new Hono()
+    app.onError(onError)
+    app.get('/boom', () => {
+      throw new Error('Failed query', {
+        cause: new Error(`D1_ERROR: ${'x'.repeat(500)}`),
+      })
+    })
+    app.get('/plain-cause', () => {
+      throw new Error('Failed query', { cause: 'not an error object' })
+    })
+    const response = await app.request('/boom')
+    expect(await response.text()).not.toContain('D1_ERROR')
+    const entry = JSON.parse(String(log.mock.calls[0]?.[0]))
+    expect(entry.cause).toMatch(/^D1_ERROR: x+$/)
+    expect(entry.cause.length).toBe(200)
+    await app.request('/plain-cause')
+    expect(JSON.parse(String(log.mock.calls[1]?.[0]))).not.toHaveProperty(
+      'cause',
+    )
+  } finally {
+    log.mockRestore()
+  }
+})
+
 test('Given a management route that fails, When requested through the server, Then the 500 page is shown', async () => {
   const log = vi.spyOn(console, 'error').mockImplementation(() => {})
   try {

@@ -39,6 +39,10 @@ export const onError: ErrorHandler = (error, c) => {
       path: loggedPath(c.req.path),
       name: error.name,
       message: error.message.slice(0, 200),
+      // A failed D1 query carries the reason in its cause, not its message.
+      ...(error.cause instanceof Error
+        ? { cause: error.cause.message.slice(0, 200) }
+        : {}),
     }),
   )
   return respond(c, 'server_error')
