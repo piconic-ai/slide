@@ -237,3 +237,38 @@ test('F03-AC42, F03-AC46, F03-AC48, F03-AC177: Given a generated cover still on 
     holdCovers = null
   }
 }, 20000)
+
+test('F44-AC11: Given decks with covers, When the top page draws their cards, Then each card holds its cover once and the author’s face, and no image is wider than its card', async () => {
+  shotFails = false
+  const { page, errors } = await openTopPage()
+
+  const cards = page.locator('.timeline-list .timeline-card')
+  await expect
+    .poll(() => cards.first().locator('.deck-cover-name').textContent(), SETTLE)
+    .toBe('Talk')
+  for (const [index, name] of ['Talk', 'Pictured'].entries()) {
+    const card = cards.nth(index)
+    await expect
+      .poll(() => drawnWidth(card.locator('.deck-cover img')), SETTLE)
+      .toBe(2)
+    expect(await card.locator('.deck-cover-name').textContent()).toBe(name)
+    // The images of a card, by the element each stands in.
+    expect(
+      await card
+        .locator('img')
+        .evaluateAll((images) =>
+          images.map((image) => image.parentElement?.className),
+        ),
+    ).toEqual(['deck-cover', 'card-author-face'])
+    const width = (await card.boundingBox())?.width ?? 0
+    const widest = await card
+      .locator('img')
+      .evaluateAll((images) =>
+        Math.max(...images.map((image) => image.getBoundingClientRect().width)),
+      )
+    expect(widest).toBeLessThanOrEqual(width)
+  }
+  expect(errors).toEqual([])
+  await page.unrouteAll({ behavior: 'ignoreErrors' })
+  await page.close()
+}, 20000)
