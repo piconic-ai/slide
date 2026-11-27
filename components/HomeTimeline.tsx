@@ -9,7 +9,6 @@ import {
   onCleanup,
   untrack,
 } from '@barefootjs/client'
-import { citedCountText } from '../src/citations/cited-count'
 import {
   focusSlides,
   frameHoldsSlides,
@@ -39,6 +38,7 @@ import {
   type DeckSource,
 } from '../src/site/home-timeline'
 import { followListStale, followVersioned } from '../src/site/home-follow'
+import { DeckMeta } from './DeckMeta'
 import { HomeCarousel } from './HomeCarousel'
 
 /** A slide of the timeline; the "following" tab's carry their source. */
@@ -291,32 +291,14 @@ export function HomeTimeline(props: HomeTimelineProps) {
                   ) : null}
                 </div>
                 <div className="timeline-card-head">
-                  <p className="card-meta">
-                    <a className="card-author" href={item.deck.authorHref}>
-                      <span className="card-author-face" aria-hidden="true">
-                        {item.deck.handle.slice(0, 1).toUpperCase()}
-                        {item.deck.authorAvatarUrl ? (
-                          <img
-                            data-cover
-                            src={item.deck.authorAvatarUrl}
-                            alt=""
-                            loading="lazy"
-                            referrerpolicy="no-referrer"
-                          />
-                        ) : null}
-                      </span>
-                      @{item.deck.handle}
-                    </a>
-                    {item.deck.source?.kind === 'person' ? (
-                      <span className="source-label">{t.followedAuthor}</span>
-                    ) : null}
-                    {citedCountText(item.deck.citedBy, props.lang) ===
-                    null ? null : (
-                      <span className="card-cited">
-                        {citedCountText(item.deck.citedBy, props.lang)}
-                      </span>
-                    )}
-                  </p>
+                  <DeckMeta
+                    lang={props.lang}
+                    authorHref={item.deck.authorHref}
+                    handle={item.deck.handle}
+                    authorAvatarUrl={item.deck.authorAvatarUrl}
+                    source={item.deck.source}
+                    citedBy={item.deck.citedBy}
+                  />
                   <a
                     className="icon-link"
                     href={item.deck.href}
