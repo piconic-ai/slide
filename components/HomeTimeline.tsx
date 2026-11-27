@@ -238,9 +238,8 @@ export function HomeTimeline(props: HomeTimelineProps) {
                 <span className="deck-cover"></span>
               </span>
               <div className="timeline-card-head">
-                <span className="timeline-card-title">&nbsp;</span>
+                <p className="card-meta">&nbsp;</p>
               </div>
-              <p className="card-meta">&nbsp;</p>
             </li>
           ))}
         </ul>
@@ -292,9 +291,32 @@ export function HomeTimeline(props: HomeTimelineProps) {
                   ) : null}
                 </div>
                 <div className="timeline-card-head">
-                  <a className="timeline-card-title" href={item.deck.href}>
-                    {item.deck.name}
-                  </a>
+                  <p className="card-meta">
+                    <a className="card-author" href={item.deck.authorHref}>
+                      <span className="card-author-face" aria-hidden="true">
+                        {item.deck.handle.slice(0, 1).toUpperCase()}
+                        {item.deck.authorAvatarUrl ? (
+                          <img
+                            data-cover
+                            src={item.deck.authorAvatarUrl}
+                            alt=""
+                            loading="lazy"
+                            referrerpolicy="no-referrer"
+                          />
+                        ) : null}
+                      </span>
+                      @{item.deck.handle}
+                    </a>
+                    {item.deck.source?.kind === 'person' ? (
+                      <span className="source-label">{t.followedAuthor}</span>
+                    ) : null}
+                    {citedCountText(item.deck.citedBy, props.lang) ===
+                    null ? null : (
+                      <span className="card-cited">
+                        {citedCountText(item.deck.citedBy, props.lang)}
+                      </span>
+                    )}
+                  </p>
                   <a
                     className="icon-link"
                     href={item.deck.href}
@@ -316,32 +338,6 @@ export function HomeTimeline(props: HomeTimelineProps) {
                     </span>
                   </a>
                 </div>
-                <p className="card-meta">
-                  <a className="card-author" href={item.deck.authorHref}>
-                    <span className="card-author-face" aria-hidden="true">
-                      {item.deck.handle.slice(0, 1).toUpperCase()}
-                      {item.deck.authorAvatarUrl ? (
-                        <img
-                          data-cover
-                          src={item.deck.authorAvatarUrl}
-                          alt=""
-                          loading="lazy"
-                          referrerpolicy="no-referrer"
-                        />
-                      ) : null}
-                    </span>
-                    @{item.deck.handle}
-                  </a>
-                  {item.deck.source?.kind === 'person' ? (
-                    <span className="source-label">{t.followedAuthor}</span>
-                  ) : null}
-                  {citedCountText(item.deck.citedBy, props.lang) ===
-                  null ? null : (
-                    <span className="card-cited">
-                      {citedCountText(item.deck.citedBy, props.lang)}
-                    </span>
-                  )}
-                </p>
                 {item.deck.source?.kind === 'community' ? (
                   <p className="card-source">
                     <span

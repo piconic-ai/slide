@@ -78,7 +78,7 @@ async function openTop({ locale = 'ja-JP', failFirstList = false } = {}) {
 
 const titles = (page: Page) =>
   page
-    .locator('.timeline-list .timeline-card .timeline-card-title')
+    .locator('.timeline-list .timeline-card .deck-cover-name')
     .allTextContents()
 
 test('Given public decks, When an English reader opens the top page and switches to Japanese, Then the grid loads under the page CSP in the chosen language', async () => {
@@ -89,7 +89,7 @@ test('Given public decks, When an English reader opens the top page and switches
   expect(await titles(page)).toEqual(['<b>New</b> talk', 'Old talk'])
   expect(
     await page
-      .locator('.timeline-list a.timeline-card-title')
+      .locator('.timeline-list a.icon-link')
       .first()
       .getAttribute('href'),
   ).toBe('/@owner/new')

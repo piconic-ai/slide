@@ -78,20 +78,6 @@ export const timelineStyle = html`<style>
     gap: 8px;
     margin-top: 8px;
   }
-  .timeline-card-title {
-    flex: 1 1 auto;
-    min-width: 0;
-    display: -webkit-box;
-    overflow: hidden;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    color: var(--foreground);
-    font-size: 16px;
-    font-weight: 700;
-    line-height: 1.5;
-    text-decoration: none;
-  }
   /* The link to the viewer: a 44px target around a 36px round icon. */
   .icon-link {
     flex: none;
@@ -138,6 +124,12 @@ export const timelineStyle = html`<style>
   }
   .timeline-card .card-source {
     margin-top: 0;
+  }
+  /* The author's line stands where the title was; the arrow sits at its end. */
+  .timeline-card-head .card-meta {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
   }
   .timeline-card .card-meta a,
   .timeline-card .card-source a {
@@ -188,9 +180,6 @@ export const timelineStyle = html`<style>
   /* The placeholder of a card that is on its way. */
   .timeline-loading .timeline-card .deck-cover {
     background: var(--secondary);
-  }
-  .timeline-loading .timeline-card-title {
-    min-height: 24px;
   }
 
   /* A note where the list is empty or could not be read. */
