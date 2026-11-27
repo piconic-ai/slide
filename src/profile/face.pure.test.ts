@@ -3,6 +3,7 @@ import {
   FACE_ASKED_AGAIN,
   FACE_KEPT,
   faceCacheControl,
+  authorAvatarUrl,
   facePath,
   faceSourceOf,
   faceVersion,
@@ -142,5 +143,36 @@ describe('F28-AC101: faceCacheControl', () => {
   test('F28-AC101: Given the two answers, When they are read, Then one is kept a year without asking, and the other is asked for each time', () => {
     expect(FACE_KEPT).toBe('public, max-age=31536000, immutable')
     expect(FACE_ASKED_AGAIN).toBe('no-cache')
+  })
+})
+
+describe('authorAvatarUrl', () => {
+  const columns = {
+    authorUserId: 'u1',
+    uploadedAt: null,
+    useGravatar: null,
+    gravatarAt: null,
+  }
+
+  test('Given an author with no profile row and no picture, When their address is made, Then Gravatar is on, as for everyone at first', () => {
+    expect(authorAvatarUrl(columns)).toBe('/avatars/u1?v=g')
+  })
+
+  test('Given an uploaded picture and Gravatar on, When their address is made, Then the uploaded picture wins and its time is the version', () => {
+    expect(
+      authorAvatarUrl({ ...columns, uploadedAt: 1234, useGravatar: 1 }),
+    ).toBe('/avatars/u1?v=u1234')
+  })
+
+  test('Given Gravatar turned off and no picture, When their address is made, Then it names no picture', () => {
+    expect(authorAvatarUrl({ ...columns, useGravatar: 0 })).toBe(
+      '/avatars/u1?v=n',
+    )
+  })
+
+  test('Given Gravatar asked at a time, When their address is made, Then that time is the version', () => {
+    expect(
+      authorAvatarUrl({ ...columns, useGravatar: 1, gravatarAt: 99 }),
+    ).toBe('/avatars/u1?v=g99')
   })
 })

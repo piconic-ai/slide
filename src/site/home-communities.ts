@@ -29,14 +29,11 @@ export const toCommunityRecentDeck = (
   contentBase: URL | null,
   /** How many decks cite each, by `handle/slug`; a deck left out has none. */
   citedBy: ReadonlyMap<string, number> = new Map(),
-  /** Each author's picture, by handle. */
-  faces: ReadonlyMap<string, string> = new Map(),
 ): CommunityRecentDeck => ({
   ...toRecentDeck(
     talk,
     contentBase,
     citedBy.get(citedKey(talk.handle, talk.slug)),
-    faces.get(talk.handle) ?? null,
   ),
   community: {
     name: talk.community.name,
@@ -50,9 +47,6 @@ export const toHomeCommunities = (
   talks: readonly FollowedCommunityTalk[],
   contentBase: URL | null,
   citedBy: ReadonlyMap<string, number> = new Map(),
-  faces: ReadonlyMap<string, string> = new Map(),
 ): HomeCommunityLists => ({
-  talks: talks.map((talk) =>
-    toCommunityRecentDeck(talk, contentBase, citedBy, faces),
-  ),
+  talks: talks.map((talk) => toCommunityRecentDeck(talk, contentBase, citedBy)),
 })

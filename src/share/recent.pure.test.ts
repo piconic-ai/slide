@@ -11,6 +11,7 @@ const deck = {
   readyAt: 100,
   deploymentId: '7ae11c67-633f-4f21-b2b1-80af84107428',
   coverPath: null,
+  authorAvatarUrl: '/avatars/u1?v=g',
 }
 const base = new URL('https://content.example')
 const origin = 'https://d-7ae11c67-633f-4f21-b2b1-80af84107428.content.example'
@@ -41,7 +42,7 @@ test('Given no content origin, When a recent deck is made, Then it has no cover 
     handle: 'owner',
     slug: 'talk',
     authorHref: '/@owner',
-    authorAvatarUrl: null,
+    authorAvatarUrl: '/avatars/u1?v=g',
     publishedAt: '1970-01-01T00:01:40.000Z',
     coverUrl: null,
     citedBy: 0,

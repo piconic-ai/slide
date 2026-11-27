@@ -14,6 +14,7 @@ import {
   blocks,
   decks,
   mutes,
+  profilePictures,
   profiles,
   suspensions,
 } from '../db/schema'
@@ -119,8 +120,14 @@ describe('the "following" tab', () => {
     await seedPublic(db, 'bobs', 300, 'Bob’s', BOB)
     await talkIn('carols-talk', 200, CAROL)
     await seedPublic(db, 'strangers', 400, 'Stranger’s', DAVE)
+    await orm.insert(profilePictures).values({ user_id: BOB, uploaded_at: 42 })
     const list = await following()
     expect(hrefs(list)).toEqual(['/@bob/bobs', '/@carol/carols-talk'])
+    // Each card carries its own author's face, read in the same query.
+    expect(list?.map((deck) => deck.authorAvatarUrl)).toEqual([
+      `/avatars/${BOB}?v=u42`,
+      `/avatars/${CAROL}?v=g`,
+    ])
     expect(list?.map((deck) => deck.source)).toEqual([
       { kind: 'person' },
       {

@@ -1,4 +1,5 @@
 import { html } from 'hono/html'
+import { z } from 'zod'
 import { GRAVATAR_KEEP_SECONDS } from './gravatar'
 
 /** The user-id shape the service issues; anything else names nobody. */
@@ -103,3 +104,30 @@ export const faceImage = (src: string, className = '') =>
     loading="lazy"
     referrerpolicy="no-referrer"
   />`
+
+/**
+ * What a list's query reads beside each author to decide their face: the
+ * same facts as `FaceFacts`, with the author's id, as nullable columns of
+ * the two tables a person may have no row in.
+ */
+export const authorFaceColumns = z.object({
+  authorUserId: z.string(),
+  uploadedAt: z.number().int().nullable(),
+  useGravatar: z.number().int().nullable(),
+  gravatarAt: z.number().int().nullable(),
+})
+export type AuthorFaceColumns = z.infer<typeof authorFaceColumns>
+
+/**
+ * Where an author's picture is served from, for a card. A person with no
+ * profile row yet has Gravatar on, as everyone starts.
+ */
+export const authorAvatarUrl = (columns: AuthorFaceColumns): string =>
+  facePath(
+    columns.authorUserId,
+    faceSourceOf({
+      uploadedAt: columns.uploadedAt,
+      useGravatar: columns.useGravatar !== 0,
+      gravatarAt: columns.gravatarAt,
+    }),
+  )

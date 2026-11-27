@@ -11,8 +11,8 @@ export type RecentDeck = Readonly<{
   /** With the handle and the time, the keys the list is sorted on. */
   slug: string
   authorHref: string
-  /** The author's picture, or null before the page knows it; the card then shows the initial. */
-  authorAvatarUrl: string | null
+  /** Where the author's picture is served from; the initial shows under it. */
+  authorAvatarUrl: string
   /** ISO 8601; the page writes the day in its own language. */
   publishedAt: string
   /** The cover image; without one the card shows the name alone. */
@@ -29,14 +29,13 @@ export const toRecentDeck = (
   deck: PublicDeck,
   contentBase: URL | null,
   citedBy = 0,
-  authorAvatarUrl: string | null = null,
 ): RecentDeck => ({
   name: deckName(deck),
   href: sharePath(deck.handle, deck.slug),
   handle: deck.handle,
   slug: deck.slug,
   authorHref: profilePath(deck.handle),
-  authorAvatarUrl,
+  authorAvatarUrl: deck.authorAvatarUrl,
   publishedAt: new Date(deck.readyAt * 1000).toISOString(),
   coverUrl: contentBase
     ? coverUrl(contentBase, deck.deploymentId, deck.coverPath)
