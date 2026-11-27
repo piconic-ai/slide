@@ -5,7 +5,7 @@ import { SERVICE_NAME } from '../../../site/service'
 export default defineArticle({
   order: 10,
   form: 'howto',
-  related: ['slides/accepted-files', 'slides/limits', 'slides/replace'],
+  related: ['slides/accepted-files', 'slides/limits', 'slides/daily-limit'],
   ja: {
     title: 'スライドを置く',
     lead: () =>
@@ -47,6 +47,17 @@ export default defineArticle({
             >)をだれでも開けるようになります。
           </li>
         </ol>
+        <p>
+          登録から ${n.newAuthorDays}
+          日のあいだは、新しく置き始められるスライドは、直近
+          ${n.newAuthorWindowHours} 時間に ${n.newAuthorPerDay}
+          本までです。上限に達すると「今日はこれ以上置けません」と出ます(<a
+            href="/help/slides/daily-limit"
+            >「今日はこれ以上置けません」と出たとき</a
+          >)。新しい版への差し替えは、数えません(<a href="/help/slides/replace"
+            >スライドを差し替える</a
+          >)。
+        </p>
         <p>
           公開を止めるときは、同じページの「公開を止める」を押します。止めると、読者は開けなくなります。もう一度公開すると、同じ
           URL
@@ -97,6 +108,15 @@ export default defineArticle({
             link (<code>/@handle/name</code>).
           </li>
         </ol>
+        <p>
+          For the first ${n.newAuthorDays} days after you register, you can
+          start up to ${n.newAuthorPerDay} new slides in any
+          ${n.newAuthorWindowHours} hours. When you reach the limit, it says
+          “You can't put up any more today” (<a href="/help/slides/daily-limit"
+            >When it says “You can’t put up any more today”</a
+          >). Putting a new version on a slide you already have does not count
+          (<a href="/help/slides/replace">Replace slides</a>).
+        </p>
         <p>
           To stop publishing, press “Stop publishing” on the same page. Readers
           can no longer open the slides; publish again and they open at the same

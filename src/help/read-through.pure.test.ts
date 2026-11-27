@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest'
-import type { Lang } from '../site/i18n'
+import { LANGS, type Lang } from '../site/i18n'
+import { parseNewAuthorLimits } from '../uploads/new-author-limits'
 import type { HelpAim } from './aims'
 import { findArticle } from './catalog'
 import { HELP_CATALOG } from './default-catalog'
@@ -41,5 +42,41 @@ describe('the article on publishing an article', () => {
     const en = await render('articles/publish', 'en')
     expect(en.body).toContain('the text that was saved')
     expect(en.body).not.toContain('what is kept is published')
+  })
+})
+
+describe('the limit on new slides of a new account', () => {
+  const limits = parseNewAuthorLimits({})
+
+  test.each(['slides/limits', 'slides/upload'])(
+    'F36-AC51: Given %s in each language, When it is read, Then it states the days, the hours and the number of the code, and leads to the article on the limit',
+    async (key) => {
+      for (const lang of LANGS) {
+        const { body, bodyHtml } = await render(key, lang)
+        for (const figure of [
+          limits.days,
+          limits.perDay,
+          numbers.newAuthorWindowHours,
+        ])
+          expect(body, `${key} ${lang}`).toContain(String(figure))
+        expect(bodyHtml).toContain('href="/help/slides/daily-limit"')
+      }
+    },
+  )
+
+  test.each(['slides/limits', 'slides/upload'])(
+    'F36-AC51: Given %s, When its related articles are read, Then the article on the limit is one of them and there are still at most three',
+    async (key) => {
+      const { related } = await render(key, 'ja')
+      expect(related).toContain('slides/daily-limit')
+      expect(related.length).toBeLessThanOrEqual(3)
+    },
+  )
+
+  test('F36-AC51: Given a replaced version, When the article on putting up slides is read, Then it says a replacement does not count, as the article on the limit does', async () => {
+    const ja = await render('slides/upload', 'ja')
+    expect(ja.body).toContain('差し替えは、数えません')
+    const en = await render('slides/upload', 'en')
+    expect(en.body).toContain('does not count')
   })
 })
