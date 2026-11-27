@@ -202,7 +202,7 @@ iOS Safari・Android Chrome の実機と、本番の Cloudflare 経由での表�
 
 ### ツールごとの読み替え
 
-未実装である。[URL を渡して読んでもらう](../features/f03-sharing.md)の F03-AC184〜F03-AC198 を作るときの出発点として、決まっていることと、実物の出力で観測したことを書く。計画は [#694](https://github.com/piconic-ai/slide/issues/694) と、そこから切った issue にある。
+未実装である。[URL を渡して読んでもらう](../features/f03-sharing.md)の F03-AC184〜F03-AC201 を作るときの出発点として、決まっていることと、実物の出力で観測したことを書く。計画は [#694](https://github.com/piconic-ai/slide/issues/694) と、そこから切った issue にある。
 
 - 方針(2026-11-27、依頼者): ページの持ち方が slide の決まり(1 始まりの `#6`、peitho の `?slide=6`)と違うツールは、サービスが読み替える。作者のファイルは変えず、作者にツールの設定を求めない。ツールごとの読み取りを、ページを伝える script(`src/pages/script.ts`)に足す。[開発設計](design.md#deployment)の「manifest とページ」にある adapter の案(`ready`、`getPage`、`goToPage`、`onPageChanged`)が、ツールごとに持つ役割として近い。どのツールの出力かは、サービスが出力の手がかりで判定する。
 - 読み替えは 2 方向に要る。スライドから viewer へは、表示中のページを読むところ(`pageScript` の `pageOf`)。サービスからスライドへは、ページ番号を渡して開くところで、いまはどれも `/#6` を渡している。viewer の枠の URL(`src/share/routes.ts`。作者だけが開ける版は `/_preview/launch` の `page`)、記事のページの画像を押したときの移動(`public/share.js`)、ページの画像の撮影(`src/covers/shot.ts`)、埋め込みの枠の URL(`src/embed/routes.ts`)の 4 つである。
@@ -215,8 +215,9 @@ iOS Safari・Android Chrome の実機と、本番の Cloudflare 経由での表�
 | reveal.js(6.0.2、既定の設定) | `#/h/v/f`(0 始まり)。既定(`hash` を指定しない)では、めくっても URL を書かない | 4 ページ目が出る(`#3` を 0 始まりで読む) | 5 ページ目が出て、枠は `/#3` のまま。アドレスバーは `/@handle/slug/3` のまま | markup の `.reveal` の中の `.slides`。script を `<script src>` で読むスライドには global の `Reveal` があり、`getIndices`、`getHorizontalSlides`、`getVerticalSlides`、`slidechanged` の event を持つ |
 | Slidev(`@slidev/cli` 53.2.0) | path(`/3`、1 始まり)。`/` を `/1` に直す | 1 ページ目が出る。枠は `/1#3`(`#3` は読まれない) | 2 ページ目が出て、枠は `/2`(fragment は消える)。アドレスバーは `/@handle/slug`(fragment が空なので、1 ページ目と受け取る) | `index.html` の `<meta property="slidev:version" content="53.2.0">` |
 
-手がかりは候補で、決めていない。suraido.js の判定、reveal.js の縦のスライドの写し方、Slidev の `routerMode: hash` は、仕様の未決事項である。実装のときに確かめることは、次のとおり。
+手がかりは候補で、決めていない。suraido.js の判定と、Slidev の `routerMode: hash` は、仕様の未決事項である。実装のときに確かめることは、次のとおり。
 
+- reveal.js の縦のスライドは、読む順の通し番号をページ番号にする(F03-AC199〜F03-AC201)。上の表の fixture は、縦のスライドを持たない。縦のスライドを持つ出力を fixture に足し、読む順の番号を何から読むかを確かめる(候補は、fixture の `dist/reveal.js` にある `getSlidePastCount`。reveal.js 自身のスライド番号の表示が使っている)。
 - reveal.js を ES module で読み込むスライドには、global の `Reveal` がない。そのスライドで、表示中のページを何から読むか(`.slides` の中の `section.present` など)。
 - 差し込む script は、いまは `viewerOrigin` だけを持ち、どのスライドにも同じ文字列である。`index.html` の `ETag` は、その文字列のハッシュで決まる(`injectedValidator`)。配信の側で判定して、ツールごとに違う文字列を差し込むなら、`ETag` の決め方も変わる。script の中で判定するなら、変わらない。
 - 差し込む script は、作者の最初の script より前に動くので、渡された `#3` を、ツールが URL を読む前に、そのツールの綴りへ直せる位置にある。ただし、その時点では `<head>` の残りがまだ読まれていない(Slidev の meta は、差し込む位置より後ろにある)。
