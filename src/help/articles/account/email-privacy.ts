@@ -15,11 +15,11 @@ export default defineArticle({
           が取ってきて配るので、ページにはメールアドレスも、そこから作った値も出ません。
         </p>
         <p>
-          運営は、招待の一覧で、招待したアドレスを読みます。メールアドレスは、${SERVICE_NAME}
-          のデータベースに、そのままの形で預かっています(<a
+          メールアドレスは、${SERVICE_NAME}
+          のデータベースに、そのままの形で預かっています。表示する場面は、運営の画面に出る場面も含めて、<a
             href="/help/safety/data-we-keep"
             >預かっている情報と、その守り方</a
-          >)。
+          >の一覧にあります。
         </p>
         <p>
           顔写真を登録していない人の既定の画像を Gravatar
@@ -40,11 +40,12 @@ export default defineArticle({
           page shows the address or anything made from it.
         </p>
         <p>
-          The operator reads the addresses it invited in its invitation list.
-          Your address is kept as plain text in ${SERVICE_NAME}’s database (<a
-            href="/help/safety/data-we-keep"
+          Your address is kept as plain text in ${SERVICE_NAME}’s database. The
+          places where it is shown, including those on the operator’s screens,
+          are listed in
+          <a href="/help/safety/data-we-keep"
             >what we keep, and how we protect it</a
-          >).
+          >.
         </p>
         <p>
           When the default picture of someone who has not set a photo is taken
