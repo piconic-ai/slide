@@ -652,7 +652,7 @@
     {
       "id": "story-9-29",
       "type": "text",
-      "text": "### F29\n関連リンクのイベントの URL で、イベントの発表として並ぶ\n\n[イベントの発表として並ぶ](features/f29-event-talks.md)",
+      "text": "### F29\n関連リンクのイベントの URL を、イベントの鍵にそろえる(見せ方はリンクのページ)\n\n[イベントの発表として並ぶ](features/f29-event-talks.md)",
       "x": 340,
       "y": 1280,
       "width": 310,
