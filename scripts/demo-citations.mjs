@@ -1,5 +1,5 @@
 // Seeds a local Worker with two public decks to try citations: a deck built
-// elsewhere, and examples/citing, which links to pages of the first. Both are
+// elsewhere, and the citing fixture, which links to pages of the first. Both are
 // sent the way a browser sends them: the upload starts with the author's
 // session, and the files and the finalize go through the real routes, so the
 // links are read when each upload is finalized. Local only; with wrangler it
@@ -37,7 +37,7 @@ const CITING = 'citing-demo'
 const DESCRIPTION =
   process.env.SLIDE_DEMO_DESCRIPTION ??
   'BarefootJS のテストで実際に使っている六つのテスト技法を、事例とともに紹介します。'
-/** The origin examples/citing is written against. */
+/** The origin used in the citing fixture. */
 const PRODUCTION = 'https://slide.community'
 /** Must match BETTER_AUTH_SECRET of the local Worker; never used elsewhere. */
 const SECRET =
@@ -159,7 +159,9 @@ try {
   await mkdir(citing)
   await writeFile(
     join(citing, 'index.html'),
-    (await readFile('examples/citing/index.html', 'utf8')).replaceAll(
+    (
+      await readFile('scripts/fixtures/verify-slide/citing/index.html', 'utf8')
+    ).replaceAll(
       `${PRODUCTION}/@kfly8/barefootjs-testing`,
       `${origin}/@${OWNER.handle}/${CITED}`,
     ),

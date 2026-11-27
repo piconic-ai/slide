@@ -241,11 +241,11 @@ migration `0029` で、`deployments` から GitHub 由来の列を消し、出�
 ```sh
 # 公開済みのスライドを 2 つ作り、作者の cookie を表示する
 SLIDE_DEMO_DECK=try-static SLIDE_PERSIST_TO="$STATE" \
-  node scripts/demo-citations.mjs examples/static http://localhost:8811
+  node scripts/demo-citations.mjs scripts/fixtures/verify-slide/static http://localhost:8811
 
 # 自分のスライドに、新しい版を足す
 SLIDE_ID=try-static SLIDE_OWNER_COOKIE="$COOKIE" \
-  node scripts/upload.mjs examples/static http://localhost:8811
+  node scripts/upload.mjs scripts/fixtures/verify-slide/static http://localhost:8811
 
 # 受け取りの経路を確かめる
 SLIDE_PERSIST_TO="$STATE" node scripts/verify-upload.mjs http://localhost:8811

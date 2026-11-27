@@ -262,7 +262,7 @@ node scripts/load/run.mjs post-talk-uploads --origin http://localhost:8787 --coo
 
 ```sh
 .agents/skills/verify-slide/launch.sh 8811 "$STATE"          # 別の端末で
-SLIDE_DEMO_DECK=try-static SLIDE_PERSIST_TO="$STATE" node scripts/demo-citations.mjs examples/static http://localhost:8811
+SLIDE_DEMO_DECK=try-static SLIDE_PERSIST_TO="$STATE" node scripts/demo-citations.mjs scripts/fixtures/verify-slide/static http://localhost:8811
 node scripts/load/run.mjs hot-slide --origin http://localhost:8811 --slide /@kfly8/try-static --views-per-minute 600 --duration 5
 node scripts/load/run.mjs venue-300 --origin http://localhost:8811 --slide /@kfly8/try-static --viewers 40 --within 4 --client-ip 203.0.113.7
 node scripts/load/make-local-authors.mjs "$STATE" 6 > cookies.json

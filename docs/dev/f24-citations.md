@@ -140,7 +140,7 @@ viewer は、引用している側とされている側を、それぞれ 4 件�
 | 節の出し分け(3 本と 4 本の境目、コミュニティの無いイベント、8 本、重なり) | `src/share/viewer-talks.pure.test.ts`、`src/share/viewer-talks.test.ts`(ローカルの HTTP・D1) |
 | スライドの中のリンクでの移動と、移動しない場合。ミュートの後の一覧の差し替え | `src/share/viewer.browser.test.ts`(Chromium・Firefox・WebKit) |
 
-ローカルで動かすときは、[verify-slide の対応表](../../.agents/skills/verify-slide/features/README.md)の引用の行に従う。`examples/citing` が、引用するスライドの例である。
+ローカルで動かすときは、[verify-slide の対応表](../../.agents/skills/verify-slide/features/README.md)の引用の行に従う。引用する側には `scripts/fixtures/verify-slide/citing` を使う。
 
 ## 決めていないこと
 

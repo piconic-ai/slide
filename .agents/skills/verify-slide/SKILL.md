@@ -35,7 +35,7 @@ port と状態の置き場を、自分専用に決めて起動する。ほかの
 
 ```sh
 SLIDE_DEMO_DECK=try-static SLIDE_PERSIST_TO="$STATE" \
-  node scripts/demo-citations.mjs examples/static http://localhost:8811
+  node scripts/demo-citations.mjs scripts/fixtures/verify-slide/static http://localhost:8811
 ```
 
 出力の `Owner cookie: __Host-slide_owner=...` の値を控える。作者は `kfly8`(ローカルの D1 に、利用者・招待・session の行を作る。メールアドレスは `kfly8@local.example`)、スライドは `http://localhost:8811/@kfly8/try-static`、管理画面は `http://localhost:8811/my/slides/try-static` である。ローカルの D1 に直接作るのは、作者の session、スライドの行、公開の状態と、2 人の作者の固定のプロフィール(`scripts/demo-profiles.mjs`。名前、場所、Web サイト、自己紹介。顔写真は入れないので、どちらも頭文字。アップロードは設定から確かめる)だけである。版(`deployments`、`upload_files`)は、受け取りの経路が作る。Worker に、認証を迂回する route は足さない。
@@ -44,7 +44,7 @@ SLIDE_DEMO_DECK=try-static SLIDE_PERSIST_TO="$STATE" \
 
 ```sh
 SLIDE_ID=try-static SLIDE_OWNER_COOKIE="$COOKIE" \
-  node scripts/upload.mjs examples/static http://localhost:8811
+  node scripts/upload.mjs scripts/fixtures/verify-slide/static http://localhost:8811
 ```
 
 ログインの画面そのものを確かめるときは、cookie を使わずに通す。招待の一覧に足し、コードを求め、送信箱からコードを読む。
