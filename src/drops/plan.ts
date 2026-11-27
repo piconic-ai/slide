@@ -1,3 +1,4 @@
+import { isHostingConfigFile } from '../uploads/ignored-files'
 import type { VersionLimits } from '../uploads/version-limits'
 import { checkFiles, type DropRefusal } from './precheck'
 import { chooseRoot } from './root'
@@ -66,10 +67,10 @@ const refused = (refusal: DropRefusal): Plan => ({ ok: false, refusal })
 
 /**
  * The files of a dropped zip, unpacked: those below its root, with what
- * macOS added left out. The zip's own list is checked against the limits
- * before anything is unpacked, and each file is unpacked only up to the
- * size the list gives it, so a zip that unpacks to more than it says cannot
- * fill the browser's memory.
+ * macOS added and the hosting settings at its top left out. The zip's own
+ * list is checked against the limits before anything is unpacked, and each
+ * file is unpacked only up to the size the list gives it, so a zip that
+ * unpacks to more than it says cannot fill the browser's memory.
  */
 export async function zipDrop(
   bytes: Uint8Array,
@@ -87,7 +88,12 @@ export async function zipDrop(
     const path = entry.path.startsWith(root.prefix)
       ? entry.path.slice(root.prefix.length)
       : null
-    return path !== null && below.has(path) ? [{ entry, path }] : []
+    // The hosting settings are judged by their place below the root, so
+    // they are left out here, after it is known and before anything is
+    // counted (F22-AC48, F22-AC50).
+    return path !== null && below.has(path) && !isHostingConfigFile(path)
+      ? [{ entry, path }]
+      : []
   })
   const refusal = checkFiles(
     listed.map(({ entry, path }) => ({ path, size: entry.size })),

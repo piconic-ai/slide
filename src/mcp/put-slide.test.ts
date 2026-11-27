@@ -294,3 +294,20 @@ test('F23-AC3: Given put_slide beside the other tools, When they are listed, The
     tools.find((tool) => tool.name === 'put_slide')?.description,
   ).toContain('cannot publish')
 })
+
+test('F22-AC52, F22-AC54: Given the two hosting settings at the top of the files, When put_slide is called, Then a slide is made and its version holds neither', async () => {
+  const { isError, data } = await callTool(client, 'put_slide', {
+    files: [
+      { path: '_redirects', text: '/* /index.html 200' },
+      { path: 'index.html', text: page('Settings Talk') },
+      { path: '_headers', text: '/*\n  X-A: b' },
+    ],
+  })
+
+  expect(isError).toBe(false)
+  const rows = await db
+    .select({ path: uploadFiles.path })
+    .from(uploadFiles)
+    .where(eq(uploadFiles.deployment_id, String(data.uploadId)))
+  expect(rows.map(({ path }) => path)).toEqual(['index.html'])
+})

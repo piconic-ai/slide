@@ -12,7 +12,7 @@ workflows:
         - 'pnpm/action-setup@v6.1.1'
     '.github/workflows/pullfrog.yml':
         - 'actions/checkout@v7.0.1'
-        - 'pullfrog/pullfrog@v0.1.138'
+        - 'pullfrog/pullfrog@v0.1.143'
     '.github/workflows/tagpr.yml':
         - 'actions/checkout@v7.0.1'
         - 'songmu/tagpr@v1.21.4'
@@ -54,9 +54,9 @@ dependencies:
         commit: 'sha1-73e46992e05b19abd31f2f3c20e0e7370d762115'
         owner_id: 21320719
         repo_id: 262289747
-    'pullfrog/pullfrog@v0.1.138':
-        ref: 'v0.1.138'
-        commit: 'sha1-9eb4e93d38160a21b0e85b759ab8ea9fecaf5e58'
+    'pullfrog/pullfrog@v0.1.143':
+        ref: 'v0.1.143'
+        commit: 'sha1-512db305e44c284c8034c1b398b7df6352207303'
         owner_id: 223181266
         repo_id: 1032749534
     'songmu/tagpr@v1.21.4':

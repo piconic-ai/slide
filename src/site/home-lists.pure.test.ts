@@ -14,6 +14,7 @@ const followed = (slug: string): PublicDeck => ({
   readyAt: 100,
   deploymentId: `d-${slug}`,
   coverPath: null,
+  authorAvatarUrl: '/avatars/u1?v=g',
 })
 
 test('Given five slides of followed people read, When the list is made, Then all five come in their order as the recent slides show theirs', () => {
@@ -28,6 +29,7 @@ test('Given five slides of followed people read, When the list is made, Then all
     handle: 'bob',
     slug: 'a',
     authorHref: '/@bob',
+    authorAvatarUrl: '/avatars/u1?v=g',
     publishedAt: '1970-01-01T00:01:40.000Z',
     coverUrl: '/covers/d-a.jpg',
     citedBy: 0,

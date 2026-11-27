@@ -7,7 +7,20 @@ import {
   type DeckId,
   type DeckSlug,
 } from '../decks/deck-id'
-import { accounts, decks, deployments, follows } from '../db/schema'
+import {
+  accounts,
+  decks,
+  deployments,
+  follows,
+  profilePictures,
+  profiles,
+} from '../db/schema'
+import { authorFaceFields } from '../profile/author-face-store'
+import {
+  authorAvatarUrl,
+  authorFaceColumns,
+  type AuthorFaceColumns,
+} from '../profile/face'
 import { notBlockedBy } from '../blocks/store'
 import { notMutedBy } from '../mutes/store'
 import { handleSchema, type Handle } from './handle'
@@ -105,7 +118,7 @@ export async function findVisibleAuthor(database: D1Database, input: unknown) {
   return author
 }
 
-const publicDeckSchema = z.object({
+const publicDeckRow = z.object({
   handle: handleSchema,
   slug: deckSlugSchema,
   title: z.string().nullable(),
@@ -114,8 +127,31 @@ const publicDeckSchema = z.object({
   deploymentId: z.string(),
   /** The image file the deck names as its cover, from the deck's root. */
   coverPath: z.string().nullable(),
+  ...authorFaceColumns.shape,
 })
-export type PublicDeck = Readonly<z.infer<typeof publicDeckSchema>>
+export type PublicDeck = Readonly<
+  Omit<z.infer<typeof publicDeckRow>, keyof AuthorFaceColumns> & {
+    /** Where the author's picture is served from. */
+    authorAvatarUrl: string
+  }
+>
+
+/** A row of a list, with the author's face made into the address a card uses. */
+const toPublicDeck = ({
+  authorUserId,
+  uploadedAt,
+  useGravatar,
+  gravatarAt,
+  ...deck
+}: z.infer<typeof publicDeckRow>): PublicDeck => ({
+  ...deck,
+  authorAvatarUrl: authorAvatarUrl({
+    authorUserId,
+    uploadedAt,
+    useGravatar,
+    gravatarAt,
+  }),
+})
 
 /**
  * The decks sorted after `after`: published before it, or in the same
@@ -160,8 +196,11 @@ export async function listPublicDecks(
       readyAt: deployments.ready_at,
       deploymentId: deployments.id,
       coverPath: deployments.cover_path,
+      ...authorFaceFields,
     })
     .from(accounts)
+    .leftJoin(profiles, eq(profiles.user_id, accounts.user_id))
+    .leftJoin(profilePictures, eq(profilePictures.user_id, accounts.user_id))
     .innerJoin(decks, and(eq(decks.owner_user_id, accounts.user_id), notHidden))
     .innerJoin(
       deployments,
@@ -187,7 +226,7 @@ export async function listPublicDecks(
     // Decks published in the same second keep one order across pages.
     .orderBy(desc(deployments.ready_at), accounts.handle, decks.slug)
     .limit(limit)
-  return publicDeckSchema.array().parse(rows)
+  return publicDeckRow.array().parse(rows).map(toPublicDeck)
 }
 
 /**

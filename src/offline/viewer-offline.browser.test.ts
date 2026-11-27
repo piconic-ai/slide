@@ -144,6 +144,38 @@ async function openKept(context: BrowserContext, slug = 'talk', query = '') {
   return Object.assign(page, { errors })
 }
 
+/**
+ * What a page can tell of the offline state when a wait ran out: what the
+ * service answered, whether the viewer's worker was in charge, and what was
+ * left on the list. A failure that only says a count was wrong does not say
+ * which step did not happen.
+ */
+const stateOf = async (page: Page, status: number | undefined) =>
+  JSON.stringify({
+    status,
+    ...(await page
+      .evaluate(
+        async ([viewers, evictions]) => ({
+          controlled: navigator.serviceWorker.controller !== null,
+          workers: (await navigator.serviceWorker.getRegistrations()).map(
+            (registration) => ({
+              scope: registration.scope,
+              active: registration.active?.state ?? null,
+              waiting: registration.waiting?.state ?? null,
+              installing: registration.installing?.state ?? null,
+            }),
+          ),
+          records: (await (await caches.open(viewers as string)).keys()).map(
+            (request) => request.url,
+          ),
+          evictions: (await (await caches.open(evictions as string)).keys())
+            .length,
+        }),
+        [VIEWER_CACHE, EVICT_CACHE],
+      )
+      .catch((error: Error) => ({ unreadable: error.message }))),
+  })
+
 const offline = (...ids: string[]) => {
   states.set('management', 'down')
   for (const id of ids) states.set(id, 'down')
@@ -426,11 +458,20 @@ test.each(withdrawals)(
     await withContext(async (context) => {
       const page = await openKept(context)
       await withdraw()
-      await page.goto(world.viewer('talk'))
+      const answer = await page.goto(world.viewer('talk'))
       await expect.poll(() => page.locator('iframe#deck').count()).toBe(0)
-      await expect
-        .poll(async () => (await recordsOf(page)).length, { timeout: 20_000 })
-        .toBe(0)
+      try {
+        await expect
+          .poll(async () => (await recordsOf(page)).length, {
+            timeout: 20_000,
+          })
+          .toBe(0)
+      } catch (error) {
+        throw new Error(
+          `the withdrawn deck's shell stayed: ${await stateOf(page, answer?.status())}`,
+          { cause: error },
+        )
+      }
       // Another viewer's run clears the version that was forgotten.
       await page.goto(world.viewer('other'))
       await expect

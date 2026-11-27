@@ -2,6 +2,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
 import { block } from '../blocks/store'
+import { drizzle } from 'drizzle-orm/d1'
+import { profilePictures } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import { mute } from '../mutes/store'
 import { applyOperatorCommand } from '../publication/takedown-store'
@@ -22,6 +24,7 @@ import {
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
+const orm = drizzle(db)
 const env = {
   ...testEnv(platform.env),
   CONTENT_ORIGIN: 'https://content.example',
@@ -132,9 +135,21 @@ describe('the new slides of followed communities on the top page', () => {
         href: '/@owner/talk',
         handle: 'owner',
         authorHref: '/@owner',
+        authorAvatarUrl: `/avatars/${OWNER_ID}?v=g`,
         community: { name: 'Kanagawa.pm', href: '/@kanagawapm', color: 'red' },
       }),
     ])
+  })
+
+  test('F31-AC4: Given an author with an uploaded picture, When their slide of a followed community comes to the top page, Then its card carries that picture and the slide is still listed once', async () => {
+    await seedTalk('talk', 10, 'kanagawapm')
+    await orm
+      .insert(profilePictures)
+      .values({ user_id: OWNER_ID, uploaded_at: 55 })
+    await followCommunity(db, { userId: BOB, communityId: KANAGAWA, now: 1 })
+    const talks = (await home())?.talks
+    expect(talks).toHaveLength(1)
+    expect(talks?.[0]?.authorAvatarUrl).toBe(`/avatars/${OWNER_ID}?v=u55`)
   })
 
   test('F03-AC168, F03-AC169: Given a visitor who follows no community, follows one with no slide, or is not signed in, When the followed communities tab asks, Then a signed-in visitor gets an empty list either way, and one not signed in gets nothing', async () => {

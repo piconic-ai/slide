@@ -70,7 +70,7 @@ async function open(
     )
     .waitFor()
   if (path === '/') {
-    await page.locator('.timeline-card a.timeline-card-title').first().waitFor()
+    await page.locator('.timeline-card a.icon-link').first().waitFor()
   }
   if (SHOTS) await page.waitForLoadState('networkidle')
   return page

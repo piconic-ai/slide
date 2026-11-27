@@ -152,7 +152,7 @@ async function settled(path: string, width: number, signedIn: boolean) {
     .locator(signedIn ? '[data-account] .avatar' : '[data-account] .sign-in')
     .waitFor()
   if (path === '/') {
-    await page.locator('.timeline-card a.timeline-card-title').first().waitFor()
+    await page.locator('.timeline-card a.icon-link').first().waitFor()
     await page.locator('[data-drop-choose]:enabled').waitFor()
     await page.locator('.carousel-card').first().waitFor()
   }
