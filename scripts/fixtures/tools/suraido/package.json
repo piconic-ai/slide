@@ -1,0 +1,14 @@
+{
+  "name": "suraido-fixture",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build"
+  },
+  "dependencies": {
+    "suraido.js": "0.5.0"
+  },
+  "devDependencies": {
+    "vite": "8.4.0"
+  }
+}

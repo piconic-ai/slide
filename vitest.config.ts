@@ -41,6 +41,8 @@ export default mergeConfig(
           '**/node_modules/**',
           '**/dist/**',
           '**/public/**',
+          // Real tools' sources and outputs, kept as test input.
+          '**/scripts/fixtures/tools/**',
           '**/*.config.ts',
           '**/*.test.*',
           '**/*.d.ts',

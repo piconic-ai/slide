@@ -23,5 +23,5 @@
     }
   },
   "include": ["**/*.ts", "**/*.tsx"],
-  "exclude": ["node_modules", "dist/components"]
+  "exclude": ["node_modules", "dist/components", "scripts/fixtures/tools"]
 }
