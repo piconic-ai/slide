@@ -302,7 +302,7 @@ export function HomeTimeline(props: HomeTimelineProps) {
                   <a
                     className="icon-link"
                     href={item.deck.href}
-                    aria-label={t.openViewer}
+                    aria-label={t.openViewerOf(item.deck.name)}
                   >
                     <span>
                       <svg

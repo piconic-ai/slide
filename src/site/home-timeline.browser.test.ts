@@ -179,7 +179,9 @@ test('F44-AC4, F44-AC10, F44-AC11: Given public slides, When the top opens at 12
   const second = (await cards.nth(1).boundingBox())!
   expect(second.y).toBe(first.y)
   expect(second.x).toBeGreaterThan(first.x)
-  const open = cards.first().getByRole('link', { name: 'ビューアーで開く' })
+  const open = cards
+    .first()
+    .getByRole('link', { name: 'Bob’s をビューアーで開く' })
   expect(await open.getAttribute('href')).toBe('/@bob/bobs')
   expect(await open.innerText()).toBe('')
   expect((await open.boundingBox())!.height).toBeGreaterThanOrEqual(44)
