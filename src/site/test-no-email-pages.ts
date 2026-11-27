@@ -66,6 +66,7 @@ export const OTHER_PATHS = [
   '/blocks/new',
   '/follows/new',
   '/events/1',
+  '/link',
   '/covers/none.png',
   '/covers/none/none.png',
   '/uploads/none',
