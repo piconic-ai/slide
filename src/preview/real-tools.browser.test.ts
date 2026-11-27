@@ -506,6 +506,30 @@ test.each([
   60000,
 )
 
+test('F03-AC193: Given the article’s images of pages 3 and 5 pressed within half a second, When the slides answer both, Then neither is moved again by the address afterwards', async () => {
+  await withPage(async (page) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await page.goto(`${TEST_ORIGIN}/@owner/revealjs`)
+    const deck = page.frameLocator('iframe#deck')
+    await expect
+      .poll(() => wordsShown(deck), { timeout: 20000 })
+      .toEqual(['alpha'])
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+    await page.evaluate(() => {
+      for (const n of [3, 5])
+        document
+          .querySelector<HTMLElement>(`a[data-article-page="${n}"]`)!
+          .click()
+    })
+    await expect
+      .poll(() => wordsShown(deck), { timeout: 20000 })
+      .toEqual(['echo'])
+    // Past the wait for an answer: a move by the address would show here.
+    await new Promise((resolve) => setTimeout(resolve, 1200))
+    expect(new URL(frameAt(page), 'https://x').hash).toBe('')
+  })
+}, 60000)
+
 test('F03-AC193: Given a piece of HTML the service serves without its page script, When the reader presses the article’s images of pages 3 and 5, Then the slides are moved to /#3 and /#5 as they always were', async () => {
   await withPage(async (page) => {
     await page.emulateMedia({ reducedMotion: 'reduce' })

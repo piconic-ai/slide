@@ -663,13 +663,18 @@ addEventListener('message', (event) => {
     history.replaceState(history.state, '', path + location.search)
   } catch {}
 })
-// The slides that answered the request to move to a page, until its wait is up.
-const answered = new Set()
+// The requests to move to a page that wait for the slides' answer, by their
+// number: the fallback move of each is cancelled when its answer comes, or
+// when a newer request is made (only the latest is of the reader's interest).
+const waiting = new Map()
+let requests = 0
 addEventListener('message', (event) => {
   const main = slidesFrame()
   if (!main || event.source !== main.contentWindow) return
   if (event.origin !== slidesOrigin(main)) return
-  if (event.data?.type === 'slide:opened') answered.add(main)
+  if (event.data?.type !== 'slide:opened') return
+  clearTimeout(waiting.get(event.data.id))
+  waiting.delete(event.data.id)
 })
 // A page of these slides shown as an image in the article: pressing it asks
 // the slides above to move to that page, then brings them into view. The
@@ -687,22 +692,28 @@ document.addEventListener('click', (event) => {
   const page = Number(link.dataset.articlePage)
   if (!main || !Number.isInteger(page) || page < 1 || page > 9999) return
   event.preventDefault()
+  for (const timer of waiting.values()) clearTimeout(timer)
+  waiting.clear()
+  const id = ++requests
   main.contentWindow.postMessage(
-    { type: 'slide:open', page },
+    { type: 'slide:open', page, id },
     slidesOrigin(main),
   )
   // Slides that run no page script (a piece of HTML the service serves as it
   // was put up) cannot answer; they are moved as they always were, by the
   // address of the top of the version with the page as the fragment.
   const target = `${slidesOrigin(main)}/#${page}`
-  setTimeout(() => {
-    if (answered.delete(main)) return
-    try {
-      main.contentWindow.location.replace(target)
-    } catch {
-      main.src = target
-    }
-  }, 500)
+  waiting.set(
+    id,
+    setTimeout(() => {
+      waiting.delete(id)
+      try {
+        main.contentWindow.location.replace(target)
+      } catch {
+        main.src = target
+      }
+    }, 500),
+  )
   const still = matchMedia('(prefers-reduced-motion: reduce)').matches
   main.scrollIntoView({ block: 'start', behavior: still ? 'auto' : 'smooth' })
 })

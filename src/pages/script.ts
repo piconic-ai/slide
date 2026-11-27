@@ -12,7 +12,7 @@ export const PAGE_SCRIPT_PATH = '/_preview/pages.js'
 export const PAGE_MESSAGE = 'slide:page'
 /** The viewer's request that the slides move to a page, with its `page`. */
 export const OPEN_MESSAGE = 'slide:open'
-/** The slides' answer to OPEN_MESSAGE: they took the request. */
+/** The slides' answer to OPEN_MESSAGE: they took the request, with its `id`. */
 export const OPENED_MESSAGE = 'slide:opened'
 /** The viewer's question, for a viewer that started listening late. */
 export const PAGE_REQUEST = 'slide:page-request'
@@ -104,7 +104,7 @@ export const pageScript = (viewerOrigin: string) => `(() => {
       // way; for slides of no known tool the page goes where it is read from.
       const asked = numberOf(String(event.data.page))
       if (asked === null) return
-      parent.postMessage({ type: ${JSON.stringify(OPENED_MESSAGE)}, page: asked }, ${JSON.stringify(viewerOrigin)})
+      parent.postMessage({ type: ${JSON.stringify(OPENED_MESSAGE)}, page: asked, id: event.data.id }, ${JSON.stringify(viewerOrigin)})
       // For slides of no known tool the address is where the page is read
       // from, as it was before the service knew any tool: the version's top
       // with the page as the fragment, which drops what a tool such as
