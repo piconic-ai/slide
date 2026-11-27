@@ -4,5 +4,5 @@ table = true
 exclude = [
   "dist/**",
   "public/components/**",
-  "scripts/fixtures/tools/*/dist/**",
+  "scripts/fixtures/tools/**",
 ]

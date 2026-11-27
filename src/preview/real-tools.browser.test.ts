@@ -141,6 +141,20 @@ const RECORDED: {
       address: '/@owner/slidev',
     },
   },
+  // suraido.js counts pages from 0 in the fragment (#3 is the fourth page),
+  // and writes it with history.replaceState as the reader turns pages.
+  {
+    slug: 'suraido',
+    dir: 'suraido',
+    apart: [],
+    seen: {
+      opened: ['delta'],
+      openedFrame: '/#3',
+      turned: ['echo'],
+      turnedFrame: '/#4',
+      address: '/@owner/suraido/4',
+    },
+  },
 ]
 
 /** What a reader sees of slides of one of these tools, opened at page 3. */
