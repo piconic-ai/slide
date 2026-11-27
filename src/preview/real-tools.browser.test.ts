@@ -122,7 +122,13 @@ const TOOLS = [
  * reveal.js: its defaults, which do not write the address; `hash: true`,
  * which writes it from 0; `hashOneBasedIndex: true`, which counts from 1.
  */
-const SURAIDO = [{ slug: 'suraido', dir: 'suraido', apart: [] }]
+const SURAIDO = [
+  { slug: 'suraido', dir: 'suraido', apart: [] },
+  // The same output without the class of its built-in layout (<Pad>): its
+  // own elements carry no class of its name, as slides that write plain HTML
+  // do not (the bundle's one word of it is changed; nothing else is).
+  { slug: 'suraido-plain', dir: 'suraido', apart: [], plain: true },
+]
 
 const SLIDEV = [
   // `_redirects` is left out of the upload until the service takes a build
@@ -169,6 +175,15 @@ beforeAll(async () => {
     const dir = 'dist' in tool ? `revealjs/${tool.dist}` : `${tool.dir}/dist`
     const built = await readBuilt(join(TOOLS_DIR, dir))
     for (const path of 'apart' in tool ? tool.apart : []) built.delete(path)
+    if ('plain' in tool)
+      for (const [path, bytes] of built)
+        if (path.endsWith('.js'))
+          built.set(
+            path,
+            Buffer.from(
+              bytes.toString().replaceAll('suraido-pad', 'pad-plain'),
+            ),
+          )
     const id = await seedPublic(db, tool.slug, index + 1, tool.slug)
     inventories.set(tool.slug, await store(id, built))
   }
@@ -339,30 +354,34 @@ test('F03-AC191, F03-AC192: Given the real output of Slidev, When the reader ope
   })
 }, 60000)
 
-test('F03-AC184, F03-AC185, F03-AC186: Given the real output of suraido.js, When the reader opens /@owner/suraido/3, turns to page 4 and back to page 1, Then page 3 shows with the address at 3, then /4, then no number', async () => {
-  await withPage(async (page) => {
-    await page.goto(`${TEST_ORIGIN}/@owner/suraido/3`)
-    const deck = page.frameLocator('iframe#deck')
-    await expect
-      .poll(() => wordsShown(deck), { timeout: 20000 })
-      .toEqual(['charlie'])
-    // Settled: the slides were recognised and moved on to page 3, if they
-    // showed another first (the address is not the slides' to change).
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-    expect(await wordsShown(deck)).toEqual(['charlie'])
-    expect(addressOf(page)).toBe('/@owner/suraido/3')
-    await pressInDeck(page, 'ArrowRight')
-    await expect
-      .poll(() => wordsShown(deck), { timeout: 20000 })
-      .toEqual(['delta'])
-    await page.waitForURL((url) => url.pathname === '/@owner/suraido/4')
-    for (let back = 0; back < 3; back++) await pressInDeck(page, 'ArrowLeft')
-    await expect
-      .poll(() => wordsShown(deck), { timeout: 20000 })
-      .toEqual(['alpha'])
-    await page.waitForURL((url) => url.pathname === '/@owner/suraido')
-  })
-}, 60000)
+test.each(['suraido', 'suraido-plain'])(
+  'F03-AC184, F03-AC185, F03-AC186: Given the real output of suraido.js (%s), When the reader opens /@owner/<slug>/3, turns to page 4 and back to page 1, Then page 3 shows with the address at 3, then /4, then no number',
+  async (slug) => {
+    await withPage(async (page) => {
+      await page.goto(`${TEST_ORIGIN}/@owner/${slug}/3`)
+      const deck = page.frameLocator('iframe#deck')
+      await expect
+        .poll(() => wordsShown(deck), { timeout: 20000 })
+        .toEqual(['charlie'])
+      // Settled: the slides were recognised and moved on to page 3, if they
+      // showed another first (the address is not the slides' to change).
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+      expect(await wordsShown(deck)).toEqual(['charlie'])
+      expect(addressOf(page)).toBe(`/@owner/${slug}/3`)
+      await pressInDeck(page, 'ArrowRight')
+      await expect
+        .poll(() => wordsShown(deck), { timeout: 20000 })
+        .toEqual(['delta'])
+      await page.waitForURL((url) => url.pathname === `/@owner/${slug}/4`)
+      for (let back = 0; back < 3; back++) await pressInDeck(page, 'ArrowLeft')
+      await expect
+        .poll(() => wordsShown(deck), { timeout: 20000 })
+        .toEqual(['alpha'])
+      await page.waitForURL((url) => url.pathname === `/@owner/${slug}`)
+    })
+  },
+  60000,
+)
 
 /** The page of each slide of the vertical fixtures, by the word it shows. */
 const PAGE_OF_WORD: Record<string, number> = {
