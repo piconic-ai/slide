@@ -9,14 +9,12 @@ import {
   onCleanup,
   untrack,
 } from '@barefootjs/client'
-import { citedCountText } from '../src/citations/cited-count'
 import {
   focusSlides,
   frameHoldsSlides,
   watchLeaving,
 } from '../src/site/flip-frame'
 import { flipFramePath } from '../src/site/home-flip'
-import { dayFormats } from '../src/share/dates'
 import type { RecentDeck } from '../src/share/recent'
 import type { HomeDiscover } from '../src/site/home-discover'
 import {
@@ -40,6 +38,7 @@ import {
   type DeckSource,
 } from '../src/site/home-timeline'
 import { followListStale, followVersioned } from '../src/site/home-follow'
+import { DeckMeta } from './DeckMeta'
 import { HomeCarousel } from './HomeCarousel'
 
 /** A slide of the timeline; the "following" tab's carry their source. */
@@ -239,9 +238,8 @@ export function HomeTimeline(props: HomeTimelineProps) {
                 <span className="deck-cover"></span>
               </span>
               <div className="timeline-card-head">
-                <span className="timeline-card-title">&nbsp;</span>
+                <p className="card-meta">&nbsp;</p>
               </div>
-              <p className="card-meta">&nbsp;</p>
             </li>
           ))}
         </ul>
@@ -293,13 +291,18 @@ export function HomeTimeline(props: HomeTimelineProps) {
                   ) : null}
                 </div>
                 <div className="timeline-card-head">
-                  <a className="timeline-card-title" href={item.deck.href}>
-                    {item.deck.name}
-                  </a>
+                  <DeckMeta
+                    lang={props.lang}
+                    authorHref={item.deck.authorHref}
+                    handle={item.deck.handle}
+                    authorAvatarUrl={item.deck.authorAvatarUrl}
+                    source={item.deck.source}
+                    citedBy={item.deck.citedBy}
+                  />
                   <a
                     className="icon-link"
                     href={item.deck.href}
-                    aria-label={t.openViewer}
+                    aria-label={t.openViewerOf(item.deck.name)}
                   >
                     <span>
                       <svg
@@ -317,24 +320,6 @@ export function HomeTimeline(props: HomeTimelineProps) {
                     </span>
                   </a>
                 </div>
-                <p className="card-meta">
-                  <a href={item.deck.authorHref}>@{item.deck.handle}</a>
-                  {item.deck.source?.kind === 'person' ? (
-                    <span className="source-label">{t.followedAuthor}</span>
-                  ) : null}
-                  <span aria-hidden="true">·</span>
-                  <time datetime={item.deck.publishedAt}>
-                    {dayFormats[props.lang].format(
-                      new Date(item.deck.publishedAt),
-                    )}
-                  </time>
-                  {citedCountText(item.deck.citedBy, props.lang) ===
-                  null ? null : (
-                    <span className="card-cited">
-                      {citedCountText(item.deck.citedBy, props.lang)}
-                    </span>
-                  )}
-                </p>
                 {item.deck.source?.kind === 'community' ? (
                   <p className="card-source">
                     <span

@@ -3,7 +3,13 @@ import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
-import { accounts, decks, deployments } from '../db/schema'
+import {
+  accounts,
+  decks,
+  deployments,
+  profilePictures,
+  profiles,
+} from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   OWNER_ID,
@@ -76,6 +82,27 @@ const recentDecks = async () => {
   }
 }
 
+test('Given an author with an uploaded picture and one who turned Gravatar off, When the recent decks are requested, Then each card carries its own author’s face and no deck is listed twice', async () => {
+  await seedPublic(db, 'mine', 100, 'Mine')
+  await seedPublic(db, 'theirs', 200, 'Theirs', OTHER_ID)
+  await orm
+    .insert(profilePictures)
+    .values({ user_id: OWNER_ID, uploaded_at: 77 })
+  await orm
+    .insert(profiles)
+    .values({ user_id: OTHER_ID, name: 'Other', use_gravatar: 0 })
+  const { decks: listed } = await recentDecks()
+  expect(
+    listed.map((deck) => [
+      deck.href,
+      (deck as { authorAvatarUrl?: string }).authorAvatarUrl,
+    ]),
+  ).toEqual([
+    ['/@other/theirs', `/avatars/${OTHER_ID}?v=n`],
+    ['/@owner/mine', `/avatars/${OWNER_ID}?v=u77`],
+  ])
+})
+
 test('Given public, draft, paused and deleted decks of two authors, When the recent decks are requested, Then only public decks come newest first with their authors', async () => {
   await seedPublic(db, 'old', 100, 'Old talk')
   await seedPublic(db, 'theirs', 150, '<b>Bold</b> & co', OTHER_ID)
@@ -90,6 +117,7 @@ test('Given public, draft, paused and deleted decks of two authors, When the rec
       handle: 'owner',
       slug: 'new',
       authorHref: '/@owner',
+      authorAvatarUrl: `/avatars/${OWNER_ID}?v=g`,
       publishedAt: '1970-01-01T00:03:20.000Z',
       coverUrl: expect.stringMatching(/^\/covers\/[0-9a-f-]{36}\.jpg$/),
       citedBy: 0,

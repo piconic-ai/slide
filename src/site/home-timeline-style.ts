@@ -76,21 +76,7 @@ export const timelineStyle = html`<style>
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-top: 8px;
-  }
-  .timeline-card-title {
-    flex: 1 1 auto;
-    min-width: 0;
-    display: -webkit-box;
-    overflow: hidden;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    color: var(--foreground);
-    font-size: 16px;
-    font-weight: 700;
-    line-height: 1.5;
-    text-decoration: none;
+    margin-top: 0;
   }
   /* The link to the viewer: a 44px target around a 36px round icon. */
   .icon-link {
@@ -139,9 +125,45 @@ export const timelineStyle = html`<style>
   .timeline-card .card-source {
     margin-top: 0;
   }
+  /* The author's line stands where the title was; the arrow sits at its end. */
+  .timeline-card-head .card-meta {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+  }
   .timeline-card .card-meta a,
   .timeline-card .card-source a {
     color: inherit;
+  }
+  .timeline-card .card-author {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+  .card-author-face {
+    position: relative;
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    overflow: hidden;
+    border-radius: var(--radius-full);
+    background: var(--border);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .card-author-face img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .card-author-face img[hidden] {
+    display: none;
   }
   .timeline-card .source-label {
     padding: 0 8px;
@@ -158,9 +180,6 @@ export const timelineStyle = html`<style>
   /* The placeholder of a card that is on its way. */
   .timeline-loading .timeline-card .deck-cover {
     background: var(--secondary);
-  }
-  .timeline-loading .timeline-card-title {
-    min-height: 24px;
   }
 
   /* A note where the list is empty or could not be read. */

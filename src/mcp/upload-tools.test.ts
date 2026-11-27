@@ -9,6 +9,7 @@ import { decks, deployments, uploadFiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   INVITED_ID,
+  openOwnerSession,
   OWNER_ID,
   seedDeck,
   seedPublic,
@@ -152,6 +153,69 @@ test('F23-AC7: Given begin_upload’s answer, When the agent sends each file to 
   )
   const [deck] = await db.select().from(decks).where(eq(decks.id, 'keynote'))
   expect(deck?.public_deployment_id).toBe(publicBefore)
+})
+
+test('F22-AC52, F22-AC54: Given a list with _redirects and _headers at its top, When the agent begins, sends what the plan names and finishes, Then the plan and the stored version hold neither, and the version’s origin answers 404 for both', async () => {
+  const redirects = Buffer.from('/* /index.html 200')
+  const headers = Buffer.from('/*\n  X-Frame-Options: DENY')
+  const { isError, data } = await callTool(client, 'begin_upload', {
+    slide: 'keynote',
+    files: [
+      listed('_redirects', redirects),
+      ...files,
+      listed('_headers', headers),
+    ],
+  })
+  expect(isError).toBe(false)
+  const plan = data as unknown as Plan
+  expect(plan.files.map(({ path }) => path).sort()).toEqual([
+    'img/dot.png',
+    'index.html',
+  ])
+  for (const file of plan.files)
+    expect((await send(plan, file.path)).status).toBe(200)
+  const finished = await callTool(client, 'finish_upload', {
+    uploadId: plan.uploadId,
+    credential: plan.credential,
+  })
+  expect(finished.isError).toBe(false)
+  const stored = await db
+    .select()
+    .from(uploadFiles)
+    .where(eq(uploadFiles.deployment_id, plan.uploadId))
+  expect(stored.map(({ path }) => path).sort()).toEqual([
+    'img/dot.png',
+    'index.html',
+  ])
+  const contentEnv = {
+    ...env,
+    CONTENT_ORIGIN: 'https://content.example',
+  } as unknown as Env
+  const session = await openOwnerSession(
+    contentEnv,
+    await signIn(contentEnv, 'alice'),
+    `/@alice/keynote?v=${plan.uploadId}`,
+  )
+  const get = (path: string) =>
+    server.fetch(
+      new Request(`https://d-${plan.uploadId}.content.example${path}`, {
+        headers: { Cookie: session },
+      }),
+      contentEnv,
+    )
+  expect((await get('/')).status).toBe(200)
+  expect((await get('/_redirects')).status).toBe(404)
+  expect((await get('/_headers')).status).toBe(404)
+})
+
+test('F22-AC51: Given a list with a hosting file below the top, When begin_upload is called, Then it is refused as invalid and no upload starts', async () => {
+  const { isError, data } = await callTool(client, 'begin_upload', {
+    slide: 'keynote',
+    files: [...files, listed('sub/_redirects', Buffer.from('x'))],
+  })
+
+  expect(isError).toBe(true)
+  expect(data).toMatchObject({ error: 'invalid_files' })
 })
 
 test('F23-AC7: Given begin_upload called without a slide, When the agent sends each file and calls finish_upload, Then new slides are made, private to the author, with a URL name from the title', async () => {
