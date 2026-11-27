@@ -51,6 +51,7 @@ import article_sharing_read_offline from './articles/sharing/read-offline'
 import article_sharing_stored_version from './articles/sharing/stored-version'
 import article_slides_accepted_files from './articles/slides/accepted-files'
 import article_slides_daily_limit from './articles/slides/daily-limit'
+import article_slides_delete_slide from './articles/slides/delete-slide'
 import article_slides_limits from './articles/slides/limits'
 import article_slides_replace from './articles/slides/replace'
 import article_slides_upload from './articles/slides/upload'
@@ -111,6 +112,7 @@ export const HELP_REGISTRY: readonly RegisteredArticle[] = [
   ['sharing/stored-version', article_sharing_stored_version],
   ['slides/accepted-files', article_slides_accepted_files],
   ['slides/daily-limit', article_slides_daily_limit],
+  ['slides/delete-slide', article_slides_delete_slide],
   ['slides/limits', article_slides_limits],
   ['slides/replace', article_slides_replace],
   ['slides/upload', article_slides_upload],

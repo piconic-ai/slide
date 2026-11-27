@@ -24,7 +24,7 @@ import { STASH_CONTINUE_MAX_AGE_MS, STASH_MAX_AGE_MS } from '../drops/stash'
 import { HOME_MORE_STEP } from '../site/home-more'
 import { HOME_FOLLOWING_SHOWN } from '../site/home-shape'
 import { MAX_PAGE } from '../share/path'
-import { DEFAULT_UPLOAD_LIMITS } from '../uploads/limits'
+import { DEFAULT_UPLOAD_LIMITS, START_WINDOW_SECONDS } from '../uploads/limits'
 import { MAX_COMMUNITY_LINKS } from '../communities/link-rules'
 import {
   DESCRIPTION_MAX as COMMUNITY_DESCRIPTION_MAX,
@@ -98,6 +98,9 @@ export const helpNumbers = (signup: SignupMode = 'invitation') =>
     newAuthorPerDay: NEW_AUTHOR_DEFAULTS.perDay,
     newAuthorWindowHours: placementWindowOf(0).seconds / 3600,
     searchTermChars: MAX_TERM_CHARS,
+    // How long the files of a deleted slide stay before they are erased: the
+    // purge waits for the start window (src/decks/deletion-store.ts).
+    deletedFilesHours: START_WINDOW_SECONDS / 3600,
   })
 
 export type HelpNumbers = ReturnType<typeof helpNumbers>

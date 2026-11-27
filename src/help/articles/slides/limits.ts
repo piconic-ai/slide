@@ -4,7 +4,7 @@ import { defineArticle } from '../../article'
 export default defineArticle({
   order: 30,
   form: 'reference',
-  related: ['slides/upload', 'slides/accepted-files', 'slides/daily-limit'],
+  related: ['slides/upload', 'slides/delete-slide', 'slides/daily-limit'],
   ja: {
     title: '置ける大きさと本数の上限を知る',
     lead: (n) =>
@@ -21,6 +21,12 @@ export default defineArticle({
         </ul>
         <p>
           ブラウザから置くときは、版の大きさ、ファイルの大きさ、ファイルの数を、送る前に確かめます。超えているときは、どの上限を超えたかを枠の中に出します。
+        </p>
+        <p>
+          スライドの本数の上限に達したときは、使わないスライドを削除してから、もう一度置きます(<a
+            href="/help/slides/delete-slide"
+            >スライドを削除する</a
+          >)。
         </p>
         <h2>登録したばかりの人の上限</h2>
         <p>
@@ -51,6 +57,13 @@ export default defineArticle({
           When you drop in the browser, the size of the version, the size of
           each file and the number of files are checked before anything is sent.
           If one is over, the drop area says which limit it is.
+        </p>
+        <p>
+          When you have as many slides as one person may hold, delete one you no
+          longer use, then drop the files once more (<a
+            href="/help/slides/delete-slide"
+            >Delete slides</a
+          >).
         </p>
         <h2>The limit for a new account</h2>
         <p>
