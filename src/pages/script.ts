@@ -183,16 +183,18 @@ export const pageScript = (viewerOrigin: string) => `(() => {
   })
   startSlidev()
   // suraido.js. Nothing in its built index.html says what made it, so it is
-  // recognised once it runs: the page has elements whose class starts with
-  // suraido- (or that carry data-suraido-keep), and the theme's custom
-  // properties (--suraido-fg and --suraido-bg) are set on the root. One of
-  // the two alone is not enough: a stylesheet may name a property by chance.
-  // It reads the fragment as a number from 0 on start and on hashchange, so
-  // once it is recognised the page asked for is put there, as a number from 0.
+  // recognised once it runs, by what the deck itself sets: it writes its
+  // scale to the root's own style as --suraido-scale when it fits itself to
+  // the window, and its theme gives the root --suraido-fg and --suraido-bg.
+  // Both are needed: a stylesheet or a script may name one by chance, and a
+  // slide's own elements carry no mark of its name unless it uses the
+  // built-in layout, so they are not looked at. It reads the fragment as a
+  // number from 0 on start and on hashchange, so once it is recognised the
+  // page asked for is put there, as a number from 0.
   const isSuraido = () => {
-    const marked = document.querySelector('[class^="suraido-"], [class*=" suraido-"], [data-suraido-keep]')
-    if (!marked) return false
-    const style = getComputedStyle(document.documentElement)
+    const root = document.documentElement
+    if (root.style.getPropertyValue('--suraido-scale').trim() === '') return false
+    const style = getComputedStyle(root)
     return style.getPropertyValue('--suraido-fg').trim() !== '' && style.getPropertyValue('--suraido-bg').trim() !== ''
   }
   const startSuraido = () => {
@@ -211,7 +213,8 @@ export const pageScript = (viewerOrigin: string) => `(() => {
     startSuraido()
     if (tool) suraidoWatch.disconnect()
   })
-  suraidoWatch.observe(document, { childList: true, subtree: true })
+  // The scale is written to the root's style, which is no change of its children.
+  suraidoWatch.observe(document, { childList: true, subtree: true, attributes: true, attributeFilter: ['style'] })
   // A stylesheet that loads after the page was built sets the properties.
   document.addEventListener('load', startSuraido, true)
   addEventListener('load', () => {

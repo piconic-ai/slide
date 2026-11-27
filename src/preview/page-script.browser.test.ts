@@ -143,18 +143,19 @@ async function decks(): Promise<Record<string, Record<string, string>>> {
           'reveal.js・Slidev・suraido.js で作るスライド',
         ),
     },
-    // Hand-written slides with one of suraido.js's signs and not the other:
-    // the theme's custom properties only, or a class of its name only. Neither
-    // is suraido.js, so the fragment is read from 1 as usual (F03-AC195).
+    // Hand-written slides with one of suraido.js's two signs and not the
+    // other: the theme's custom properties only, or the scale written to the
+    // root only. Neither is suraido.js, so the fragment is read from 1 as
+    // usual (F03-AC195).
     'suraido-css': {
       'index.html': page(
         '<style>:root{--suraido-fg:#111;--suraido-bg:#fff}</style>' + inline,
       ),
     },
-    'suraido-class': {
-      'index.html': page(inline).replace(
-        '<h1 id="title">',
-        '<h1 class="suraido-pad" id="title">',
+    'suraido-scale': {
+      'index.html': page(
+        `<script>document.documentElement.style.setProperty('--suraido-scale', '1')</script>` +
+          inline,
       ),
     },
     // An inline script its own policy refuses: violations are seen.
@@ -325,7 +326,7 @@ test('F03-AC196: Given slides that only name a tool in their title and text, and
   })
 }, 30000)
 
-test.each(['suraido-css', 'suraido-class'])(
+test.each(['suraido-css', 'suraido-scale'])(
   'F03-AC195: Given hand-written slides (%s) with only one sign of suraido.js, and the fragment from 1, When they are opened at /3 and turned, Then they are not read as suraido.js: page 3 is told, and the address follows from 1',
   async (slug) => {
     await withPage(async (page) => {
