@@ -80,18 +80,29 @@
   </nav>
   <script>
     const pages = [...document.querySelectorAll('section')]
-    let current = 0
-    function show(n) {
-      current = Math.max(0, Math.min(pages.length - 1, n))
-      pages.forEach((page, i) => (page.hidden = i !== current))
+    function currentPage() {
+      const page = Number(location.hash.slice(1))
+      return Number.isInteger(page) && page >= 1 && page <= pages.length
+        ? page
+        : 1
+    }
+    function show() {
+      const current = currentPage()
+      pages.forEach((page, i) => (page.hidden = i + 1 !== current))
       document.getElementById('page').textContent =
-        `${current + 1} / ${pages.length}`
+        `${current} / ${pages.length}`
     }
-    document.getElementById('previous').onclick = () => show(current - 1)
-    document.getElementById('next').onclick = () => show(current + 1)
+    function turn(by) {
+      const page = Math.max(1, Math.min(pages.length, currentPage() + by))
+      location.hash = String(page)
+    }
+    document.getElementById('previous').onclick = () => turn(-1)
+    document.getElementById('next').onclick = () => turn(1)
     document.onkeydown = (event) => {
-      if (event.key === 'ArrowRight') show(current + 1)
-      if (event.key === 'ArrowLeft') show(current - 1)
+      if (event.key === 'ArrowRight') turn(1)
+      if (event.key === 'ArrowLeft') turn(-1)
     }
+    addEventListener('hashchange', show)
+    show()
   </script>
 </html>

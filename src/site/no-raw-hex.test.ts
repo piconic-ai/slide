@@ -9,9 +9,7 @@ const HEX_COLOR =
 const SOURCE_EXT = new Set(['.ts', '.tsx', '.js', '.mjs', '.css'])
 
 const allowed = (relative: string) =>
-  relative === 'src/site/design-tokens.ts' ||
-  relative.includes('.test.') ||
-  relative.split(path.sep).includes('examples')
+  relative === 'src/site/design-tokens.ts' || relative.includes('.test.')
 
 async function filesUnder(dir: string): Promise<string[]> {
   const entries = await readdir(dir, { withFileTypes: true })
