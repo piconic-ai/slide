@@ -20,7 +20,9 @@ import {
   EVICT_CACHE,
   OFFLINE_MAX_AGE_MS,
   OFFLINE_MAX_VERSIONS,
+  OFFLINE_MESSAGE,
   STORED_AT_HEADER,
+  VIEWER_ATTRIBUTE,
   VIEWER_CACHE,
 } from './limits'
 import { createWorld, FILES } from './test-offline-world'
@@ -126,6 +128,19 @@ async function openKept(context: BrowserContext, slug = 'talk', query = '') {
       { timeout: 30_000 },
     )
     .toBe(true)
+  // The viewer's own write and prune are queued once the record shows, and
+  // they go on after it: the list is left alone until they are done, so
+  // what a test then changes is not undone or counted half way.
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          (name) => document.documentElement.getAttribute(name),
+          VIEWER_ATTRIBUTE.listIdle,
+        ),
+      { timeout: 30_000 },
+    )
+    .toBe('true')
   return Object.assign(page, { errors })
 }
 
@@ -430,6 +445,65 @@ test.each(withdrawals)(
   },
 )
 
+test('F37-AC9: Given a viewer opened once, When the frame says it is stored again, Then the shell is not written again, so it cannot bring back a deck the service withdrew', async () => {
+  await withContext(async (context) => {
+    const page = await openKept(context)
+    const before = (await recordsOf(page)).find((r) => r.key === KEY('talk'))
+    expect(before).toBeDefined()
+    // Asks the frame again and waits for its answer. The viewer hears the
+    // answer first (its listener is older), so a write it starts is queued,
+    // and the list is no longer idle, by the time this one resolves.
+    const idleAfterAnswer = await page.evaluate(
+      ([attribute, register, state]) =>
+        new Promise<string | null>((resolve) => {
+          const frame = document.querySelector<HTMLIFrameElement>('iframe#deck')
+          addEventListener('message', function heard(event) {
+            if (event.source !== frame?.contentWindow) return
+            if ((event.data as { type?: string } | null)?.type !== state) return
+            removeEventListener('message', heard)
+            resolve(document.documentElement.getAttribute(attribute as string))
+          })
+          frame?.contentWindow?.postMessage(
+            { type: register },
+            new URL(frame.src).origin,
+          )
+        }),
+      [
+        VIEWER_ATTRIBUTE.listIdle,
+        OFFLINE_MESSAGE.register,
+        OFFLINE_MESSAGE.state,
+      ],
+    )
+    expect(idleAfterAnswer).toBe('true')
+    const after = (await recordsOf(page)).find((r) => r.key === KEY('talk'))
+    expect(after?.storedAt).toBe(before?.storedAt)
+  })
+})
+
+test('F37-AC6: Given a viewer opened once, When the router mounts the same deck again in the same document, Then its shell is written again for the new frame', async () => {
+  await withContext(async (context) => {
+    const page = await openKept(context)
+    const before = (await recordsOf(page)).find((r) => r.key === KEY('talk'))
+    expect(before).toBeDefined()
+    // What the router does for a page it moves to: a new frame, and the
+    // viewer's script started again for it, in the document that stays.
+    // A string, so the test runner leaves the page's own import alone.
+    await page.evaluate(`(async () => {
+      const old = document.querySelector('iframe#deck')
+      old.replaceWith(old.cloneNode(false))
+      const offline = await import('/offline-client.js')
+      offline.startViewer(document)
+    })()`)
+    await expect
+      .poll(
+        async () =>
+          (await recordsOf(page)).find((r) => r.key === KEY('talk'))?.storedAt,
+        { timeout: 30_000 },
+      )
+      .toBeGreaterThan(before?.storedAt ?? Infinity)
+  })
+})
+
 test('F37-AC9: Given a viewer opened once, When the service answers 403 for the deck, Then the deck is forgotten and nothing stored shows', async () => {
   await withContext(async (context) => {
     const page = await openKept(context)
@@ -446,20 +520,6 @@ test('F37-AC9: Given a viewer opened once, When the service answers 403 for the 
 test('F37-AC10: Given a viewer kept more than a day ago, When it is opened with no connection, Then nothing stored shows', async () => {
   await withContext(async (context) => {
     const page = await openKept(context)
-    // The viewer keeps its shell again each time the frame says it is stored,
-    // and the frame can say so a second time after the first record shows (it
-    // is asked twice, and a loaded runner is slow). Such a late write would
-    // make the aged record fresh again. Emptying the frame stops the viewer
-    // from hearing it, and the wait lets a write already started finish.
-    await page.evaluate(
-      () =>
-        new Promise<void>((done) => {
-          document
-            .querySelector('iframe#deck')
-            ?.setAttribute('src', 'about:blank')
-          setTimeout(done, 1000)
-        }),
-    )
     await page.evaluate(
       async ([name, header, age]) => {
         const cache = await caches.open(name as string)
