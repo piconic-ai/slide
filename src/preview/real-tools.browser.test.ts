@@ -12,6 +12,7 @@ import {
 } from 'playwright'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
+import { keepArticle } from '../articles/store'
 import { uploadFiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import { DEFAULT_UPLOAD_LIMITS } from '../uploads/limits'
@@ -171,6 +172,18 @@ beforeAll(async () => {
     for (const path of 'apart' in tool ? tool.apart : []) built.delete(path)
     const id = await seedPublic(db, tool.slug, index + 1, tool.slug)
     inventories.set(tool.slug, await store(id, built))
+    // An article with pages 3 and 5 of the slides as images (F03-AC193).
+    await keepArticle(db, {
+      deckId: tool.slug,
+      status: 'published',
+      citations: [],
+      now: 5,
+      body: [
+        '# Notes',
+        `${TEST_ORIGIN}/@owner/${tool.slug}/3`,
+        `${TEST_ORIGIN}/@owner/${tool.slug}/5`,
+      ].join('\n\n'),
+    })
   }
   browser = await openTestBrowser(chromium)
 })
@@ -363,6 +376,46 @@ test('F03-AC184, F03-AC185, F03-AC186: Given the real output of suraido.js, When
     await page.waitForURL((url) => url.pathname === '/@owner/suraido')
   })
 }, 60000)
+
+// The article's images of pages move the slides, as the address does when
+// they are opened (F03-AC193). Each is pressed after the other, so the move
+// is made in slides that are already running.
+test.each([
+  ['suraido.js', 'suraido', ['charlie', 'echo', 'charlie']],
+  ['reveal.js', 'revealjs', ['charlie', 'echo', 'charlie']],
+  ['Slidev', 'slidev', ['charlie', 'echo', 'charlie']],
+])(
+  'F03-AC193: Given the real output of %s with an article holding images of pages 3 and 5, When the reader presses them in turn, Then the slides move to page 3, 5 and 3 again, and the address follows',
+  async (_name, slug, words) => {
+    await withPage(async (page) => {
+      // The viewer scrolls to the slides smoothly: a click made while it
+      // moves can miss, which is not what is checked here.
+      await page.emulateMedia({ reducedMotion: 'reduce' })
+      await page.goto(`${TEST_ORIGIN}/@owner/${slug}`)
+      const deck = page.frameLocator('iframe#deck')
+      await expect
+        .poll(() => wordsShown(deck), { timeout: 20000 })
+        .toEqual(['alpha'])
+      // Let the slides settle where they put their own address.
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+      for (const [at, pressed] of [3, 5, 3].entries()) {
+        // The link's own click, as the page's script sees it: pressing it by
+        // its place on the screen can miss while the viewer scrolls.
+        await page
+          .getByRole('link', { name: `スライドの ${pressed} ページへ移る` })
+          .first()
+          .evaluate((link) => (link as HTMLElement).click())
+        await expect
+          .poll(() => wordsShown(deck), { timeout: 20000 })
+          .toEqual([words[at]])
+        await page.waitForURL(
+          (url) => url.pathname === `/@owner/${slug}/${pressed}`,
+        )
+      }
+    })
+  },
+  60000,
+)
 
 /** The page of each slide of the vertical fixtures, by the word it shows. */
 const PAGE_OF_WORD: Record<string, number> = {

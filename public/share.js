@@ -663,11 +663,12 @@ addEventListener('message', (event) => {
     history.replaceState(history.state, '', path + location.search)
   } catch {}
 })
-// A page of these slides shown as an image in the article: pressing it moves
-// the slides above to that page, then brings them into view. Only the page
-// number is sent, as the fragment the slides' own script reads (`/#3`); the
-// frame is not touched from here. Without this script the link opens the
-// page's own viewer, which shows the same page.
+// A page of these slides shown as an image in the article: pressing it asks
+// the slides above to move to that page, then brings them into view. The
+// request is a message the slides' page script answers (it knows how the tool
+// that made them keeps its pages); the frame is not touched from here.
+// Without this script the link opens the page's own viewer, which shows the
+// same page.
 document.addEventListener('click', (event) => {
   const link =
     event.target instanceof Element
@@ -679,14 +680,10 @@ document.addEventListener('click', (event) => {
   const page = Number(link.dataset.articlePage)
   if (!main || !Number.isInteger(page) || page < 1 || page > 9999) return
   event.preventDefault()
-  const target = `${slidesOrigin(main)}/#${page}`
-  // The fragment changes in place; a frame whose location cannot be set
-  // from here is given the address as its source.
-  try {
-    main.contentWindow.location.replace(target)
-  } catch {
-    main.src = target
-  }
+  main.contentWindow.postMessage(
+    { type: 'slide:open', page },
+    slidesOrigin(main),
+  )
   const still = matchMedia('(prefers-reduced-motion: reduce)').matches
   main.scrollIntoView({ block: 'start', behavior: still ? 'auto' : 'smooth' })
 })
