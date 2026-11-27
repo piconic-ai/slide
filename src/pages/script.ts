@@ -1,3 +1,4 @@
+import { GESTURE_SOURCE } from './gesture'
 import {
   FRAME_SCRIPT_PATH,
   OFFLINE_MESSAGE,
@@ -47,9 +48,14 @@ export const pageScript = (viewerOrigin: string) => `(() => {
   const running = Symbol.for(${JSON.stringify(RUNNING)})
   if (window[running]) return
   Object.defineProperty(window, running, { value: true })
-  if (parent === window || parent !== top) return
+  if (parent === window) return
+  // Only the viewer is told of pages, and asks; a frame in the embed page
+  // (which another site holds) is not its to tell, but still gets the
+  // gestures below.
+  const viewed = parent === top
   ${STORED_AT_PLACEHOLDER}
   ${READING_SOURCE}
+  ${GESTURE_SOURCE}
   // What a slide tool shows, once the script has recognised the tool by its
   // own API (see the readers below). Until then, and for slides of no known
   // tool, the page is what the address says.
@@ -59,6 +65,7 @@ export const pageScript = (viewerOrigin: string) => `(() => {
   const requested = requestedIn(location.hash)
   let told = 0
   const tell = () => {
+    if (!viewed) return
     const page = pageOf()
     if (page === null || page === told) return
     told = page
@@ -73,9 +80,10 @@ export const pageScript = (viewerOrigin: string) => `(() => {
     }
   }
   const announce = () => {
+    if (!viewed) return
     if (storedAt > 0) parent.postMessage({ type: ${JSON.stringify(OFFLINE_MESSAGE.stored)}, at: storedAt }, ${JSON.stringify(viewerOrigin)})
   }
-  addEventListener('message', (event) => {
+  if (viewed) addEventListener('message', (event) => {
     if (event.source !== parent || event.origin !== ${JSON.stringify(viewerOrigin)}) return
     const type = event.data?.type
     if (type === ${JSON.stringify(PAGE_REQUEST)}) {
@@ -124,6 +132,71 @@ export const pageScript = (viewerOrigin: string) => `(() => {
     }
     tell()
   }
+  // Turning pages by touch, for slides that only know the keyboard. Touches
+  // reach this window because the viewer (and the embed page) make the
+  // frame count as having a touch handler, which iOS Safari asks for. A
+  // tap is read from the touches: iOS gives no click to a window. The turn
+  // is the key the slides already answer to, sent after they have had a
+  // moment to turn the page themselves, so slides with a touch of their own
+  // are not turned twice.
+  let touch = null
+  let spoiled = false
+  let latched = false
+  // When the service last sent a key, by performance.now().
+  let sentAt = -1
+  const chainOf = (element) => {
+    const chain = []
+    for (let at = element; at instanceof Element; at = at.parentElement) {
+      const style = getComputedStyle(at)
+      chain.push({
+        tag: at.localName,
+        role: at.getAttribute('role'),
+        onclick: at.hasAttribute('onclick'),
+        editable: at.isContentEditable,
+        pointer: style.cursor === 'pointer',
+        scrollsX: at.scrollWidth > at.clientWidth + 1 && (style.overflowX === 'auto' || style.overflowX === 'scroll'),
+      })
+    }
+    return chain
+  }
+  const zoomed = () => !!window.visualViewport && window.visualViewport.scale > 1.01
+  const selecting = () => String(getSelection() ?? '') !== ''
+  const press = (turn) => {
+    const { key, code, keyCode } = keyOf(turn)
+    sentAt = performance.now()
+    const event = new KeyboardEvent('keydown', { key, code, keyCode, which: keyCode, bubbles: true, cancelable: true })
+    // An engine that leaves the legacy codes out of the init is given them.
+    if (event.keyCode !== keyCode) Object.defineProperty(event, 'keyCode', { value: keyCode })
+    if (event.which !== keyCode) Object.defineProperty(event, 'which', { value: keyCode })
+    ;(document.body ?? document.documentElement).dispatchEvent(event)
+  }
+  addEventListener('touchstart', (event) => {
+    spoiled = event.touches.length > 1
+    const first = event.changedTouches[0]
+    touch = spoiled || !first ? null : { x: first.clientX, y: first.clientY, t: event.timeStamp, page: pageOf(), element: event.target, began: performance.now() }
+  }, { passive: true })
+  addEventListener('touchcancel', () => {
+    touch = null
+    spoiled = false
+  }, { passive: true })
+  addEventListener('touchend', (event) => {
+    const began = touch
+    const alone = !spoiled && event.touches.length === 0
+    touch = null
+    if (event.touches.length === 0) spoiled = false
+    else spoiled = true
+    const last = event.changedTouches[0]
+    if (!began || !alone || !last) return
+    const gesture = gestureOf(began, { x: last.clientX, y: last.clientY, t: event.timeStamp }, innerWidth)
+    if (!gesture || zoomed() || selecting()) return
+    const chain = chainOf(began.element)
+    if (gesture.tap ? tappedForItself(chain) : scrollsAcross(chain)) return
+    if (!mayTurn(tool, began.page, latched)) return
+    setTimeout(() => {
+      if (afterSettling(began.page, pageOf(), sentAt > began.began) === 'send') press(gesture.turn)
+      else latched = true
+    }, SETTLE_MS)
+  }, { passive: true })
   document.addEventListener('ready', startReveal)
   document.addEventListener('slidechanged', tell)
   addEventListener('load', startReveal)
