@@ -34,7 +34,12 @@ import {
 } from '../decks/deck-id'
 import { sharePath } from '../share/path'
 import { readHandle } from '../share/store'
-import { freeSlug, slugBase, type SlideName } from '../decks/slug-name'
+import {
+  contendedSlug,
+  freeSlug,
+  slugBase,
+  type SlideName,
+} from '../decks/slug-name'
 import {
   countLiveDecks,
   readDeckOwner,
@@ -391,6 +396,21 @@ async function createSession(
 /** How often a new slide's name is picked again when another start took it. */
 const SLUG_ATTEMPTS = 3
 /**
+ * The name of a new slide. The last round does not take the first free
+ * one, which starts at once read the same way and fight over, but one with a
+ * random number, so a start is never turned away only for its name and a
+ * refusal in the end always comes from a limit.
+ */
+function pickSlug(
+  base: DeckSlug,
+  taken: ReadonlySet<string>,
+  attempt: number,
+): DeckSlug {
+  if (attempt < SLUG_ATTEMPTS) return freeSlug(base, taken)
+  const [random = 0] = crypto.getRandomValues(new Uint32Array(1))
+  return contendedSlug(base, random)
+}
+/**
  * Makes a new slide with the session of its first upload, and returns the
  * slide. Its name comes from what the sender knows of it; a start that is
  * refused makes no slide.
@@ -413,7 +433,7 @@ async function createSlide(
     await releaseEmptySlides(db, owner, session.created)
     const deck = {
       id: deckIdSchema.parse(crypto.randomUUID()),
-      slug: freeSlug(base, await readOwnerSlugs(c.env.DB, owner)),
+      slug: pickSlug(base, await readOwnerSlugs(c.env.DB, owner), attempt),
     }
     const created = { ...session, deckId: deck.id }
     if (refused) return rejectStart(db, created, refused, limits, false)
