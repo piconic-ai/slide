@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test, vi } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
@@ -12,6 +13,7 @@ import {
   TEST_ORIGIN,
   testEnv,
 } from '../publication/test-support'
+import { serveFacePicture } from './face-picture-store'
 import { PICTURE_PNG_MAX_BYTES } from './picture-policy'
 import { cleanPicturePng } from './picture-png'
 import {
@@ -520,4 +522,88 @@ test('Given no sign-in or another origin, When a picture is posted or removed, T
     env,
   )
   expect(remove.status).toBe(401)
+})
+
+/**
+ * Stands in for Workers Cache in front of the FacePictures entrypoint: the
+ * key is the request path, and a response is stored only when its
+ * Cache-Control allows it. It shows what the route asks for and with which
+ * key; that the real cache hits is checked in production.
+ */
+class FakeWorkersCache {
+  readonly entries = new Map<string, Response>()
+  readonly misses: string[] = []
+  async fetch(request: Request): Promise<Response> {
+    const key = new URL(request.url).pathname
+    const hit = this.entries.get(key)
+    if (hit) return hit.clone()
+    this.misses.push(key)
+    const response = await serveFacePicture(platform.env.UPLOADS, request)
+    if (/\bpublic\b/.test(response.headers.get('Cache-Control') ?? ''))
+      this.entries.set(key, response.clone())
+    return response
+  }
+}
+
+const getVia = (cache: FakeWorkersCache, path: string) =>
+  server.fetch(new Request(new URL(path, TEST_ORIGIN)), env, {
+    exports: { FacePictures: cache },
+    waitUntil: () => {},
+    passThroughOnException: () => {},
+  } as unknown as ExecutionContext)
+
+test('F28-AC49: Given an uploaded picture behind the edge cache, When it is asked for twice, Then R2 is read once and both answers carry the same bytes and headers', async () => {
+  await upload(squarePng())
+  const cache = new FakeWorkersCache()
+  const path = (await get('/settings', cookie).then((r) => r.text())).match(
+    /src="(\/avatars\/[^"]+)"/,
+  )![1]
+  const first = await getVia(cache, path)
+  const second = await getVia(cache, path)
+  expect(first.status).toBe(200)
+  expect(cache.misses).toHaveLength(1)
+  expect(cache.misses[0]).toMatch(new RegExp(`/${OWNER_ID}/\\d+$`))
+  const bytes = async (r: Response) => Buffer.from(await r.arrayBuffer())
+  expect((await bytes(second)).equals(await bytes(first))).toBe(true)
+  for (const response of [first, second]) {
+    expect(response.headers.get('content-type')).toBe('image/png')
+    expect(response.headers.get('cache-control')).toBe(
+      'public, max-age=31536000, immutable',
+    )
+    expect(response.headers.get('x-content-type-options')).toBe('nosniff')
+    expect(response.headers.get('content-security-policy')).toContain('sandbox')
+    // The edge's own lifetime and tag stay behind the gateway.
+    expect(response.headers.get('cache-tag')).toBeNull()
+  }
+})
+
+test('F28-AC49: Given a picture the edge has kept, When it is replaced, Then the new bytes are served at once under a new key', async () => {
+  const cache = new FakeWorkersCache()
+  await upload(squarePng())
+  const before = await getVia(cache, `/avatars/${OWNER_ID}`)
+  expect(before.status).toBe(200)
+  const replaced = ascii('RIFF\x10\x00\x00\x00WEBPVP8 replaced')
+  await platform.env.UPLOADS.put(`avatars/${OWNER_ID}`, replaced, {
+    httpMetadata: { contentType: 'image/webp' },
+  })
+  await db
+    .update(profilePictures)
+    .set({ uploaded_at: Date.now() + 1000 })
+    .where(eq(profilePictures.user_id, OWNER_ID))
+  const after = await getVia(cache, `/avatars/${OWNER_ID}`)
+  expect(
+    Buffer.from(await after.arrayBuffer()).equals(Buffer.from(replaced)),
+  ).toBe(true)
+  expect(new Set(cache.misses).size).toBe(2)
+})
+
+test('F28-AC52: Given a picture the edge has kept, When it is taken away, Then the avatar is not served from the kept entry', async () => {
+  const cache = new FakeWorkersCache()
+  await upload(squarePng())
+  expect((await getVia(cache, `/avatars/${OWNER_ID}`)).status).toBe(200)
+  expect(cache.entries.size).toBe(1)
+  await db.delete(profilePictures)
+  await platform.env.UPLOADS.delete(`avatars/${OWNER_ID}`)
+  const response = await getVia(cache, `/avatars/${OWNER_ID}`)
+  expect(response.status).toBe(404)
 })

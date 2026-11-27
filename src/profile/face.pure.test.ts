@@ -3,6 +3,9 @@ import {
   FACE_ASKED_AGAIN,
   FACE_KEPT,
   faceCacheControl,
+  FACE_CACHE_REVISION,
+  facePictureUrl,
+  parseFacePictureUrl,
   authorAvatarUrl,
   facePath,
   faceSourceOf,
@@ -174,5 +177,57 @@ describe('authorAvatarUrl', () => {
     expect(
       authorAvatarUrl({ ...columns, useGravatar: 1, gravatarAt: 99 }),
     ).toBe('/avatars/u1?v=g99')
+  })
+})
+
+describe('F28-AC49: the internal URL of an uploaded picture', () => {
+  test('Given a person and an upload time, When the URL is built and read back, Then it names the same person and time', () => {
+    expect(parseFacePictureUrl(facePictureUrl('u1', 1730000000123))).toEqual({
+      userId: 'u1',
+      uploadedAt: 1730000000123,
+    })
+  })
+
+  test('Given an upload at time 0, When the URL is read back, Then time 0 is kept', () => {
+    expect(parseFacePictureUrl(facePictureUrl('u1', 0))).toEqual({
+      userId: 'u1',
+      uploadedAt: 0,
+    })
+  })
+
+  test('Given two uploads of one person, When their URLs are built, Then the keys differ', () => {
+    expect(facePictureUrl('u1', 1)).not.toBe(facePictureUrl('u1', 2))
+  })
+
+  test.each([
+    ['another host', `https://example.com/${FACE_CACHE_REVISION}/u1/5`],
+    ['an old revision', 'https://face-pictures.internal/v0/u1/5'],
+    ['no time', `https://face-pictures.internal/${FACE_CACHE_REVISION}/u1`],
+    [
+      'an extra part',
+      `https://face-pictures.internal/${FACE_CACHE_REVISION}/u1/5/x`,
+    ],
+    [
+      'a time with a sign',
+      `https://face-pictures.internal/${FACE_CACHE_REVISION}/u1/-5`,
+    ],
+    [
+      'a time with a leading zero',
+      `https://face-pictures.internal/${FACE_CACHE_REVISION}/u1/05`,
+    ],
+    [
+      'a time that is not a number',
+      `https://face-pictures.internal/${FACE_CACHE_REVISION}/u1/g5`,
+    ],
+    [
+      'an id that is an address',
+      `https://face-pictures.internal/${FACE_CACHE_REVISION}/a%40b.example/5`,
+    ],
+    [
+      'an id with a slash',
+      `https://face-pictures.internal/${FACE_CACHE_REVISION}/..%2Fx/5`,
+    ],
+  ])('Given %s, When the URL is read, Then it names nothing', (_, url) => {
+    expect(parseFacePictureUrl(url)).toBeNull()
   })
 })

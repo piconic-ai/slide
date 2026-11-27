@@ -109,7 +109,14 @@ migration は 0042(リンクと切り替え)、0043(画像と運営の記録)、
 確かめていないこと・限界:
 
 - 同じミリ秒の中で、外してからアップロードし直すと、版が前のアップロードと同じになりうる。画面の操作では、ページを 2 回読み直すので起きない。
-- 本番の Cloudflare の cache(CDN)は、Worker の応答を cache しない前提である。ブラウザの cache の動きは、`src/profile/picture-auto.browser.test.ts` で、Chromium・Firefox・WebKit の HTTP cache を通して確かめる(Playwright で request を横取りすると、ブラウザの HTTP cache が切れるので、このテストだけは横取りしない)。
+- アップロードした画像の bytes は、Workers Cache を有効にした名前付き entrypoint `FacePictures`(`src/app/worker-routes.ts`)の内側に置く。`/avatars/:userId` は毎回 D1 で、いまの版(`uploaded_at`)を読んでから呼ぶ。そのため、置き換え・取り外し・退会は purge なしですぐ反映される。内側の cache が省くのは R2 の読み出しだけで、D1 の読み出しと Worker の request は残る。
+  - 内部 URL と key は `https://face-pictures.internal/<revision>/<user ID>/<uploaded_at>`(`facePictureUrl`、`src/profile/face.ts`)。key には D1 から出した版だけを使い、読者が求めた `?v=` は使わない。返す bytes を変えるときは `FACE_CACHE_REVISION` を上げる。
+  - 内側の応答は `public, max-age=86400` と `Cache-Tag: face-<user ID>`。取り外した画像の bytes が edge に残る期間を 1 日に限る(gateway はその版をもう求めない)。見つからない object は `no-store` の 404 で、cache しない。
+  - 読者への応答は、いままでどおり gateway が `faceCacheControl`、`nosniff`、CSP を付け直す。
+  - Gravatar の画像は、取りに行き直す判断と書き込み(`markGravatarAsked`)が絡むので、この cache の外に置いた。次の issue で扱う。
+  - リサイズや形式の変換はしない(アップロードはブラウザで 256×256 に縮め、Gravatar も `s=256` で取る。Cloudflare Images の binding は 2026-11-24 に採らないと決めた)。
+  - `ctx` のない呼び出し(テスト)では R2 を直接読む。cache が実際に効くこと(`cf-cache-status: HIT`)は、本番でしか確かめられない。`src/profile/picture.test.ts` の Workers Cache の代役は、route が現在の版の key で entrypoint を呼ぶことを確かめるもので、本物の cache が効く根拠ではない。
+- ブラウザの cache の動きは、`src/profile/picture-auto.browser.test.ts` で、Chromium・Firefox・WebKit の HTTP cache を通して確かめる(Playwright で request を横取りすると、ブラウザの HTTP cache が切れるので、このテストだけは横取りしない)。
 
 ### アップロード(D-34、F28-AC93〜F28-AC98)
 
