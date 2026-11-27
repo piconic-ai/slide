@@ -14,6 +14,7 @@ import {
   type CachedGravatar,
 } from './gravatar-store'
 import { serveFacePicture } from './face-picture-store'
+import { servedPictureType } from './picture-policy'
 import { markGravatarAsked, readEmail, readFaceFacts } from './store'
 
 export const faceRoutes = new Hono<{ Bindings: Env }>()
@@ -119,7 +120,9 @@ async function uploadedFace(
   }
   return {
     body: stored.body ?? '',
-    contentType: stored.headers.get('Content-Type') ?? 'image/webp',
+    contentType: servedPictureType(
+      stored.headers.get('Content-Type') ?? undefined,
+    ),
     source: { kind: 'uploaded', at },
   }
 }

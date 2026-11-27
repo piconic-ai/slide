@@ -108,7 +108,8 @@ migration は 0042(リンクと切り替え)、0043(画像と運営の記録)、
 
 確かめていないこと・限界:
 
-- 同じミリ秒の中で、外してからアップロードし直すと、版が前のアップロードと同じになりうる。画面の操作では、ページを 2 回読み直すので起きない。
+- 同じミリ秒の中で、外してからアップロードし直すと、版が前のアップロードと同じになりうる。画面の操作では、ページを 2 回読み直すので起きない。edge の key も版で決まるので、起きたときは edge に残った前の bytes が最長 1 日出る(0048 より前の行は秒なので、同じ秒の 2 回のアップロードも同じ)。
+- 置き換えの途中(R2 に新しい object が入り、D1 の行がまだ前の版のとき)に来た request は、新しい bytes を前の版の key で edge に入れうる。その後 D1 の書き込みが失敗して前の版に戻ると、edge の場所ごとに前後の bytes が最長 1 日分かれうる。まれなので受け入れた。
 - アップロードした画像の bytes は、Workers Cache を有効にした名前付き entrypoint `FacePictures`(`src/app/worker-routes.ts`)の内側に置く。`/avatars/:userId` は毎回 D1 で、いまの版(`uploaded_at`)を読んでから呼ぶ。そのため、置き換え・取り外し・退会は purge なしですぐ反映される。内側の cache が省くのは R2 の読み出しだけで、D1 の読み出しと Worker の request は残る。
   - 内部 URL と key は `https://face-pictures.internal/<revision>/<user ID>/<uploaded_at>`(`facePictureUrl`、`src/profile/face.ts`)。key には D1 から出した版だけを使い、読者が求めた `?v=` は使わない。返す bytes を変えるときは `FACE_CACHE_REVISION` を上げる。
   - 内側の応答は `public, max-age=86400` と `Cache-Tag: face-<user ID>`。取り外した画像の bytes が edge に残る期間を 1 日に限る(gateway はその版をもう求めない)。見つからない object は `no-store` の 404 で、cache しない。

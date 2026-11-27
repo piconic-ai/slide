@@ -13,6 +13,7 @@ import {
   TEST_ORIGIN,
   testEnv,
 } from '../publication/test-support'
+import { FACE_CACHE_REVISION } from './face'
 import { serveFacePicture } from './face-picture-store'
 import { PICTURE_PNG_MAX_BYTES } from './picture-policy'
 import { cleanPicturePng } from './picture-png'
@@ -552,7 +553,7 @@ const getVia = (cache: FakeWorkersCache, path: string) =>
     passThroughOnException: () => {},
   } as unknown as ExecutionContext)
 
-test('F28-AC49: Given an uploaded picture behind the edge cache, When it is asked for twice, Then R2 is read once and both answers carry the same bytes and headers', async () => {
+test('F28-AC49: Given an uploaded picture behind the edge cache, When it is asked for twice, Then the edge is asked under one key and both answers carry the same bytes and headers', async () => {
   await upload(squarePng())
   const cache = new FakeWorkersCache()
   const path = (await get('/settings', cookie).then((r) => r.text())).match(
@@ -572,7 +573,7 @@ test('F28-AC49: Given an uploaded picture behind the edge cache, When it is aske
     )
     expect(response.headers.get('x-content-type-options')).toBe('nosniff')
     expect(response.headers.get('content-security-policy')).toContain('sandbox')
-    // The edge's own lifetime and tag stay behind the gateway.
+    // The reader's answer is built by the gateway, not the edge's.
     expect(response.headers.get('cache-tag')).toBeNull()
   }
 })
@@ -606,4 +607,28 @@ test('F28-AC52: Given a picture the edge has kept, When it is taken away, Then t
   await platform.env.UPLOADS.delete(`avatars/${OWNER_ID}`)
   const response = await getVia(cache, `/avatars/${OWNER_ID}`)
   expect(response.status).toBe(404)
+})
+
+test('F28-AC49: Given a reader who asks under a forged version, When the picture is asked for, Then the edge key is the one D1 gives', async () => {
+  await upload(squarePng())
+  const cache = new FakeWorkersCache()
+  const response = await getVia(cache, `/avatars/${OWNER_ID}?v=u1`)
+  expect(response.status).toBe(200)
+  expect(response.headers.get('cache-control')).toBe('no-cache')
+  const uploadedAt = (await db.select().from(profilePictures).get())!
+    .uploaded_at
+  expect(cache.misses).toEqual([
+    `/${FACE_CACHE_REVISION}/${OWNER_ID}/${uploadedAt}`,
+  ])
+})
+
+test('F28-AC49: Given a row whose object is missing, When it is asked for and the object then appears, Then the miss was not kept', async () => {
+  const cache = new FakeWorkersCache()
+  await db.insert(profilePictures).values({ user_id: OWNER_ID, uploaded_at: 7 })
+  expect((await getVia(cache, `/avatars/${OWNER_ID}`)).status).toBe(404)
+  expect(cache.entries.size).toBe(0)
+  await platform.env.UPLOADS.put(`avatars/${OWNER_ID}`, squarePng(), {
+    httpMetadata: { contentType: 'image/png' },
+  })
+  expect((await getVia(cache, `/avatars/${OWNER_ID}`)).status).toBe(200)
 })
