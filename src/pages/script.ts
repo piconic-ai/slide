@@ -87,7 +87,8 @@ export const pageScript = (viewerOrigin: string) => `(() => {
     }
   }
   const announce = () => {
-    if (viewed && storedAt > 0) parent.postMessage({ type: ${JSON.stringify(OFFLINE_MESSAGE.stored)}, at: storedAt }, ${JSON.stringify(viewerOrigin)})
+    if (!viewed) return
+    if (storedAt > 0) parent.postMessage({ type: ${JSON.stringify(OFFLINE_MESSAGE.stored)}, at: storedAt }, ${JSON.stringify(viewerOrigin)})
   }
   addEventListener('message', (event) => {
     if (!viewed || event.source !== parent || event.origin !== ${JSON.stringify(viewerOrigin)}) return
