@@ -75,6 +75,80 @@ describe('prepareTextFiles', () => {
   })
 
   it.each([
+    ['_redirects', ['_redirects']],
+    ['_headers', ['_headers']],
+    ['both', ['_redirects', '_headers']],
+  ])(
+    'F22-AC52, F22-AC54: Given the top of the list holds %s, When it is prepared, Then they are not refused, and neither the inventory nor the bytes hold them',
+    async (_name, names) => {
+      const prepared = await prepareTextFiles([
+        ...names.map((path) => ({ path, text: '/* /index.html 200' })),
+        { path: 'index.html', text: page },
+      ])
+      if (!prepared.ok) throw new Error(prepared.message)
+      expect(prepared.inventory.files.map(({ path }) => path)).toEqual([
+        'index.html',
+      ])
+      expect([...prepared.bytes.keys()]).toEqual(['index.html'])
+      expect(prepared.inventory.totalBytes).toBe(
+        new TextEncoder().encode(page).byteLength,
+      )
+    },
+  )
+
+  it('F22-AC52: Given the two settings and a list of exactly the most files, When it is prepared, Then they are not counted; one more file is refused', async () => {
+    const files = Array.from({ length: MAX_ARGUMENT_FILES - 1 }, (_, i) => ({
+      path: `f${i}.css`,
+      text: 'a',
+    }))
+    const settings = [
+      { path: '_redirects', text: 'x' },
+      { path: '_headers', text: 'x' },
+    ]
+    const index = { path: 'index.html', text: page }
+
+    const fits = await prepareTextFiles([index, ...files, ...settings])
+    const over = await prepareTextFiles([
+      index,
+      ...files,
+      { path: 'one-more.css', text: 'a' },
+      ...settings,
+    ])
+
+    expect(fits).toMatchObject({ ok: true })
+    expect(over).toMatchObject({ ok: false, error: 'invalid_files' })
+  })
+
+  it('F22-AC52: Given settings that alone hold more text than a call may carry, When it is prepared, Then their text is not counted', async () => {
+    const prepared = await prepareTextFiles([
+      { path: 'index.html', text: page },
+      { path: '_redirects', text: 'x'.repeat(MAX_ARGUMENT_BYTES + 1) },
+    ])
+
+    expect(prepared).toMatchObject({ ok: true })
+  })
+
+  it.each([
+    ['sub/_redirects'],
+    ['sub/_headers'],
+    ['_Redirects'],
+    ['_worker.js'],
+    ['_routes.json'],
+    ['CNAME'],
+  ])(
+    'F22-AC51: Given %s beside _redirects, When it is prepared, Then that file is still refused',
+    async (path) => {
+      const prepared = await prepareTextFiles([
+        { path: 'index.html', text: page },
+        { path: '_redirects', text: 'x' },
+        { path, text: 'x' },
+      ])
+
+      expect(prepared).toMatchObject({ ok: false, error: 'invalid_files' })
+    },
+  )
+
+  it.each([
     ['no file', []],
     ['no index.html', [{ path: 'main.html', text: page }]],
     ['index.html only in a folder', [{ path: 'dist/index.html', text: page }]],

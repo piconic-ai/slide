@@ -1,3 +1,4 @@
+import { withoutHostingConfig } from '../uploads/ignored-files'
 import {
   parseInventoryStructure,
   type UploadInventory,
@@ -53,16 +54,22 @@ const invalid = (message: string): PreparedFiles => ({
  * bytes as written, and an inventory of their sizes and hashes that
  * has passed the same path checks as any upload. Nothing here trusts the
  * agent: a path that climbs out, repeats, or names a kind of file the
- * service does not serve is refused with the reason.
+ * service does not serve is refused with the reason. `_redirects` and
+ * `_headers` at the top are left out first, as for any upload.
  */
 export async function prepareTextFiles(
-  files: readonly TextFile[],
+  given: readonly TextFile[],
 ): Promise<PreparedFiles> {
+  // The hosting settings at the top are no part of the slide: they are not
+  // counted, checked or kept (F22-AC52).
+  const files = withoutHostingConfig(
+    given.map((file) => ({ ...file, path: file.path.normalize('NFC') })),
+  )
   if (files.length > MAX_ARGUMENT_FILES)
     return invalid(`Too many files: at most ${MAX_ARGUMENT_FILES} are read`)
   // Paths are judged before any content is read: a placeholder inventory
   // goes through the same checks the real one will.
-  const paths = files.map((file) => file.path.normalize('NFC'))
+  const paths = files.map((file) => file.path)
   if (new Set(paths).size !== paths.length || !isInventory(paths.map(blank)))
     return invalid(INVALID_FILES)
   const encoder = new TextEncoder()
