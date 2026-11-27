@@ -7,6 +7,8 @@ import { loginPromptTrigger, type LoginPromptKind } from '../site/login-prompt'
 const text = messages({
   ja: {
     follow: 'フォロー',
+    followBack: 'フォローバック',
+    followsYou: 'フォローされています',
     following: 'フォロー中',
     unfollowShort: '解除する',
     confirm: (handle: Handle) => `@${handle} さんをフォローしますか？`,
@@ -20,6 +22,7 @@ const text = messages({
       `解除すると、@${handle} さんが新しいスライドを公開しても、お知らせは届かなくなります。`,
     release: 'フォローを解除する',
     followOf: (handle: Handle) => `@${handle} さんをフォローする`,
+    followBackOf: (handle: Handle) => `@${handle} さんをフォローバックする`,
     releaseOf: (handle: Handle) => `@${handle} さんのフォローを解除する`,
     muted: (handle: Handle) =>
       `@${handle} さんをフォローするには、先に設定でミュートを解除してください。`,
@@ -30,6 +33,8 @@ const text = messages({
   },
   en: {
     follow: 'Follow',
+    followBack: 'Follow back',
+    followsYou: 'Follows you',
     following: 'Following',
     unfollowShort: 'Unfollow',
     confirm: (handle: Handle) => `Follow @${handle}?`,
@@ -42,6 +47,7 @@ const text = messages({
       `If you unfollow @${handle}, you’ll stop receiving notifications when they publish new slides.`,
     release: 'Unfollow',
     followOf: (handle: Handle) => `Follow @${handle}`,
+    followBackOf: (handle: Handle) => `Follow @${handle} back`,
     releaseOf: (handle: Handle) => `Unfollow @${handle}`,
     muted: (handle: Handle) =>
       `To follow @${handle}, unmute them in settings first.`,
@@ -115,6 +121,8 @@ export type FollowTarget = Readonly<{
   follow: FollowFormTarget
   release: FollowFormTarget
   followName: string
+  /** The name of the button where the person already follows the reader. */
+  followBackName?: string
   releaseName: string
   prompt: LoginPromptKind
 }>
@@ -126,14 +134,24 @@ const hiddenFields = (fields: Readonly<Record<string, string>>) =>
   )
 
 /**
+ * The mark beside a person who follows the reader. It is drawn only for a
+ * reader who may follow them, so it never tells a blocked or muted reader
+ * anything.
+ */
+export const followsYouBadge = (lang: Lang) =>
+  html`<span class="follows-you">${text[lang].followsYou}</span>`
+
+/**
  * The button that follows or unfollows at once, without a page between,
  * whatever it follows. A reader who is not signed in gets a link that opens
- * the sign-in prompt of `target.prompt`.
+ * the sign-in prompt of `target.prompt`. Where the person already follows
+ * the reader (`followsYou`), the button to follow reads "Follow back".
  */
 export function followButton(
   state: FollowState,
   target: FollowTarget,
   lang: Lang,
+  followsYou = false,
 ) {
   if (state === 'none') return ''
   const t = text[lang]
@@ -170,9 +188,9 @@ export function followButton(
     <button
       class="button-secondary"
       type="submit"
-      aria-label="${target.followName}"
+      aria-label="${(followsYou && target.followBackName) || target.followName}"
     >
-      ${t.follow}
+      ${followsYou ? t.followBack : t.follow}
     </button>
   </form>`
 }
@@ -189,6 +207,7 @@ export function followForm(
   back: string,
   lang: Lang,
   named = false,
+  followsYou = false,
 ) {
   const t = text[lang]
   return followButton(
@@ -201,10 +220,12 @@ export function followForm(
         fields: { slide: back },
       },
       followName: named ? t.followOf(handle) : t.follow,
+      followBackName: named ? t.followBackOf(handle) : t.followBack,
       releaseName: named ? t.releaseOf(handle) : t.release,
       prompt: 'follow',
     },
     lang,
+    followsYou,
   )
 }
 
@@ -242,7 +263,8 @@ export const profileFollowForm = (
   state: FollowState,
   handle: Handle,
   lang: Lang,
-) => followForm(state, handle, profilePath(handle), lang)
+  followsYou = false,
+) => followForm(state, handle, profilePath(handle), lang, false, followsYou)
 
 export function followFormBody(
   handle: Handle,

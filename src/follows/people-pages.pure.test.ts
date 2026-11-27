@@ -12,6 +12,7 @@ const person = (handle: string, rest: Partial<Person> = {}): Person => ({
   name: null,
   avatarUrl: null,
   followedByViewer: false,
+  followsViewer: false,
   ...rest,
 })
 const draw = (
@@ -135,3 +136,43 @@ test('F21-AC43: Given a reader who is not signed in, When the rows are drawn, Th
     'href="/follows/new?handle=carol&amp;slide=%2F%40alice%2Ffollowing"',
   )
 })
+
+test.each([
+  {
+    followsViewer: true,
+    followed: false,
+    badge: true,
+    label: 'フォローバック',
+  },
+  { followsViewer: true, followed: true, badge: true, label: 'フォロー中' },
+  { followsViewer: false, followed: false, badge: false, label: 'フォロー' },
+])(
+  'F21-AC68: Given a person who follows the reader: $followsViewer and the reader follows them: $followed, When the row is drawn, Then the mark is $badge and the button reads $label',
+  ({ followsViewer, followed, badge, label }) => {
+    const row = draw(
+      [person('bob', { followsViewer, followedByViewer: followed })],
+      1,
+      1,
+      { kind: 'member', userId: 'a' },
+    )
+    expect(row.includes('class="follows-you"')).toBe(badge)
+    expect(row).toMatch(
+      new RegExp(
+        `<button[^>]*>\\s*(?:<span class="state">)?${label}\\s*(?:<|$)`,
+      ),
+    )
+  },
+)
+
+test.each<PeopleReader>([
+  { kind: 'signed-out' },
+  { kind: 'stopped' },
+  { kind: 'member', userId: 'bob' },
+])(
+  'F21-AC69: Given a person who follows the reader, When a reader who may not follow them (%j) sees the row, Then no mark and no Follow back',
+  (reader) => {
+    const row = draw([person('bob', { followsViewer: true })], 1, 1, reader)
+    expect(row).not.toContain('class="follows-you"')
+    expect(row).not.toContain('フォローバック')
+  },
+)

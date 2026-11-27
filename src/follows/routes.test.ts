@@ -689,3 +689,58 @@ test('F21-AC50: Given a visitor without scripts follows the link, When the confi
     'href="/login?to=%2F%40bob%2Ftalk%2F3"',
   )
 })
+
+const bobFollowsAlice = () =>
+  db.insert(follows).values({
+    follower_user_id: INVITED_ID,
+    followee_user_id: OWNER_ID,
+    created_at: 10,
+  })
+
+test('F21-AC68: Given Bob follows Alice, When Alice opens Bob’s profile before and after she follows back, Then it says he follows her and the button reads Follow back, then Following', async () => {
+  await bobFollowsAlice()
+  const before = await (await get(profile)).text()
+  expect(before).toContain('class="follows-you">フォローされています')
+  const form = submittedForm(before, '/follows', 'フォローバック')
+  expect(form.values).toEqual({ handle: 'bob', slide: profile })
+  expectRedirect(await post(form.action, form.values), profile)
+  const after = await (await get(profile)).text()
+  expect(after).toContain('class="follows-you">フォローされています')
+  submittedForm(after, releaseBob, 'フォロー中')
+})
+
+test('F21-AC68: Given Bob follows Alice and she reads in English, When she opens his profile, Then the mark and the button are in English', async () => {
+  await bobFollowsAlice()
+  const page = await (await get(profile, `${alice}; ${LANG_COOKIE}=en`)).text()
+  expect(page).toContain('class="follows-you">Follows you')
+  expect(page).toContain('Follow back')
+})
+
+test('F21-AC69: Given Bob follows Alice only, When Carol, a visitor, or Alice, who muted him, opens his profile, Then none is told he follows Alice, and the button stays Follow', async () => {
+  await bobFollowsAlice()
+  const carolPage = await (await get(profile, carol)).text()
+  expect(carolPage).not.toContain('class="follows-you"')
+  expect(carolPage).not.toContain('フォローバック')
+  const visitor = await (await get(profile, '')).text()
+  expect(visitor).not.toContain('class="follows-you"')
+  expect(visitor).not.toContain('フォローバック')
+  await db.insert(mutes).values({
+    muter_user_id: OWNER_ID,
+    muted_user_id: INVITED_ID,
+    created_at: 20,
+  })
+  expect(await (await get(profile)).text()).not.toContain('class="follows-you"')
+})
+
+test('F21-AC68: Given Bob and Carol follow Alice and Alice follows Carol, When Alice opens her followers, Then Bob’s row says he follows her with Follow back, and Carol’s says so with Following', async () => {
+  await bobFollowsAlice()
+  await db.insert(follows).values([
+    { follower_user_id: CAROL_ID, followee_user_id: OWNER_ID, created_at: 11 },
+    { follower_user_id: OWNER_ID, followee_user_id: CAROL_ID, created_at: 12 },
+  ])
+  const page = await (await get('/@alice/followers')).text()
+  const rows = page.slice(page.indexOf('class="people-list"'))
+  expect(rows.match(/class="follows-you"/g)).toHaveLength(2)
+  submittedForm(rows, '/follows', 'フォローバック')
+  submittedForm(rows, '/follows/carol/release', 'フォロー中')
+})

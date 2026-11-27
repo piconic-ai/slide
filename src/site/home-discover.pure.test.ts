@@ -83,6 +83,7 @@ describe('toDiscoverPerson', () => {
     handle: handleSchema.parse('bob'),
     avatarUrl: '/avatars/1?v=n',
     followedByViewer: false,
+    followsViewer: false,
   }
 
   test('F44-AC19: Given a person with an emoji name, When they are drawn, Then the initial is the whole emoji', () => {

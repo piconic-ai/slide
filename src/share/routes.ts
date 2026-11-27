@@ -148,9 +148,16 @@ async function profileReader(
       ? false
       : hasBlocked(database, { blocker: reader, blocked: author }),
   ])
+  // Only a reader who may follow the author is told the author follows them.
+  const mayFollow = follow === 'can-follow' || follow === 'following'
+  const followsYou =
+    reader !== null &&
+    mayFollow &&
+    (await isFollowing(database, { follower: author, followee: reader }))
   return {
     kind: 'reader',
     follow,
+    followsYou,
     block: reader === null ? 'none' : blocking ? 'blocking' : 'can-block',
   }
 }

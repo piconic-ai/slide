@@ -83,6 +83,8 @@ export type Person = Readonly<{
   avatarUrl: string | null
   /** Whether the reader of the list follows this person. */
   followedByViewer: boolean
+  /** Whether this person follows the reader of the list. */
+  followsViewer: boolean
 }>
 
 /** The other side of each follow: who is followed, or who follows. */
@@ -134,7 +136,7 @@ export async function countPeople(database: D1Database, query: PeopleQuery) {
 /**
  * What a list of people reads of each person, beside the user ID it is
  * joined on: their handle, name, what decides their face, and whether the
- * reader follows them. The query joins `accounts`, `profiles` and
+ * reader follows them and they follow the reader. The query joins `accounts`, `profiles` and
  * `profilePictures` on the person.
  */
 export const personColumns = (viewer: string | null) => ({
@@ -151,6 +153,12 @@ export const personColumns = (viewer: string | null) => ({
       : sql<number>`EXISTS (SELECT 1 FROM ${follows} AS own
           WHERE own.follower_user_id = ${viewer}
             AND own.followee_user_id = ${accounts.user_id})`,
+  followsViewer:
+    viewer === null
+      ? sql<number>`0`
+      : sql<number>`EXISTS (SELECT 1 FROM ${follows} AS back
+          WHERE back.follower_user_id = ${accounts.user_id}
+            AND back.followee_user_id = ${viewer})`,
 })
 
 type PersonRow = Readonly<{
@@ -161,6 +169,7 @@ type PersonRow = Readonly<{
   useGravatar: number | null
   gravatarAt: number | null
   followedByViewer: number
+  followsViewer: number
 }>
 
 /** A person as a list shows them, from the row `personColumns` reads. */
@@ -169,6 +178,7 @@ export const toPerson = (row: PersonRow): Person => ({
   handle: handleSchema.parse(row.handle),
   name: row.name,
   followedByViewer: row.followedByViewer === 1,
+  followsViewer: row.followsViewer === 1,
   avatarUrl: facePath(
     row.userId,
     faceSourceOf({

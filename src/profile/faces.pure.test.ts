@@ -42,6 +42,7 @@ const person = (avatarUrl: string | null) => ({
   name: 'Rina Reader',
   avatarUrl,
   followedByViewer: false,
+  followsViewer: false,
 })
 const list = (avatarUrl: string | null) =>
   String(
