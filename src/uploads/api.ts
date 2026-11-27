@@ -91,6 +91,7 @@ import {
   decidePlacement,
   parseNewAuthorLimits,
   placementCapOf,
+  placementWindowOf,
   type PlacementCap,
 } from './new-author-limits'
 import { readNewSlideTimes, readRegisteredAt } from './new-author-store'
@@ -449,7 +450,7 @@ async function createSlide(
     // by the insert itself, so starts at once cannot pass it together), the
     // owner holds as many as allowed, or another start took the name
     // meanwhile and the next round picks another.
-    if (cap !== null) await refuseOverCap(c, owner, cap, session.created)
+    if (cap !== null) await refuseOverCapNow(c, owner, cap)
     if ((await countLiveDecks(c.env.DB, owner)) >= limits.decks)
       fail(
         409,
@@ -722,6 +723,17 @@ async function refuseOverCap(
       'new_author_limit',
       { availableAt: String(decision.availableAt) },
     )
+}
+/**
+ * Refuses a new slide that the insert did not make for the limit of the day,
+ * counting as of now. The insert counts every slide the person has, also the
+ * ones that starts at once made after this one began, which a window ending
+ * at this start's own time would leave out, and a start would then be
+ * answered busy over and over while the limit is in fact reached (F42-AC17).
+ */
+function refuseOverCapNow(c: UploadScope, owner: string, cap: PlacementCap) {
+  const at = now()
+  return refuseOverCap(c, owner, { ...cap, window: placementWindowOf(at) }, at)
 }
 /** Renews the credential of an attempt started before, and names its slide. */
 async function resumedDeck(
