@@ -118,18 +118,26 @@ pnpm install --frozen-lockfile
 - そのレビューの本文と、行へのコメントのうち、自分が返信していないものが 1 つもない。直すと答えたものは、直してある。
 - `gh pr view <PR> --json mergeable,mergeStateStatus` が `MERGEABLE` と `CLEAN` を返す。`UNSTABLE` は、check がまだ実行中か、失敗していることを表す。Pullfrog のレビュー本文が付いていても、`pullfrog` の check が終わるまで待つ。
 - 差分を読み直し、issue の範囲に収まっている。
-- branch が `origin/main` に追いついていなくても、次の 2 つを満たせば merge してよい(2026-11-27、依頼者の判断)。複数の agent が並行して `main` へ merge するので、そのたびに取り込み直して CI を待つと、いつまでも merge できない。`main` に merge しても本番は変わらず、merge の後に `main` の CI を見る(6 の 2)ためである。
+- branch が `origin/main` に追いついていなくても、次の 2 つを満たせば merge してよい。複数の agent が並行して `main` へ merge するので、そのたびに取り込み直して CI を待つと、いつまでも merge できない。`main` に merge しても本番は変わらず、merge の後に `main` の CI を見る(6 の 2)ためである。
 
-  - いまの `origin/main` を取り込んでも、衝突しない。次のコマンドが、終了コード 0 で tree の ID を 1 行だけ返す。
-  - この PR の `migrations/` に足したファイルの番号が、追いついていない間に `main` へ入った migration の番号と重ならない。同じ番号の別名のファイルは、衝突せずに両方残り、適用の順が決まらなくなる。
+  - いまの `origin/main` を取り込んでも、衝突しない。次のコマンドの 2 つ目が、終了コード 0 で tree の ID を 1 行だけ返す。
+  - この PR の `migrations/` に足したファイルの番号が、追いついていない間に `main` へ入った migration の番号と重ならない。同じ番号の別名のファイルは、衝突せずに両方残り、適用の順が決まらなくなる。次のコマンドの 3 つ目が、`main` に入った migration を返すので、この PR の番号と比べる。
 
   ```sh
   git fetch origin
   git merge-tree --write-tree HEAD origin/main
-  git diff --name-only --diff-filter=A HEAD...origin/main -- migrations   # main に入った migration。この PR の番号と比べる
+  git diff --name-only --diff-filter=A HEAD...origin/main -- migrations
   ```
 
   どちらかを満たさないときは、`git merge origin/main` で取り込み、衝突を直すか番号を付け直して、push し、手順 3 と 5 をやり直す。取り込んだあとの head が、レビュー済みの commit に `origin/main` を取り込んだだけの merge commit なら、上の `pullfrog` の扱いを使う。
+
+- 今回の PR の `migrations/` の差分を、すべて読んだ。どの SQL にも `DROP`、`DELETE`、表の作り直し(`CREATE TABLE ... _new` と `DROP TABLE` の組)、値が失われる変更がない。1 つでもあれば、PR の本文の先頭に、ファイルの名前と消えるものを書く。本番にある未適用の migration は、リリース PR を merge する前に、依頼者が見る(本番の D1 には触れない)。
+
+- いま本番で動いている版のコードが、migration を適用したあとのスキーマでも動く(適用から deploy までの間と、Worker を戻したときのため)。列の追加と表の追加は動く。列名の変更や制約の追加は、動くことをテストで示してある。
+
+## 6. `main` に merge する
+
+開発中のあいだ、依頼者は `main` への merge をこのループに任せている(2026-11-16)。任されているのは、5 の「次へ進む条件」をすべて満たし、止まる条件のどれにも当たらない PR だけである。PR の「人の確認」が残っていても merge してよいが、残っていることを 7 で issue に書く。**`main` に merge しても、本番は変わらない。** 本番に出すのは、依頼者がリリース PR を merge したときだけである。
 
 0. merge の前に、tagpr の workflow が動いていないことを確かめる。リリース PR の merge の run が待っている間に `main` へ merge すると、その run が置き換えられて、タグが作られない([リリース PR を merge した後に見るもの](../../../docs/dev/deploy.md#リリース-pr-を-merge-した後に見るもの))。動いている run(`queued`、`in_progress`、`waiting`)が 1 つでもあれば、終わるまで merge せず待つ。
 
