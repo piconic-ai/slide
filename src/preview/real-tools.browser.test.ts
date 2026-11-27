@@ -3,7 +3,13 @@ import { join, relative, sep } from 'node:path'
 import { openTestBrowser } from '../test-open-browser'
 import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, expect, test } from 'vitest'
-import { chromium, type Browser, type Page, type Route } from 'playwright'
+import {
+  chromium,
+  type Browser,
+  type FrameLocator,
+  type Page,
+  type Route,
+} from 'playwright'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
 import { uploadFiles } from '../db/schema'
@@ -110,6 +116,42 @@ const TOOLS = [
   },
 ]
 
+/**
+ * Tools whose way of keeping the page the service's rules do not cover
+ * (#694, open question 2). Their tests record what happens now; they do not
+ * say what should happen. `apart` lists output files left out of the upload.
+ */
+const RECORDED: {
+  slug: string
+  dir: string
+  apart: string[]
+  seen: Observed
+}[] = [
+  {
+    slug: 'slidev',
+    dir: 'slidev',
+    apart: ['_redirects'],
+    // Slidev keeps the page in the path (/2); the fragment it was opened with
+    // is dropped when it redirects to /1, so the viewer is told nothing more.
+    seen: {
+      opened: ['alpha'],
+      openedFrame: '/1#3',
+      turned: ['bravo'],
+      turnedFrame: '/2',
+      address: '/@owner/slidev',
+    },
+  },
+]
+
+/** What a reader sees of slides of one of these tools, opened at page 3. */
+type Observed = {
+  opened: string[]
+  openedFrame: string
+  turned: string[]
+  turnedFrame: string
+  address: string
+}
+
 let browser: Browser
 const inventories = new Map<
   string,
@@ -118,8 +160,9 @@ const inventories = new Map<
 beforeAll(async () => {
   await applyMigrations(db)
   await signIn(env)
-  for (const [index, tool] of TOOLS.entries()) {
+  for (const [index, tool] of [...TOOLS, ...RECORDED].entries()) {
     const built = await readBuilt(join(TOOLS_DIR, tool.dir, 'dist'))
+    for (const path of 'apart' in tool ? tool.apart : []) built.delete(path)
     const id = await seedPublic(db, tool.slug, index + 1, tool.slug)
     inventories.set(tool.slug, await store(id, built))
   }
@@ -202,3 +245,87 @@ test.each(TOOLS)(
   },
   60000,
 )
+
+const WORDS = ['alpha', 'bravo', 'charlie', 'delta', 'echo']
+
+/** Which pages' words are on show in the slides' frame. */
+async function wordsShown(deck: FrameLocator) {
+  const text = await deck.locator('body').innerText()
+  return WORDS.filter((word) => text.includes(word))
+}
+
+/** Where the slides' frame is, without its origin. */
+const frameAt = (page: Page) => {
+  const url = new URL(
+    page
+      .frames()
+      .find((frame) => frame.url().includes('.content.example'))!
+      .url(),
+  )
+  return url.pathname + url.search + url.hash
+}
+
+const RECORD_NOTE =
+  'A record of what happens now, not an expectation: the spec has not decided how these slides should behave (#694, open question 2)'
+
+test.each(RECORDED)(
+  `${RECORD_NOTE}. Given the real output of $slug, When the reader opens /@owner/$slug/3 and presses the right arrow once, Then the slides and addresses are as recorded`,
+  async ({ slug, seen }) => {
+    await withPage(async (page) => {
+      await page.goto(`${TEST_ORIGIN}/@owner/${slug}/3`)
+      const deck = page.frameLocator('iframe#deck')
+      await expect
+        .poll(() => wordsShown(deck), { timeout: 20000 })
+        .not.toEqual([])
+      // Let the slides settle where they redirect themselves.
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+      expect({
+        opened: await wordsShown(deck),
+        openedFrame: frameAt(page),
+      }).toEqual({ opened: seen.opened, openedFrame: seen.openedFrame })
+      // A key as the reader presses it: the frame holds the focus. An event
+      // sent to the frame would reach tools that listen twice, twice.
+      await page.locator('iframe#deck').focus()
+      await page
+        .frames()
+        .find((frame) => frame.url().includes('.content.example'))!
+        .evaluate(() => window.focus())
+      await page.keyboard.press('ArrowRight')
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+      expect({
+        turned: await wordsShown(deck),
+        turnedFrame: frameAt(page),
+        address: new URL(page.url()).pathname,
+      }).toEqual({
+        turned: seen.turned,
+        turnedFrame: seen.turnedFrame,
+        address: seen.address,
+      })
+    })
+  },
+  60000,
+)
+
+test(`${RECORD_NOTE}. Given Slidev's output as built, When it is read as an upload, Then \`_redirects\` is refused as a file type, and the rest is within the limits of one version (F22-AC6)`, async () => {
+  const built = await readBuilt(join(TOOLS_DIR, 'slidev', 'dist'))
+  expect([...built.keys()]).toContain('_redirects')
+  const inventoryOf = (files: Map<string, Buffer>) =>
+    parseInventoryStructure({
+      entry: 'index.html',
+      files: [...files].map(([path, bytes]) => ({
+        path,
+        size: bytes.byteLength,
+        sha256: 'a'.repeat(64),
+      })),
+    })
+  expect(() => inventoryOf(built)).toThrow('Unsupported static file type')
+  built.delete('_redirects')
+  const inventory = inventoryOf(built)
+  expect(inventory.files.length).toBe(42)
+  expect(inventory.files.length).toBeLessThanOrEqual(
+    DEFAULT_UPLOAD_LIMITS.files,
+  )
+  expect(inventory.totalBytes).toBeLessThanOrEqual(
+    DEFAULT_UPLOAD_LIMITS.deploymentBytes,
+  )
+})
