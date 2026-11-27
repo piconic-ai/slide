@@ -406,22 +406,32 @@ async function articleFor<E extends { Bindings: Env }>(
 type DeckPath = Extract<SharePath, { kind: 'deck' | 'page' }>
 
 /**
+ * What `Sec-Fetch-Dest` says of a load of the page itself. `empty` is one
+ * too: the viewer's Service Worker asks for every move to a share URL with a
+ * fetch of its own, which reaches the service as `empty` in every browser,
+ * as a script's fetch does. The two cannot be told apart, and need not be:
+ * the scripts of this origin are the service's own, and another site's
+ * fetch does not carry the author's session.
+ */
+const PAGE_LOADS: ReadonlySet<string | undefined> = new Set([
+  undefined,
+  'document',
+  'empty',
+])
+
+/**
  * Whether the request is the author opening the page to read it. The page
  * holds a one-time token, and making it writes a row, so a HEAD, a page
- * loaded ahead of time, and any request that is not a document load are
- * answered as they are for readers.
+ * loaded ahead of time, and a request for something else (a frame, an image)
+ * are answered as they are for readers.
  */
 const readsADocument = (request: {
   method: string
   header(name: string): string | undefined
-}) => {
-  const dest = request.header('Sec-Fetch-Dest')
-  return (
-    request.method === 'GET' &&
-    request.header('Sec-Purpose') === undefined &&
-    (dest === undefined || dest === 'document')
-  )
-}
+}) =>
+  request.method === 'GET' &&
+  request.header('Sec-Purpose') === undefined &&
+  PAGE_LOADS.has(request.header('Sec-Fetch-Dest'))
 
 /**
  * The viewer of slides only their author may open: a deck with no public

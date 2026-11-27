@@ -39,6 +39,8 @@ export async function createWorld() {
   const states = new Map<string, Down>()
   let port = 0
   let env = platform.env as Env
+  let ownerLogin = ''
+  let asAuthor = false
   const http: Server = createServer(async (request, response) => {
     const host = request.headers.host ?? ''
     const id = /^d-([^.]+)\./.exec(host)?.[1] ?? 'management'
@@ -62,6 +64,9 @@ export async function createWorld() {
     const headers = new Headers()
     for (const [name, value] of Object.entries(request.headers))
       if (value !== undefined) headers.set(name, String(value))
+    // The author's session is a `__Host-` cookie, which a browser does not
+    // keep for plain http; the server adds it, as a signed-in browser would.
+    if (asAuthor && id === 'management') headers.set('Cookie', ownerLogin)
     const answer = await server.fetch(
       new Request(`http://${host}${request.url}`, {
         method: request.method,
@@ -84,7 +89,7 @@ export async function createWorld() {
   } as unknown as Env
   await applyMigrations(db)
   // Makes the author, whose handle the share URLs name.
-  await signIn(env)
+  ownerLogin = await signIn(env)
 
   async function putFiles(id: string, files: Record<string, [string, string]>) {
     for (const [at, [path, [type, body]]] of Object.entries(files).entries()) {
@@ -122,6 +127,10 @@ export async function createWorld() {
       env = { ...env, MAINTENANCE: value } as unknown as Env
     },
     port,
+    /** Whether the requests to the management origin are the author's, signed in. */
+    setAuthor(on: boolean) {
+      asAuthor = on
+    },
     putFiles,
     publish,
     viewer: (slug: string, query = '') =>

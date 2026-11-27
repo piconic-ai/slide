@@ -376,6 +376,44 @@ test('F02-AC25: Given requests that are not the author reading the page, When th
   expect(await orm.$count(previewLaunches)).toBe(1)
 })
 
+test("F02-AC29, AC25: Given the author's move to a newer version asked for by the viewer's Service Worker, When the service answers, Then it is the author's view, and no other kind of request gets one", async () => {
+  await seedPublic(db, 'talk', 1, 'Talk')
+  const next = await seedDeployment(db, 'talk')
+  const ask = (headers: Record<string, string>, cookie = owner) =>
+    server.fetch(
+      new Request(`${TEST_ORIGIN}/@owner/talk?v=${next}`, {
+        headers: { Cookie: cookie, ...headers },
+      }),
+      env,
+    )
+  // As each browser's worker asks: Chromium and WebKit, then Firefox.
+  const replays = [
+    { 'Sec-Fetch-Dest': 'empty', 'Sec-Fetch-Mode': 'navigate' },
+    { 'Sec-Fetch-Dest': 'empty', 'Sec-Fetch-Mode': 'same-origin' },
+  ]
+  // A frame, an image, a script, a page loaded ahead of time, and someone
+  // who is not the author are answered as readers are.
+  for (const headers of [
+    { 'Sec-Fetch-Dest': 'iframe' },
+    { 'Sec-Fetch-Dest': 'image' },
+    { 'Sec-Fetch-Dest': 'script' },
+    { 'Sec-Fetch-Dest': '' },
+    { 'Sec-Fetch-Dest': 'Empty' },
+    { ...replays[0], 'Sec-Purpose': 'prefetch' },
+  ])
+    await (await ask(headers)).text()
+  await (await ask(replays[0] ?? {}, '')).text()
+  expect(await orm.$count(previewLaunches)).toBe(0)
+  for (const [at, headers] of replays.entries()) {
+    const r = await ask(headers)
+    expect(r.status).toBe(200)
+    expect(r.headers.get('Cache-Control')).toContain('no-store')
+    const { action } = await launchOf(r)
+    expect(action).toContain(originOf(next))
+    expect(await orm.$count(previewLaunches)).toBe(at + 1)
+  }
+})
+
 test('F02-AC25: Given an author who opens the viewer again and again, When many tokens are unused, Then only the newest few are kept', async () => {
   await seedDeck(db, 'talk')
   await seedDeployment(db, 'talk')

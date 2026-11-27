@@ -12,7 +12,7 @@ import {
   type Page,
 } from 'playwright'
 import { decks } from '../db/schema'
-import { seedDeployment } from '../publication/test-support'
+import { seedDeck, seedDeployment } from '../publication/test-support'
 import { applyOperatorCommand } from '../publication/takedown-store'
 import { openTestBrowser } from '../test-open-browser'
 import {
@@ -48,6 +48,7 @@ afterAll(() => world.close())
 beforeEach(async () => {
   states.clear()
   world.setMaintenance(undefined)
+  world.setAuthor(false)
   await orm
     .update(decks)
     .set({ public_deployment_id: first, hidden_at: null })
@@ -244,6 +245,95 @@ test('F37-AC5: Given a viewer opened once, When the service is back and a new ve
     offline(first, next)
     await page.goto(world.viewer('talk'))
     await hasText(shellFrame(page).locator('#title'), 'Newer')
+  })
+})
+
+/**
+ * The author's own view of a version, in the frame it is launched into. The
+ * frame's session is a partitioned cookie, which Playwright's WebKit does not
+ * keep over plain http; there the viewer is checked up to the launch.
+ */
+async function showsToAuthor(
+  page: Page,
+  expected: Readonly<{ notice: string; origin: string; heading: string }>,
+) {
+  await hasText(page.locator('main'), expected.notice)
+  expect(
+    await page.locator('form[data-launch]').getAttribute('action'),
+  ).toContain(`${expected.origin}/_preview/launch`)
+  if (engineName !== 'webkit')
+    await hasText(
+      page.frameLocator('iframe#deck').locator('#title'),
+      expected.heading,
+    )
+}
+
+const workerInCharge = (page: Page) =>
+  page.evaluate(() => navigator.serviceWorker.controller !== null)
+
+test("F02-AC29, AC41, AC45: Given the author with the viewer's worker in charge, When they open a version that is not public yet, Then that version shows under its notice", async () => {
+  await withContext(async (context) => {
+    world.setAuthor(true)
+    const page = await openKept(context)
+    const next = await seedDeployment(world.db, 'talk')
+    await world.putFiles(next, FILES('Newer draft'))
+    await page.goto(world.viewer('talk', `?v=${next}`))
+    expect(await workerInCharge(page)).toBe(true)
+    await showsToAuthor(page, {
+      notice: 'まだ公開していない新しい版です',
+      origin: world.origin(next),
+      heading: 'Newer draft',
+    })
+  })
+})
+
+test("F02-AC18: Given the author with the viewer's worker in charge, When they open their deck that was never public, Then its slides show under its notice", async () => {
+  await withContext(async (context) => {
+    world.setAuthor(true)
+    const page = await openKept(context)
+    await seedDeck(world.db, 'unpublished')
+    const only = await seedDeployment(world.db, 'unpublished')
+    await world.putFiles(only, FILES('Unpublished'))
+    await page.goto(world.viewer('unpublished'))
+    expect(await workerInCharge(page)).toBe(true)
+    await showsToAuthor(page, {
+      notice: 'まだ公開していません',
+      origin: world.origin(only),
+      heading: 'Unpublished',
+    })
+  })
+})
+
+test("F02-AC36: Given the author with the viewer's worker in charge, When they open their deck whose publication is paused, Then its slides show under its notice", async () => {
+  await withContext(async (context) => {
+    world.setAuthor(true)
+    const page = await openKept(context)
+    const paused = await world.publish('paused', 'Paused')
+    await orm
+      .update(decks)
+      .set({
+        paused_at: 2,
+        public_deployment_id: null,
+        resume_deployment_id: paused,
+      })
+      .where(eq(decks.id, 'paused'))
+    await page.goto(world.viewer('paused'))
+    expect(await workerInCharge(page)).toBe(true)
+    await showsToAuthor(page, {
+      notice: '公開を止めています',
+      origin: world.origin(paused),
+      heading: 'Paused',
+    })
+  })
+})
+
+test("F02-AC30: Given a reader with the viewer's worker in charge, When they open the address of a version that is not public, Then the public version shows", async () => {
+  await withContext(async (context) => {
+    const page = await openKept(context)
+    const next = await seedDeployment(world.db, 'talk')
+    await world.putFiles(next, FILES('Draft'))
+    await page.goto(world.viewer('talk', `?v=${next}`))
+    await hasText(page.frameLocator('iframe#deck').locator('#title'), 'First')
   })
 })
 
