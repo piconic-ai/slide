@@ -158,6 +158,15 @@ iOS Safari は、touch の処理が登録された場所にだけ touch を送�
 
 タップは別の仕組みで、viewer では直せない。iOS Safari は、リンク・ボタン・click の処理が付いた要素など、クリックできると判定した要素でしか `click` を出さない。`window` に付けた処理は判定に数えないので、`window` でタップを受け取る資料は、資料だけで開いても iPhone ではタップで進まない。資料の作者は、タップの処理をスライドの要素に付ける（[slide-sample](https://github.com/piconic-ai/slide-sample) の `nav.js` を参照）。
 
+キーボードでしか送れない資料(touch の処理がない資料)には、サービスが差し込む script がスワイプとタップを補う（F03-AC202〜F03-AC208、`src/pages/gesture.ts`・`src/pages/script.ts`）。タップは `click` ではなく `touchstart`・`touchend` から判定する。iOS は `window` に付けた `click` を出さないが、viewer と埋め込みのページが iframe に passive な `touchstart` を登録しているので、資料の `window` には touch が届くためである。次へ・前へは、資料の `document.body` に `ArrowRight`・`ArrowLeft` の `keydown`（`key`・`code`・`keyCode`・`which` を付けたもの）を送る。
+
+- **二重送りの防ぎ方。** 資料が自前の touch 操作を持つかは、解析して決めない。操作の後 80ms（`SETTLE_MS`）待ち、ページ番号が操作の前と同じならキーを送る。変わっていたら、資料が自分で送ったとみなして、その文書では以後送らない。ページ番号は、`tell` と同じ `pageOf()` で読む（fragment、または reveal.js などの adapter）。
+- **対象。** `tool === null`（reveal.js のような自前の touch を持つ既知のツールでない）で、ページ番号が分かる資料だけである。
+- **送らない操作。** リンク・ボタン・入力欄・動画・`cursor: pointer` の要素の上のタップ、縦のスワイプ、指 2 本以上、拡大中、テキスト選択中。判定の純粋な部分（`gestureOf`、`tappedForItself`、`afterSettling`、`mayTurn`、`keyOf`）は `GESTURE_SOURCE` にあり、`src/pages/gesture.pure.test.ts` が同じ text を動かして確かめる。
+- **埋め込みでも動く。** これまで script は、スライドが viewer の直下にないとき（`parent !== top`）に何もせず終わっていた。いまは、枠の中（`parent !== window`）なら動かし、ページを viewer に伝える部分と、viewer の問い合わせに答える部分だけを、`parent === top` のときに限る。他の site に置いた埋め込みでも、補正が動く。
+- **限界。** 遷移のアニメーションが終わってから fragment を書く資料と、touch で送るのにページ番号を外に出さない資料は、二重に進みうる。`isTrusted` を見る資料と、キーを使わない資料には効かないが、何も起きないだけである。作者が補正を止める設定は、まだない（仕様の「作らないこと」）。
+- **確認。** `src/pages/gesture.browser.test.ts` は、Chromium（Pixel 7 の模擬）で、DevTools の入力 event を使って、viewer と埋め込みで操作する。WebKit では iOS の touch 配送を再現できないので、実機の iOS Safari と Android Chrome で、デプロイ後に人が確かめる。
+
 作者のファイルの CSP は `sandbox`・`worker-src`・`frame-ancestors` だけを制限し、外部の font・script・画像の読み込みと `fetch` は止めない。理由と、読者への説明は [外部との通信](#外部との通信) に書く。サービスは外部 URL を proxy せず、外部依存の可用性は作者の責任とする。発表で確実に使う資料は、依存を deployment に含めることを勧める。
 
 自動の確認は `src/share/viewer.browser.test.ts` で行う。engine は環境変数 `BROWSER`（`chromium`・`webkit`・`firefox`、既定は `chromium`）で選ぶ。`pnpm test` は Chromium で、CI の `Viewer on webkit`・`Viewer on firefox` が WebKit（Safari の engine）と Firefox で同じテストを動かす。スマートフォンは、WebKit では iPhone 13、Chromium では Pixel 7 の画面サイズ・タッチを模し、Firefox は幅 390px の画面で確かめる。実機の iOS Safari・Android Chrome とは別物である。service worker の登録が CSP で拒否されたときの文言は engine ごとに違うので、engine ごとに照合する。すべての request を Worker の `fetch` に通し、実際の header のもとで確かめる。
