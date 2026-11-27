@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <title>reveal.js fixture: one-based</title>
+    <link rel="stylesheet" href="dist/reset.css" />
+    <link rel="stylesheet" href="dist/reveal.css" />
+  </head>
+  <body>
+    <div class="reveal">
+      <div class="slides">
+        <section><h2>一ページ目 alpha</h2></section>
+        <section><h2>二ページ目 bravo</h2></section>
+        <section><h2>三ページ目 charlie</h2></section>
+        <section><h2>四ページ目 delta</h2></section>
+        <section><h2>五ページ目 echo</h2></section>
+      </div>
+    </div>
+    <script src="dist/reveal.js"></script>
+    <!-- hashOneBasedIndex: true, so a number in the address counts from 1. -->
+    <script>
+      Reveal.initialize({ hashOneBasedIndex: true })
+    </script>
+  </body>
+</html>
