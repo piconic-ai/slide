@@ -29,9 +29,6 @@ interface DeckMetaProps {
 export function DeckMeta(props: DeckMetaProps) {
   const t = homeText[props.lang]
   const cited = citedCountText(props.citedBy, props.lang)
-  const followed = props.source?.kind === 'person'
-  // Chosen here: a ternary among the children would be a conditional.
-  const followedText = followed ? t.followedAuthor : ''
   return (
     <p className="card-meta">
       <a className="card-author" href={props.authorHref}>
@@ -47,8 +44,9 @@ export function DeckMeta(props: DeckMetaProps) {
         </span>
         @{props.handle}
       </a>
-      <span className="source-label" hidden={!followed}>
-        {followedText}
+      {/* Read from the props, so a row kept for another source follows it. */}
+      <span className="source-label" hidden={props.source?.kind !== 'person'}>
+        {t.followedAuthor}
       </span>
       <span className="card-cited" hidden={cited === null}>
         {cited ?? ''}

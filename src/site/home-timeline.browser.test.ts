@@ -441,6 +441,48 @@ test('F44-AC5, F44-AC7, F44-AC9: Given Alice follows Carol and a community, When
   await page.close()
 })
 
+test('F44-AC7, F44-AC26: Given Alice follows Bob, whose talk is in a community she does not follow, When she follows that community in the carousel and goes back to "フォロー", Then the card names the community and no longer says "フォロー中"', async () => {
+  await follow(database, { follower: OWNER_ID, followee: BOB, now: 1 })
+  await seedCommunity(database, {
+    id: 61,
+    handle: 'kanagawapm',
+    name: 'Kanagawa.pm',
+    links: ['https://kanagawapm.connpass.com/'],
+    creator: BOB,
+  })
+  await seedPublic(database, 'bobs-talk', 200, 'Bob’s talk', BOB)
+  await seedTalkLink(database, {
+    deckId: 'bobs-talk',
+    owner: BOB,
+    url: 'https://kanagawapm.connpass.com/event/1/',
+  })
+  const page = await openTop({ cookie: owner })
+  await page.getByRole('tab', { name: 'フォロー' }).click()
+  const card = panel(page).locator('.timeline-card')
+  await expect
+    .poll(() => card.locator('.source-label').isVisible(), POLL)
+    .toBe(true)
+  expect(await card.locator('.source-label').innerText()).toBe('フォロー中')
+  expect(await card.locator('.card-source').count()).toBe(0)
+
+  await page.getByRole('tab', { name: 'すべて' }).click()
+  const community = panel(page).locator('.carousel-card', {
+    hasText: 'Kanagawa.pm',
+  })
+  await community
+    .getByRole('button', { name: 'Kanagawa.pm をフォローする' })
+    .click()
+  await community
+    .getByRole('button', { name: 'Kanagawa.pm のフォローを解除する' })
+    .waitFor(POLL)
+  await page.getByRole('tab', { name: 'フォロー' }).click()
+  await expect
+    .poll(() => card.locator('.card-source').allInnerTexts(), POLL)
+    .toEqual(['Kanagawa.pm'])
+  expect(await card.locator('.source-label').isHidden()).toBe(true)
+  await page.close()
+})
+
 /** Counts the requests for the "following" list a page sends. */
 const countFollowingRequests = (page: Page) => {
   const seen: string[] = []

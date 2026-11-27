@@ -238,7 +238,7 @@ test('F03-AC42, F03-AC46, F03-AC48, F03-AC177: Given a generated cover still on 
   }
 }, 20000)
 
-test('F44-AC11: Given decks with covers, When the top page draws their cards, Then each card holds its cover once and the author’s face, and no image is wider than its card', async () => {
+test('F44-AC11: Given decks with covers, When the top page draws their cards, Then each card holds two images, its cover and the author’s face, and shows no mark that does not apply', async () => {
   shotFails = false
   const { page, errors } = await openTopPage()
 
@@ -260,13 +260,10 @@ test('F44-AC11: Given decks with covers, When the top page draws their cards, Th
           images.map((image) => image.parentElement?.className),
         ),
     ).toEqual(['deck-cover', 'card-author-face'])
-    const width = (await card.boundingBox())?.width ?? 0
-    const widest = await card
-      .locator('img')
-      .evaluateAll((images) =>
-        Math.max(...images.map((image) => image.getBoundingClientRect().width)),
-      )
-    expect(widest).toBeLessThanOrEqual(width)
+    // Nobody is followed and nothing cites these decks.
+    expect(await card.locator('.source-label').isHidden()).toBe(true)
+    expect(await card.locator('.card-cited').isHidden()).toBe(true)
+    expect(await card.locator('.card-meta').innerText()).toBe('O\n@owner')
   }
   expect(errors).toEqual([])
   await page.unrouteAll({ behavior: 'ignoreErrors' })
