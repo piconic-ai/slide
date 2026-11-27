@@ -1,12 +1,15 @@
 import { describe, expect, test } from 'vitest'
 import { articleId } from '../legal/document'
 import { LEGAL_TEXTS } from '../legal/documents'
+import { deletionFrame } from '../decks/deletion-frame'
+import { failurePlace } from '../drops/help-place'
 import { EXPORT_SLIDES_PER_PAGE } from '../exports/list-view'
 import { MAX_ZIP_BYTES, MAX_ZIP_FILES } from '../exports/zip-plan'
 import { FILE_URL_SECONDS } from '../mcp/file-url'
 import { FILES_PAGE_SIZE } from '../mcp/files-page'
 import { maintenanceHelpPath } from '../maintenance/help-link'
 import { LANGS, type Lang } from '../site/i18n'
+import { START_WINDOW_SECONDS } from '../uploads/limits'
 import {
   parseNewAuthorLimits,
   placementWindowOf,
@@ -266,5 +269,100 @@ describe('the figures of the new articles are the code’s', () => {
       expect(agent.body).toContain(String(FILE_URL_SECONDS / 60))
       expect(agent.body).toContain(String(FILES_PAGE_SIZE))
     }
+  })
+})
+
+describe('the article on deleting slides', () => {
+  test('F36-AC55: Given the article in each language, When it is read, Then the steps use the words of the deletion frame, and what deleting does is said', async () => {
+    for (const lang of LANGS) {
+      const frame = plainText(String(deletionFrame('talk', lang)))
+      const { lead, body } = await render('slides/delete-slide', lang)
+      const text = plainText(`${lead}${body}`)
+      expect(body, lang).toContain('<ol>')
+      const words =
+        lang === 'ja'
+          ? ['スライドを削除', '確認のため、URL の末尾']
+          : ['Delete these slides', 'To confirm, type the end of the URL']
+      for (const word of words) {
+        expect(frame, `${lang} frame`).toContain(word)
+        expect(text, `${lang} article`).toContain(word)
+      }
+      const press = lang === 'ja' ? '「スライドを削除」を押' : '“Delete slides”'
+      expect(text, lang).toContain(press)
+      expect(frame, lang).toContain(
+        lang === 'ja' ? 'スライドを削除' : 'Delete slides',
+      )
+      expect(body).toContain('href="/help/slides/daily-limit"')
+      expect(body).toContain('href="/help/sharing/read-offline"')
+      expect(body).toContain('href="/help/account/export-slide"')
+    }
+  })
+
+  test('F36-AC55: Given the frame’s note and the article, When the hours are read, Then both say the number of the code, and the share URL, the article and the related links are said to go at once', async () => {
+    const hours = START_WINDOW_SECONDS / 3600
+    expect(numbers.deletedFilesHours).toBe(hours)
+    const frame = {
+      ja: plainText(String(deletionFrame('talk', 'ja'))),
+      en: plainText(String(deletionFrame('talk', 'en'))),
+    }
+    expect(frame.ja).toContain(`${hours} 時間ほど後に消えます`)
+    expect(frame.en).toContain(`about ${hours} hours later`)
+    expect(frame.ja).toContain('元には戻せません')
+    expect(frame.en).toContain('cannot be undone')
+    const ja = await render('slides/delete-slide', 'ja')
+    expect(plainText(ja.body)).toContain(`${hours} 時間ほど後に消えます`)
+    for (const phrase of [
+      '公開中の共有 URL は、すぐに読めなくなります',
+      '記事と関連リンクは、すぐに消えます',
+      '元には戻せません',
+    ])
+      expect(plainText(ja.body), phrase).toContain(phrase)
+    const en = await render('slides/delete-slide', 'en')
+    expect(plainText(en.body)).toContain(`about ${hours} hours later`)
+    for (const phrase of [
+      'stops working at once',
+      'article and related links go at once',
+      'cannot be undone',
+    ])
+      expect(plainText(en.body), phrase).toContain(phrase)
+  })
+
+  test('F36-AC55: Given the article, When it speaks of the backups, Then it points at the privacy policy’s article on how long information is kept and names no number of days', async () => {
+    for (const lang of LANGS) {
+      const { body } = await render('slides/delete-slide', lang)
+      expect(body).toContain(`href="${legalHref('privacy', PRIVACY_KEEPING)}"`)
+      expect(legalArticle('privacy', PRIVACY_KEEPING)).not.toBeNull()
+      expect(plainText(body)).not.toMatch(/\b3[05]\b/)
+    }
+  })
+
+  test('F36-AC55: Given the article, When the reader’s saved copy is read about, Then it takes the days of the code', async () => {
+    const ja = plainText((await render('slides/delete-slide', 'ja')).body)
+    expect(ja).toContain(
+      `${numbers.offlineDays} 日のあいだ読めることがあります`,
+    )
+    const en = plainText((await render('slides/delete-slide', 'en')).body)
+    expect(en).toContain(`${numbers.offlineDays} day`)
+  })
+
+  test('F36-AC56: Given the articles on the limits, When they are read, Then each links to the article on deleting in both languages, and the one on the number of slides has it among its related articles', async () => {
+    for (const key of ['slides/limits', 'slides/daily-limit'])
+      for (const lang of LANGS) {
+        const { body } = await render(key, lang)
+        expect(body, `${key} ${lang}`).toContain(
+          'href="/help/slides/delete-slide"',
+        )
+      }
+    const related = findArticle(HELP_CATALOG, 'slides', 'limits')!.article
+      .related
+    expect(related).toContain('slides/delete-slide')
+    expect(related.length).toBeLessThanOrEqual(3)
+  })
+
+  test('F36-AC56: Given the help the upload message points at, When the reason is the number of slides, Then it leads to the limits article, which leads on to deleting', async () => {
+    expect(failurePlace('deck_limit')).toBe('drop-limit')
+    expect(
+      findArticle(HELP_CATALOG, 'slides', 'limits')!.article.related,
+    ).toContain('slides/delete-slide')
   })
 })
