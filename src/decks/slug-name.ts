@@ -88,6 +88,23 @@ export function freeSlug(base: DeckSlug, taken: ReadonlySet<string>): DeckSlug {
   }
 }
 
+/** Where the numbers of `contendedSlug` start, past what `freeSlug` reaches. */
+const CONTENDED_FROM = 1000
+/** How many different numbers `contendedSlug` may take. */
+const CONTENDED_SPAN = 9_000_000
+
+/**
+ * `base` with a number after it, for a start that lost its name to other
+ * starts at once more than once (their names were read before each other's
+ * were taken). The number is `random` turned into one of 9 million past
+ * 1000, so that starts at once rarely take the same one. Only the
+ * boundary that starts a slide has a random number to give.
+ */
+export function contendedSlug(base: DeckSlug, random: number): DeckSlug {
+  const offset = Math.abs(Math.trunc(random)) % CONTENDED_SPAN
+  return numbered(base, CONTENDED_FROM + offset)
+}
+
 export type SlugChange =
   | Readonly<{ ok: true; slug: DeckSlug }>
   | Readonly<{ ok: false; reason: 'invalid' | 'reserved' }>

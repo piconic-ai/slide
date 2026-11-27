@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { deckSlugSchema } from './deck-id'
 import {
   chosenSlug,
+  contendedSlug,
   freeSlug,
   isReservedSlug,
   parseSlugNotice,
@@ -184,4 +185,38 @@ describe('parseSlugNotice', () => {
       expect(parseSlugNotice(value)).toBeNull()
     },
   )
+})
+
+describe('contendedSlug', () => {
+  const base = slug('slide')
+
+  it('F22-AC13: Given a name and a random number, When made, Then it is the name with a number from 1000', () => {
+    expect(contendedSlug(base, 0)).toBe('slide-1000')
+    expect(contendedSlug(base, 42)).toBe('slide-1042')
+  })
+
+  it('F22-AC13: Given the same random number twice, When made, Then the name is the same, and a different one gives a different name', () => {
+    expect(contendedSlug(base, 7)).toBe(contendedSlug(base, 7))
+    expect(contendedSlug(base, 1)).not.toBe(contendedSlug(base, 2))
+  })
+
+  it.each([4_294_967_295, 9_000_000, -5, 3.9, Number.MAX_SAFE_INTEGER])(
+    'Given the extreme random number %j, When made, Then the number stays from 1000 to 9,000,999',
+    (random) => {
+      const number = Number(/-(\d+)$/.exec(contendedSlug(base, random))?.[1])
+      expect(number).toBeGreaterThanOrEqual(1000)
+      expect(number).toBeLessThan(9_001_000)
+    },
+  )
+
+  it('Given the longest name, When made, Then it is cut to fit and ends in the number', () => {
+    const made = contendedSlug(slug('a'.repeat(64)), 4_294_967_295)
+    expect(made.length).toBeLessThanOrEqual(64)
+    expect(made).toMatch(/^a+-\d+$/)
+  })
+
+  it('Given a name that ends in a hyphen once cut, When made, Then no double hyphen is left', () => {
+    const cut = slug(`${'a'.repeat(54)}-bcdefghi`)
+    expect(contendedSlug(cut, 1)).not.toContain('--')
+  })
 })
