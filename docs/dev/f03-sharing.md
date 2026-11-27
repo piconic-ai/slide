@@ -233,7 +233,7 @@ reveal.js の読み替え(縦のスライドを含む。#709)と、Slidev の読
 
 #### 同じページ番号を渡す 3 か所(#712)
 
-- 記事のページの画像(F03-AC193): `public/share.js` は、枠の fragment を書き換えるのをやめ、枠に `{ type: 'slide:open', page }` を `postMessage` で送る(`OPEN_MESSAGE`)。差し込む script が受け取り、読み替えるツールならそのツールの「開く」で、そうでなければ、これまでどおり fragment(`#N`)を書き換えて開く。理由: Slidev は path でページを持ち、枠の fragment だけを書き換えても動かない(枠の path が `/3` のときに `/#5` を設定すると、文書を読み込み直すか、何も起きないかが、押す順で変わった)。送る相手は viewer の枠だけで、受け取るのは viewer の origin からの message だけである。
+- 記事のページの画像(F03-AC193): `public/share.js` は、枠の fragment を書き換えるのをやめ、枠に `{ type: 'slide:open', page }` を `postMessage` で送る(`OPEN_MESSAGE`)。差し込む script が受け取り、読み替えるツールならそのツールの「開く」で、そうでなければ、版の origin のトップに fragment(`#N`)を付けた URL へ移る(これまでと同じ。peitho が query に持つページを落とすため)。受け取ったら `{ type: 'slide:opened' }` を返す(`OPENED_MESSAGE`)。返事が 500ms 以内に来ないスライド(差し込まずに配る HTML の断片など。F03-AC153)は、`share.js` が、これまでどおり枠を `/#N` へ移す。理由: Slidev は path でページを持ち、枠の fragment だけを書き換えても動かない(枠の path が `/3` のときに `/#5` を設定すると、文書を読み込み直すか、何も起きないかが、押す順で変わった)。送る相手は viewer の枠だけで、受け取るのは viewer の origin からの message だけである。
 - ページの画像の撮影(F03-AC194)と埋め込み(F03-AC198): 差し込む script は、スライドの親が最上位の文書でないとき(埋め込み)と、スライド自身が最上位のとき(撮影)にも、判定と「開く」を行うようにした。ページは伝えず、offline の連携もしない(`viewed` が偽のとき)。撮影は `shotLocation`(`/#N`)のまま、版の origin を開くので、読み替えるツールの 3 ページ目が写る。
 - `PAGE_SHOT_REVISION` を `p1` から `p2` に上げた(読み替える前に撮った、ずれたページの画像を撮り直す)。
 - テスト(`src/preview/real-tools.browser.test.ts`、Chromium、実物): 記事の画像を 3、5、3 の順に押す(F03-AC193)。版の origin を最上位の文書として `/#3` で開く(F03-AC194)。他のサイトのページに入れた `/embed/@owner/<slug>/3`(F03-AC198)。suraido.js・reveal.js・Slidev の 3 つ。読み替えを外すと、撮影と埋め込みのテストは失敗する(撮影は確かめた)。実物のテストでは、押す操作を、リンクの `click()`(page の script が見る click)で行う。viewer が滑らかにスクロールするので、画面の座標で押すと、外れることがあるためである。

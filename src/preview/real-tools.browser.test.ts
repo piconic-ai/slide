@@ -204,6 +204,27 @@ beforeAll(async () => {
       ].join('\n\n'),
     })
   }
+  // A piece of HTML with no document around it: the service serves it as it
+  // was put up, with no page script in it (F03-AC153).
+  const piece = await seedPublic(db, 'piece', 90, 'piece')
+  inventories.set(
+    'piece',
+    await store(
+      piece,
+      new Map([['index.html', Buffer.from('<h1>piece</h1>')]]),
+    ),
+  )
+  await keepArticle(db, {
+    deckId: 'piece',
+    status: 'published',
+    citations: [],
+    now: 5,
+    body: [
+      '# Notes',
+      `${TEST_ORIGIN}/@owner/piece/3`,
+      `${TEST_ORIGIN}/@owner/piece/5`,
+    ].join('\n\n'),
+  })
   browser = await openTestBrowser(chromium)
 })
 afterAll(async () => {
@@ -439,6 +460,63 @@ test.each([
   },
   60000,
 )
+
+// Slides of no tool the service reads (peitho keeps its page in the query, as
+// the slides were opened; Marp in the fragment) are moved as before: by the
+// address of the top of the version with the page as the fragment.
+test.each([
+  ['peitho', 'body'],
+  ['marp', '.bespoke-marp-active section'],
+])(
+  'F03-AC193: Given the real output of %s with an article holding images of pages 3 and 5, When the reader presses them in turn, Then the slides move to page 3, 5 and 3 again',
+  async (slug, shown) => {
+    await withPage(async (page) => {
+      await page.emulateMedia({ reducedMotion: 'reduce' })
+      await page.goto(`${TEST_ORIGIN}/@owner/${slug}`)
+      const deck = page.frameLocator('iframe#deck')
+      await expect
+        .poll(() => deck.locator(shown).innerText(), { timeout: 20000 })
+        .toContain('alpha')
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+      for (const [pressed, word] of [
+        [3, 'charlie'],
+        [5, 'echo'],
+        [3, 'charlie'],
+      ] as const) {
+        await page
+          .getByRole('link', { name: `スライドの ${pressed} ページへ移る` })
+          .first()
+          .evaluate((link) => (link as HTMLElement).click())
+        await expect
+          .poll(() => deck.locator(shown).innerText(), { timeout: 20000 })
+          .toContain(word)
+      }
+    })
+  },
+  60000,
+)
+
+test('F03-AC193: Given a piece of HTML the service serves without its page script, When the reader presses the article’s images of pages 3 and 5, Then the slides are moved to /#3 and /#5 as they always were', async () => {
+  await withPage(async (page) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await page.goto(`${TEST_ORIGIN}/@owner/piece`)
+    const deck = page.frameLocator('iframe#deck')
+    await expect
+      .poll(() => deck.locator('h1').innerText(), { timeout: 20000 })
+      .toBe('piece')
+    for (const pressed of [3, 5]) {
+      await page
+        .getByRole('link', { name: `スライドの ${pressed} ページへ移る` })
+        .first()
+        .evaluate((link) => (link as HTMLElement).click())
+      await expect
+        .poll(() => new URL(frameAt(page), 'https://x').hash, {
+          timeout: 10000,
+        })
+        .toBe(`#${pressed}`)
+    }
+  })
+}, 60000)
 
 const OPENS_AT_THREE = [
   ['suraido.js', 'suraido'],
