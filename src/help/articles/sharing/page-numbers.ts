@@ -28,7 +28,23 @@ export default defineArticle({
         <p>
           SNS が一度取得したカードの画像をいつ更新するかは、SNS
           が決めます。スライドを直したあとも、古い画像がしばらく残ることがあります。
-        </p>`,
+        </p>
+        <h2>ツールごとの制限</h2>
+        <ul>
+          <li>
+            Slidev
+            のスライドは、めくったあとにブラウザの「戻る」「進む」を使うと、見つからないページ(404)になることがあります。Chromium
+            で起きることを確かめました。Firefox では起きませんでした。WebKit
+            は未確認です。ページを開く、めくる、URL
+            を共有することは、影響を受けません。
+          </li>
+          <li>
+            reveal.js を ES module で読み込む出力(<code>import Reveal</code>
+            で読み込み、グローバルの <code>Reveal</code>
+            がないもの)は、ページ番号つきの URL を読み替えません。番号が 1
+            つずれたページが開くことがあります。
+          </li>
+        </ul>`,
   },
   en: {
     title: 'Know the rules of page numbers',
@@ -52,6 +68,21 @@ export default defineArticle({
           When a social service refreshes a card image it has already taken is
           up to that service. After you fix the slides, the old image may stay
           for a while.
-        </p>`,
+        </p>
+        <h2>Limits by tool</h2>
+        <ul>
+          <li>
+            With Slidev slides, using the browser's Back and Forward after
+            turning pages can show a page that is not found (404). This was seen
+            in Chromium and not in Firefox; WebKit has not been checked. Opening
+            a page, turning pages and sharing the URL are not affected.
+          </li>
+          <li>
+            Output that loads reveal.js as an ES module (with
+            <code>import Reveal</code>, so no global <code>Reveal</code>) does
+            not have its page-numbered URLs read as reveal.js does. The page
+            that opens can be one off.
+          </li>
+        </ul>`,
   },
 })
