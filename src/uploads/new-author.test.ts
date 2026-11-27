@@ -1,6 +1,6 @@
 import { eq, isNull } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
-import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
+import { afterAll, beforeAll, beforeEach, expect, test, vi } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
 import { accounts, decks, deployments } from '../db/schema'
@@ -165,6 +165,38 @@ test('F42-AC17: Given a new author and 50 starts at once, When they all run, The
     '201 created': 3,
     '429 new_author_limit': 47,
   })
+  expect(await db.$count(decks)).toBe(3)
+})
+
+test('F42-AC17: Given 3 slides that other starts at once made after this start began, When it finds the limit reached, Then it is refused as over the limit and not answered busy', async () => {
+  for (let i = 0; i < 3; i++) await browserNew()
+  const began = nowSeconds()
+  // Made a moment after the start below began, as a slower start sees them.
+  await db.update(decks).set({ created_at: began + 3 })
+  vi.useFakeTimers({ toFake: ['Date'], now: began * 1000 })
+  try {
+    // The clock moves on once the start has tried to make its slide.
+    const later = new Proxy(platform.env.DB, {
+      get(target, key) {
+        const value = Reflect.get(target, key)
+        if (key !== 'batch') {
+          return typeof value === 'function' ? value.bind(target) : value
+        }
+        return async (...args: unknown[]) => {
+          const result = await value.apply(target, args)
+          vi.setSystemTime((began + 5) * 1000)
+          return result
+        }
+      },
+    })
+    const result = await browserNew({ ...env, DB: later } as unknown as Env)
+    expect({ status: result.status, code: result.body.code }).toEqual({
+      status: 429,
+      code: 'new_author_limit',
+    })
+  } finally {
+    vi.useRealTimers()
+  }
   expect(await db.$count(decks)).toBe(3)
 })
 

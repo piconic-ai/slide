@@ -1,14 +1,4 @@
-import {
-  and,
-  eq,
-  exists,
-  gt,
-  isNull,
-  lte,
-  notExists,
-  or,
-  sql,
-} from 'drizzle-orm'
+import { and, eq, exists, gt, isNull, lte, notExists, or } from 'drizzle-orm'
 import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1'
 import {
   Hono,
@@ -18,7 +8,6 @@ import {
 } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import {
-  decks,
   deployments,
   uploadFiles,
   deploymentRowSchema,
@@ -102,6 +91,7 @@ import {
   decidePlacement,
   parseNewAuthorLimits,
   placementCapOf,
+  placementWindowOf,
   type PlacementCap,
 } from './new-author-limits'
 import { readNewSlideTimes, readRegisteredAt } from './new-author-store'
@@ -421,8 +411,6 @@ function pickSlug(
   const [random = 0] = crypto.getRandomValues(new Uint32Array(1))
   return contendedSlug(base, random)
 }
-/** The last round of a new slide's start that made no slide, for the log. */
-type LostRound = Readonly<{ attempt: number; result: string; slug: string }>
 /**
  * Makes a new slide with the session of its first upload, and returns the
  * slide. Its name comes from what the sender knows of it; a start that is
@@ -439,7 +427,6 @@ async function createSlide(
   const owner = session.ownerUserId
   const refused = inventoryRejection(session.inventory, limits)
   const base = slugBase(name)
-  let lastRound: LostRound | null = null
   for (let attempt = 1; attempt <= SLUG_ATTEMPTS; attempt++) {
     // A slide whose first upload never finished is no slide: it neither
     // holds its name nor counts toward the limit. An upload given up in
@@ -456,10 +443,6 @@ async function createSlide(
     if (result === 'no_session') {
       // Returns when uploads left open were given up; the next round
       // tries again.
-      lastRound = { attempt, result, slug: deck.slug }
-      console.warn(
-        JSON.stringify({ event: 'new_slide_no_session', ...lastRound }),
-      )
       await settleRefusedSession(db, created, limits, false)
       continue
     }
@@ -467,8 +450,7 @@ async function createSlide(
     // by the insert itself, so starts at once cannot pass it together), the
     // owner holds as many as allowed, or another start took the name
     // meanwhile and the next round picks another.
-    if (cap !== null) await refuseOverCap(c, owner, cap, session.created)
-    lastRound = { attempt, result, slug: deck.slug }
+    if (cap !== null) await refuseOverCapNow(c, owner, cap)
     if ((await countLiveDecks(c.env.DB, owner)) >= limits.decks)
       fail(
         409,
@@ -476,35 +458,7 @@ async function createSlide(
         'deck_limit',
       )
   }
-  await logBusyStart(c, owner, lastRound)
   return failConcurrentStart()
-}
-/**
- * Says why a new slide's start was turned away as busy after every round,
- * with what the owner holds now, so that a busy answer that no limit explains
- * can be told apart from a lost name in the logs (#666).
- */
-async function logBusyStart(
-  c: UploadScope,
-  owner: string,
-  lastRound: LostRound | null,
-) {
-  const rows = await drizzle(c.env.DB)
-    .select({
-      slug: decks.slug,
-      deleted: sql<number>`${decks.deleted_at} IS NOT NULL`,
-    })
-    .from(decks)
-    .where(eq(decks.owner_user_id, owner))
-  console.warn(
-    JSON.stringify({
-      event: 'new_slide_busy',
-      lastRound,
-      decks: rows.length,
-      deleted: rows.filter((row) => row.deleted).length,
-      lastSlugHeld: rows.some((row) => row.slug === lastRound?.slug),
-    }),
-  )
 }
 /**
  * Reports a refused guarded write. A session that closed meanwhile gets its
@@ -769,6 +723,17 @@ async function refuseOverCap(
       'new_author_limit',
       { availableAt: String(decision.availableAt) },
     )
+}
+/**
+ * Refuses a new slide that the insert did not make for the limit of the day,
+ * counting as of now. The insert counts every slide the person has, also the
+ * ones that starts at once made after this one began, which a window ending
+ * at this start's own time would leave out, and a start would then be
+ * answered busy over and over while the limit is in fact reached (F42-AC17).
+ */
+function refuseOverCapNow(c: UploadScope, owner: string, cap: PlacementCap) {
+  const at = now()
+  return refuseOverCap(c, owner, { ...cap, window: placementWindowOf(at) }, at)
 }
 /** Renews the credential of an attempt started before, and names its slide. */
 async function resumedDeck(
