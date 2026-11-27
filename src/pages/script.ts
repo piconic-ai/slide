@@ -99,11 +99,12 @@ export const pageScript = (viewerOrigin: string) => `(() => {
     const known = deck && typeof deck.isReady === 'function' && typeof deck.getIndices === 'function' && typeof deck.slide === 'function'
     return known && deck.isReady() && document.querySelector('.reveal .slides') ? deck : null
   }
-  const stacksOf = () => Array.from(document.querySelectorAll('.reveal .slides > section'), (column) => column.querySelectorAll(':scope > section').length)
-  const columnsOf = () => stacksOf().map((below) => Math.max(1, below))
+  // How many slides each column holds: a column that is a stack holds the
+  // slides inside it, any other holds itself.
+  const columnsOf = () => Array.from(document.querySelectorAll('.reveal .slides > section'), (column) => Math.max(1, column.querySelectorAll(':scope > section').length))
   const startReveal = () => {
     const deck = tool ? null : revealOf()
-    if (!deck || stacksOf().some((below) => below > 0)) return
+    if (!deck) return
     tool = {
       pageOf: () => {
         const at = deck.getIndices()

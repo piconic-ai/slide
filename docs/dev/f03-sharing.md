@@ -202,7 +202,7 @@ iOS Safari・Android Chrome の実機と、本番の Cloudflare 経由での表�
 
 ### ツールごとの読み替え
 
-reveal.js(縦のスライドのないもの)の読み替えまでを実装した(#709)。suraido.js と Slidev は未実装である。以降は、実装した部分と、実装の前に調べたことを分けて書く。
+reveal.js の読み替え(縦のスライドを含む)までを実装した(#709)。suraido.js と Slidev は未実装である。以降は、実装した部分と、実装の前に調べたことを分けて書く。
 
 #### 実装したもの(reveal.js)
 
@@ -212,7 +212,7 @@ reveal.js(縦のスライドのないもの)の読み替えまでを実装した
   - 第 3 引数の `-1` は、fragment(1 つずつ出す要素)を 1 つも出していない状態を指す。省略すると、reveal.js は、後ろの slide から前の slide へ戻るときと同じに、その slide の fragment をすべて出す。`#3` で 4 枚目が先に開く場合(0 始まりの読み)がこれに当たり、3 ページ目が、fragment が出きった形で開いてしまう(F03-AC190 の fixture で再現した)。
   - 渡されたページが slide の数を超えるときは、最後の slide に移る。
 - 表示中のページ: `Reveal.getIndices()` の横の位置を 1 始まりにしたもの。fragment(`f`)は数えない(F03-AC190)。`slidechanged` event で通知する。`hash: false`(既定)でも、`hash: true` でも、`hashOneBasedIndex` の有無でも、URL を読まずに API から読むので、同じ結果になる(F03-AC187〜F03-AC189)。
-- 縦の slide(`.slides > section` の中の `section`)を持つ出力は、まだ読み替えない(これまでどおり読む)。F03-AC199〜F03-AC201 で足す。
+- 縦の slide: `.slides > section` の列ごとに、中の `section` の数(なければ 1)を数え、読む順の通し番号をページ番号にする(`pageOfSlide`・`slideOfPage`。F03-AC199〜F03-AC201)。reveal.js 自身の `getSlidePastCount` は使わない。global の API に頼らず、DOM の構造と `getIndices()` の `h`・`v` だけで決まり、純粋な処理としてテストできるためである。1 列目が 1 枚、2 列目が縦に 3 枚、3 列目が 1 枚のスライドは、1・2・3・4・5 ページで、縦の列の下から右へ送ると 4 から 5 になる。縦の列が先頭にある出力、末尾にある出力(`[2, 1, 2]`)も、全部のキー操作のあとで、表示中の slide の番号とアドレスが合うことを確かめた。
 - `ETag`: 差し込む script は、これまでどおり `viewerOrigin` だけを持つ 1 つの文字列で、どのスライドにも同じである。判定は script の中で行うので、`ETag` の決め方は変わらない。script の文字列が変わるので、`ETag`(`scriptHashSource`)は変わり、前の script で配った byte を `304` にしない。
 - 読み替えない出力: global の `Reveal` がない出力(`import Reveal from './reveal.mjs'` で `new Reveal().initialize()` を呼ぶ ES module)は、読み替えない。起動を呼んだ instance に、差し込む script から届く手段がないためである。そのスライドは、これまでどおり `#3` を 1 始まりの番号として通知し、reveal.js は 4 枚目を開く(確かめた: `/@owner/<slug>/3` で 4 枚目が出て、めくってもアドレスバーは `/3` のまま)。F03-AC187〜F03-AC190 は、global の API で読み込むスライド(reveal.js の starter の形)で確かめた範囲である。
 
