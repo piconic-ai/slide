@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.4.3](https://github.com/piconic-ai/slide/compare/v0.4.2...v0.4.3) - 2026-11-27
+
+- 利用規約とプライバシーポリシーを、2026-11-27 制定の初版にする(丁寧語、誤字、施行日) by @kfly8 in https://github.com/piconic-ai/slide/pull/659
+
 ## [v0.4.2](https://github.com/piconic-ai/slide/compare/v0.4.1...v0.4.2) - 2026-11-27
 
 - 計測の集計が Workers で失敗する不具合を直す(redirect: 'error' は使えない) by @kfly8 in https://github.com/piconic-ai/slide/pull/664
