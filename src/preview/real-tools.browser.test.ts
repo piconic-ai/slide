@@ -233,7 +233,7 @@ async function withPage(use: (page: Page) => Promise<void>) {
   }
 }
 
-test.each(TOOLS)(
+test.each([...TOOLS, ...RECORDED])(
   'F22-AC6: Given the $slug fixture, When it is read as an upload, Then it is within the limits of one version',
   ({ slug }) => {
     const inventory = inventories.get(slug)!
