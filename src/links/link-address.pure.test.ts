@@ -1,5 +1,10 @@
 import { describe, expect, it, test } from 'vitest'
-import { linkPagePath, linkTargetOf, parseLinkPath } from './link-address'
+import {
+  eventKeysOf,
+  linkPagePath,
+  linkTargetOf,
+  parseLinkPath,
+} from './link-address'
 
 /** The canonical `rest` a written `rest` leads to, or 'refused'. */
 const canonical = (rest: string) => {
@@ -161,4 +166,16 @@ describe('parseLinkPath and linkTargetOf', () => {
     const rest = canonical(`${'www.'.repeat(40)}example.com/a`)
     expect(rest.endsWith('example.com/a')).toBe(true)
   })
+})
+
+test('F45-AC35: Given the keys an event may be kept under, When they are told, Then an event of connpass has one, an event of another site both ways of writing www., and an address with a query none', () => {
+  const keys = (url: string) => eventKeysOf(linkTargetOf(url))
+  expect(keys('https://kanagawapm.connpass.com/event/410635/?a=1')).toEqual([
+    'https://connpass.com/event/410635',
+  ])
+  expect(keys('https://www.example.com/conf/')).toEqual([
+    'https://example.com/conf',
+    'https://www.example.com/conf',
+  ])
+  expect(keys('https://example.com/conf?day=1')).toEqual([])
 })

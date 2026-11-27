@@ -107,6 +107,19 @@ export function linkTargetOf(url: string): LinkTarget {
   }
 }
 
+/**
+ * The keys an event of the address may be kept under, the likelier first
+ * (F45-AC35). An event of connpass, Doorkeeper or Luma has one key. An event
+ * of another site keeps the `www.` its address was written with, which the
+ * path of the page drops, so both ways of writing the host are looked up.
+ * None when the address has a query and so can be no event.
+ */
+export function eventKeysOf(target: LinkTarget): readonly string[] {
+  if (target.eventKey === null) return []
+  if (target.eventShaped) return [target.eventKey]
+  return [target.eventKey, target.eventKey.replace('https://', 'https://www.')]
+}
+
 /** The one path of the page of links an https address belongs to. */
 export const linkPagePath = (url: string): string =>
   `/link/${linkTargetOf(url).rest}`
