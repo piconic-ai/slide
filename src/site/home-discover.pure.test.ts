@@ -104,8 +104,17 @@ describe('toDiscoverPerson', () => {
   test('F44-AC19: Given a person, When they are drawn, Then only the fields of the card come', () => {
     expect(
       Object.keys(toDiscoverPerson({ ...person, name: 'Bob' })).sort(),
-    ).toEqual(['avatarUrl', 'handle', 'href', 'initial', 'name'])
+    ).toEqual(['avatarUrl', 'followsYou', 'handle', 'href', 'initial', 'name'])
   })
+
+  test.each([true, false])(
+    'F44-AC32: Given a person who follows the reader: %s, When they are drawn, Then the card only carries it as followsYou',
+    (followsViewer) => {
+      expect(
+        toDiscoverPerson({ ...person, name: 'Bob', followsViewer }).followsYou,
+      ).toBe(followsViewer)
+    },
+  )
 })
 
 describe('toDiscoverCommunity', () => {
