@@ -37,6 +37,8 @@ const HELP_PAGE = new RegExp(
 
 /**
  * Share URLs of public decks, such as /@kfly8/good-slide, may be listed. So
+ * may a page of links, `/link/<address>` (F45-AC36); the page of an address
+ * no one gathered answers 404, which is never listed. So
  * may a legal text once it has a date; a draft may not (D-21). `legal` is the
  * set of texts to judge by, the ones the service carries unless a test gives
  * others.
@@ -51,4 +53,5 @@ export const isIndexablePath = (
   HELP_PAGE.test(path) ||
   path === '/robots.txt' ||
   path.startsWith('/@') ||
+  path.startsWith('/link/') ||
   indexableLegalPaths(legal).has(path)
