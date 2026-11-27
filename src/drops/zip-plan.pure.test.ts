@@ -132,6 +132,132 @@ describe('planZip', () => {
     expect(files).toHaveLength(3)
   })
 
+  it.each([
+    ['_redirects only', ['_redirects']],
+    ['_headers only', ['_headers']],
+    ['both', ['_redirects', '_headers']],
+  ])(
+    'F22-AC48, F22-AC49: Given a zip with %s at its top, When planned, Then it is accepted and the version holds neither',
+    async (_name, names) => {
+      const files = await planned(
+        makeZip([
+          { name: 'index.html', data: page },
+          ...names.map((name) => ({ name, data: '/* /index.html 200' })),
+          { name: 'assets/app.js', data: 'a' },
+        ]),
+      )
+
+      expect(files.map(({ path }) => path)).toEqual([
+        'index.html',
+        'assets/app.js',
+      ])
+    },
+  )
+
+  it('F22-AC48: Given a zip whose one folder holds the slide and both files, When planned, Then the folder is the root and the files at its top are left out', async () => {
+    const files = await planned(
+      makeZip([
+        { name: 'dist/index.html', data: page },
+        { name: 'dist/_redirects', data: '/* /index.html 200' },
+        { name: 'dist/_headers', data: '/*\n  X-A: b' },
+        { name: 'dist/assets/app.js', data: 'a' },
+      ]),
+    )
+
+    expect(files.map(({ path }) => path)).toEqual([
+      'index.html',
+      'assets/app.js',
+    ])
+  })
+
+  it('F22-AC48: Given a zip that is index.html and the two files, When planned, Then index.html alone is sent', async () => {
+    const files = await planned(
+      makeZip([
+        { name: '_redirects', data: 'x' },
+        { name: 'index.html', data: page },
+        { name: '_headers', data: 'x' },
+      ]),
+    )
+
+    expect(files.map(({ path }) => path)).toEqual(['index.html'])
+  })
+
+  it.each([
+    ['sub/_redirects', 'unsupported_file'],
+    ['sub/_headers', 'unsupported_file'],
+    ['_Redirects', 'unsupported_file'],
+    ['_worker.js', 'unsupported_path'],
+    ['_routes.json', 'unsupported_path'],
+    ['CNAME', 'unsupported_file'],
+  ])(
+    'F22-AC51: Given a zip with %s beside _redirects, When planned, Then that file is still named and the whole drop is refused',
+    async (name, reason) => {
+      const zip = makeZip([
+        { name: 'index.html', data: page },
+        { name: '_redirects', data: 'x' },
+        { name, data: 'x' },
+      ])
+
+      expect(await refusal(zip)).toMatchObject({ reason, path: name })
+    },
+  )
+
+  it('F22-AC50: Given a zip of 3 files and both settings, When planned against a limit of 3 files, Then the settings are not counted', async () => {
+    const files = await planned(
+      makeZip([
+        { name: 'index.html', data: page },
+        { name: 'a.css', data: 'a' },
+        { name: 'b.css', data: 'b' },
+        { name: '_redirects', data: 'x' },
+        { name: '_headers', data: 'x' },
+      ]),
+      limits,
+    )
+
+    expect(files).toHaveLength(3)
+  })
+
+  it('F22-AC50: Given a zip of exactly 100 files and both settings, When planned against the real limits, Then it is accepted; with one file more it is refused', async () => {
+    const hundred = Array.from({ length: 99 }, (_, i) => ({
+      name: `f${i}.css`,
+      data: 'a',
+    }))
+    const settings = [
+      { name: '_redirects', data: 'x' },
+      { name: '_headers', data: 'x' },
+    ]
+    const ok = makeZip([
+      { name: 'index.html', data: page },
+      ...hundred,
+      ...settings,
+    ])
+    const tooMany = makeZip([
+      { name: 'index.html', data: page },
+      ...hundred,
+      { name: 'extra.css', data: 'a' },
+      ...settings,
+    ])
+
+    expect(await planned(ok)).toHaveLength(100)
+    expect(await refusal(tooMany, VERSION_LIMITS)).toEqual({
+      reason: 'too_many_files',
+      count: 101,
+      limit: 100,
+    })
+  })
+
+  it('F22-AC50: Given settings larger than a file may be, When planned, Then their size is not counted', async () => {
+    const files = await planned(
+      makeZip([
+        { name: 'index.html', data: page },
+        { name: '_redirects', data: 'x'.repeat(201) },
+      ]),
+      limits,
+    )
+
+    expect(files.map(({ path }) => path)).toEqual(['index.html'])
+  })
+
   it('Given a zip that says a file is small but unpacks to far more, When planned, Then it is refused and the bytes beyond the listed size are never kept', async () => {
     const zip = makeZip([
       { name: 'index.html', data: page },
