@@ -16,6 +16,7 @@ import {
   VIEWER_CACHE,
   WORKER_ASSET_PATH,
 } from './limits'
+import { singleFlight } from './single-flight'
 import {
   evictedOrigin,
   evictKey,
@@ -156,6 +157,13 @@ async function prune(contentBase: string) {
   }
 }
 
+/**
+ * `prune`, never twice at once: it runs when a version is kept and when a
+ * viewer has loaded, and two runs side by side would clear the same origin
+ * twice.
+ */
+const pruneOnce = singleFlight(prune)
+
 /** Writes what is needed to open this deck later without a connection, once its frame has kept the version. */
 async function keepShell(
   shell: string,
@@ -185,7 +193,7 @@ async function keepShell(
       evictKey(location.origin, previous),
       new Response('', { headers: { [STORED_AT_HEADER]: String(Date.now()) } }),
     )
-  await prune(contentBase)
+  await pruneOnce(contentBase)
 }
 
 export function startViewer(root: ParentNode): void {
@@ -221,6 +229,14 @@ export function startViewer(root: ParentNode): void {
       )
     slides.addEventListener('load', ask)
     ask()
+    // What the service stopped showing is cleared once the page has loaded,
+    // and the page's load waits for the slides' frame, so it never competes
+    // with the first paint. A deck whose version could not be stored never
+    // reaches `keepShell`, and would otherwise leave its origin on the list
+    // (F37-AC22). This module is loaded late, so the load may have passed.
+    const clear = () => void pruneOnce(contentBase).catch(() => {})
+    if (document.readyState === 'complete') clear()
+    else addEventListener('load', clear, { once: true })
   } catch {}
 }
 
