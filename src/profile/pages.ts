@@ -1,5 +1,6 @@
 import { html } from 'hono/html'
 import { initialOf } from '../follows/people'
+import { followsYouBadge } from '../follows/pages'
 import { faceImage } from './face'
 import type { Handle } from '../share/handle'
 import {
@@ -53,6 +54,7 @@ export function profileCard(
   stored: StoredProfile | null,
   lang: Lang,
   action: ReturnType<typeof html> | '' = '',
+  followsYou = false,
 ) {
   const t = text[lang]
   // Until a name is chosen, the handle stands in for the name.
@@ -78,7 +80,9 @@ export function profileCard(
       profile.avatarUrl ? faceImage(profile.avatarUrl, 'portrait-image') : ''
     }</span
   >`
-  const handleLine = html`<p class="card-meta">@${handle}</p>`
+  const handleLine = html`<p class="card-meta">
+    @${handle}${followsYou ? followsYouBadge(lang) : ''}
+  </p>`
   // Picture on the left, the name and what follows it beside it, the button
   // last: at the right on a wide screen, under the facts on a narrow one.
   return html`<div class="profile-head">

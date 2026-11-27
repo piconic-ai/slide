@@ -199,6 +199,8 @@ export type ProfileReader =
   | Readonly<{
       kind: 'reader'
       follow: FollowState | 'refused'
+      /** Whether the author follows this reader, who may follow them. */
+      followsYou: boolean
       block: ProfileBlock
     }>
 
@@ -208,7 +210,7 @@ function profileActions(handle: Handle, reader: ProfileReader, lang: Lang) {
   const follow =
     reader.follow === 'refused'
       ? refusedFollowForm(lang)
-      : profileFollowForm(reader.follow, handle, lang)
+      : profileFollowForm(reader.follow, handle, lang, reader.followsYou)
   const menu =
     reader.block === 'none' ? '' : profileBlockMenu(handle, reader.block, lang)
   if (!follow && !menu) return ''
@@ -240,7 +242,13 @@ export function profileBody(
       asksToSignIn ? loginPrompt('follow', openPath(handle, view), lang) : ''
     }
     <section class="profile">
-      ${profileCard(handle, author.profile, lang, action)}
+      ${profileCard(
+        handle,
+        author.profile,
+        lang,
+        action,
+        reader.kind === 'reader' && reader.followsYou,
+      )}
     </section>
     ${profileTabs(handle, author.counts, openTab(view), lang)}
     ${openPart(author.handle, author.counts, view, lang)}`

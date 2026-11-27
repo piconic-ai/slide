@@ -142,15 +142,22 @@ async function profileReader(
   author: string,
 ): Promise<ProfileReader> {
   if (viewer === author) return { kind: 'owner' }
-  const [follow, blocking] = await Promise.all([
+  const [follow, blocking, followedBack] = await Promise.all([
     profileFollow(database, viewer, reader, author),
     reader === null
       ? false
       : hasBlocked(database, { blocker: reader, blocked: author }),
+    reader === null
+      ? false
+      : isFollowing(database, { follower: author, followee: reader }),
   ])
+  // Only a reader who may follow the author is told the author follows them.
+  const followsYou =
+    followedBack && (follow === 'can-follow' || follow === 'following')
   return {
     kind: 'reader',
     follow,
+    followsYou,
     block: reader === null ? 'none' : blocking ? 'blocking' : 'can-block',
   }
 }

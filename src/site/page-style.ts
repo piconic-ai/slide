@@ -935,6 +935,16 @@ export const pageStyle = html`<style>
   .people-list li:hover .person-name {
     text-decoration: underline;
   }
+  .follows-you {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 0 6px;
+    border-radius: 4px;
+    background: var(--muted);
+    color: var(--muted-foreground);
+    font-size: 12px;
+    line-height: 20px;
+  }
   .person-handle {
     display: block;
     color: var(--muted-foreground);

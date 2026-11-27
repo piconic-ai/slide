@@ -35,6 +35,8 @@ export const homeText = messages({
     follow: 'フォロー',
     following: 'フォロー中',
     followOf: (name: string) => `${name} をフォローする`,
+    followBack: 'フォローバック',
+    followBackOf: (name: string) => `${name} をフォローバックする`,
     unfollowOf: (name: string) => `${name} のフォローを解除する`,
   },
   en: {
@@ -70,6 +72,8 @@ export const homeText = messages({
     follow: 'Follow',
     following: 'Following',
     followOf: (name: string) => `Follow ${name}`,
+    followBack: 'Follow back',
+    followBackOf: (name: string) => `Follow ${name} back`,
     unfollowOf: (name: string) => `Unfollow ${name}`,
   },
 })
