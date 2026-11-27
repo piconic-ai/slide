@@ -120,14 +120,17 @@ pnpm install --frozen-lockfile
 - 差分を読み直し、issue の範囲に収まっている。
 - branch が `origin/main` に追いついていなくても、次の 2 つを満たせば merge してよい。複数の agent が並行して `main` へ merge するので、そのたびに取り込み直して CI を待つと、いつまでも merge できない。`main` に merge しても本番は変わらず、merge の後に `main` の CI を見る(6 の 2)ためである。
 
-  - いまの `origin/main` を取り込んでも、衝突しない。次のコマンドの 2 つ目が、終了コード 0 で tree の ID を 1 行だけ返す。
-  - この PR の `migrations/` に足したファイルの番号が、追いついていない間に `main` へ入った migration の番号と重ならない。同じ番号の別名のファイルは、衝突せずに両方残り、適用の順が決まらなくなる。次のコマンドの 3 つ目が、`main` に入った migration を返すので、この PR の番号と比べる。
+  - いまの `origin/main` を取り込んでも、衝突しない。`git merge-tree` が、終了コード 0 で tree の ID を 1 行だけ返す。
+  - この PR の `migrations/` に足したファイルの番号が、追いついていない間に `main` へ入った migration の番号と重ならない。番号が同じファイルが 2 つできると、どちらの変更が先かを、だれも決めていないことになる。2 つの一覧を比べ、重なりがなければ(どちらかが空でもよい)満たしている。
 
   ```sh
   git fetch origin
   git merge-tree --write-tree HEAD origin/main
-  git diff --name-only --diff-filter=A HEAD...origin/main -- migrations
+  git diff --name-only --diff-filter=A origin/main...HEAD -- migrations   # この PR が足した migration
+  git diff --name-only --diff-filter=A HEAD...origin/main -- migrations   # 追いついていない間に main へ入った migration
   ```
+
+  この 2 つで分かるのは、文字の上で衝突しないことだけである。意味の上のぶつかりや、`migrations/` から作る図、ヘルプの一覧のような生成物の古さは、merge の後の `main` の CI でしか見つからない。待ったあとは `main` が進んでいることがあるので、`gh pr merge` の直前に、もう一度確かめる。
 
   どちらかを満たさないときは、`git merge origin/main` で取り込み、衝突を直すか番号を付け直して、push し、手順 3 と 5 をやり直す。取り込んだあとの head が、レビュー済みの commit に `origin/main` を取り込んだだけの merge commit なら、上の `pullfrog` の扱いを使う。
 
