@@ -101,7 +101,8 @@ test('F39-AC24: Given the steps for the logs, When they are read, Then they cove
   expect(part).toContain('Audit Logs')
   expect(part).toContain('18 か月')
   expect(part).toContain('画面で確かめた値')
-  expect(part).toContain('`(日数)`')
+  // The period the privacy policy states, which these steps check against.
+  expect(part).toContain('最大 3 か月')
 })
 
 test('Given the runbook, When it is read, Then it carries no webhook address and no email address', () => {
