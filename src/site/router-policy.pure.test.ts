@@ -177,6 +177,24 @@ test.each([
 )
 
 test.each([
+  ['/@owner/talk', '/@owner/other'],
+  ['/@owner/talk/3', '/@owner/talk/4'],
+  ['/@owner/talk', '/@other/talk'],
+])(
+  'F03-AC72: Given a link from the viewer at %s to the viewer at %s, When it is followed, Then it is a whole page load, so a viewer script runs once per document',
+  (from, to) => {
+    expect(
+      movesInFrame(
+        link({
+          from: `https://slide.example${from}`,
+          href: `https://slide.example${to}`,
+        }),
+      ),
+    ).toBe(false)
+  },
+)
+
+test.each([
   '/',
   '/@owner',
   '/my/slides',

@@ -270,6 +270,31 @@ test('F37-AC21: Given a viewer opened once, When the deck is replaced by a versi
   })
 })
 
+test('F37-AC22: Given an origin on the list to clear, When any public viewer opens online and its version is not stored, Then the list empties', async () => {
+  await withContext(async (context) => {
+    const page = await openKept(context)
+    // A version that cannot be stored: its frame never says it is stored, so
+    // the viewer never writes a shell and never reaches its own clearing.
+    const next = await seedDeployment(world.db, 'talk')
+    await world.putFiles(next, {
+      'index.html': ['text/html; charset=utf-8', '<h1 id="title">Piece</h1>'],
+    })
+    await orm
+      .update(decks)
+      .set({ public_deployment_id: next })
+      .where(eq(decks.id, 'talk'))
+    // The viewer's worker drops the old record, after it has queued its origin.
+    await page.goto(world.viewer('talk'))
+    await expect
+      .poll(async () => (await recordsOf(page)).length, { timeout: 30_000 })
+      .toBe(0)
+    // Opened online again, the page clears the list although it stores nothing.
+    await page.goto(world.viewer('talk'))
+    await hasText(page.frameLocator('iframe#deck').locator('#title'), 'Piece')
+    await expect.poll(() => evictionsOf(page), { timeout: 30_000 }).toBe(0)
+  })
+})
+
 const withdrawals: [string, () => Promise<unknown>][] = [
   [
     'F37-AC7 (made private)',
