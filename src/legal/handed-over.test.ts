@@ -10,7 +10,8 @@ import {
 import { LEGAL_TEXTS, type LegalTextKind } from './documents'
 
 /**
- * The Markdown the operator handed over is kept in `handed-over/`. These
+ * The Markdown of the texts is kept in `handed-over/`: first the drafts the
+ * operator handed over, and since the first edition the source itself. These
  * tests hold the texts the pages draw to it, word for word (F34-AC1,
  * F34-AC2, F34-AC3). The marks of Markdown (`#`, list numbers, table bars)
  * and the layout whitespace are the only differences allowed.

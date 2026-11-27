@@ -614,7 +614,7 @@ D1 を [復元した](#d1-を復元する) あとは、D1 の行は復元した�
 2. **見張りの Worker を deploy する**(同 9)。サービスの deploy とは別で、手で行う。commit と push の後、きれいな checkout の push 済みの commit から行う。[見張りの Worker の deploy](alerts-runbook.md#見張りの-worker-の-deploy)。
 3. **Cloudflare のアラート 3 つと Budget alerts 9 段を設定する**(同 9)。[Monitors のアラート 3 つ](alerts-runbook.md#monitors-のアラート-3-つ)、[Budget alerts 9 段](alerts-runbook.md#budget-alerts-9-段)。
 4. **通知を 1 つずつ、わざと失敗を起こして試す**(同 9)。[わざと失敗を起こして確かめる](alerts-runbook.md#わざと失敗を起こして確かめる)。
-5. **Workers のログと Cloudflare の監査ログの保存期間を確かめる**。結果は、プライバシーポリシーの履歴情報の日数を決める材料になる。[ログと監査ログの保存期間を確かめる](alerts-runbook.md#ログと監査ログの保存期間を確かめる)。
+5. **Workers のログと Cloudflare の監査ログの保存期間を確かめる**。結果は、プライバシーポリシーの履歴情報を残す期間(初版で「最大 3 か月」と決まった)が、実際と合っているかを確かめる材料になる。[ログと監査ログの保存期間を確かめる](alerts-runbook.md#ログと監査ログの保存期間を確かめる)。
 
 **無いときの動き(D-08)。** webhook が無い、または Discord の webhook の形でないあいだは、すぐの通知は送られず、記録とログ 1 行(`alert_not_sent`)が残る。運営の画面の「通知」の枠は「未設定」と出す。翌日のメールは、メールの送り口があれば送る。サービスは、今までどおり動く。
 

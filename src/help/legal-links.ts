@@ -4,7 +4,7 @@ import { LEGAL_TEXT_PATHS, LEGAL_TEXTS } from '../legal/documents'
 /**
  * The articles of the terms and the privacy policy that the help points at.
  * The help names an article by its title and reaches it by its `id`, never by
- * its number: the texts are drafts and the numbers may move (D-132). The
+ * its number: the numbers may move when the texts are amended (D-132). The
  * titles are the texts' own words, so a changed title is found by a test and
  * not by a reader.
  */
