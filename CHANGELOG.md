@@ -1,5 +1,18 @@
 # Changelog
 
+## [v0.4.4](https://github.com/piconic-ai/slide/compare/v0.4.3...v0.4.4) - 2026-11-27
+
+- ヘルプの記事の、事実と違う記述を直す(埋め込み、メールアドレス、Gravatar) by @kfly8 in https://github.com/piconic-ai/slide/pull/670
+- 運営の入口の pass の書き方を 1 通りにする by @kfly8 in https://github.com/piconic-ai/slide/pull/674
+- ヘルプの記事: 公開前の読み直しの指摘を直す(#672 の C) by @kfly8 in https://github.com/piconic-ai/slide/pull/677
+- 差し替え・下見のあと、古い保存した版を消す(F37-AC21) by @kfly8 in https://github.com/piconic-ai/slide/pull/678
+- バックアップのバケットを UPLOADS_BACKUP に結ぶ(バケットを作ってから merge) by @kfly8 in https://github.com/piconic-ai/slide/pull/669
+- ヘルプ: メールアドレスの変更で、運営が本人確認をすることを書く(#672 の 5) by @kfly8 in https://github.com/piconic-ai/slide/pull/680
+- メンテナンスの手順に until を必須にし、受け入れた危険を記録する(#673) by @kfly8 in https://github.com/piconic-ai/slide/pull/676
+- ヘルプ: スライドを削除する記事を足す(#672 の 3) by @kfly8 in https://github.com/piconic-ai/slide/pull/681
+- 保存した版: viewer の開始時にも消す予定を消す(#671 の指摘 2 から 7) by @kfly8 in https://github.com/piconic-ai/slide/pull/682
+- 招待制を外したときの決定を、仕様に書く(F17-AC41〜43、F42、F28) by @kfly8 in https://github.com/piconic-ai/slide/pull/679
+
 ## [v0.4.3](https://github.com/piconic-ai/slide/compare/v0.4.2...v0.4.3) - 2026-11-27
 
 - 利用規約とプライバシーポリシーを、2026-11-27 制定の初版にする(丁寧語、誤字、施行日) by @kfly8 in https://github.com/piconic-ai/slide/pull/659
