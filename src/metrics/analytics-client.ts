@@ -37,8 +37,11 @@ export async function queryAnalytics(
       method: 'POST',
       headers: { Authorization: `Bearer ${request.token}` },
       body: request.sql,
-      // A redirect would carry the token somewhere else.
-      redirect: 'error',
+      // A redirect would carry the token somewhere else, so it is received and
+      // not followed: its status is not 200, and the call fails below. Not
+      // `error`: Workers does not implement that mode and throws a TypeError
+      // when the request is made, which no stub of `fetch` shows.
+      redirect: 'manual',
       signal: AbortSignal.timeout(20_000),
     },
   )

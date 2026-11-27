@@ -30,9 +30,31 @@ test('F40-AC17: Given a request, When the API is asked, Then it is one POST of t
   expect(init?.method).toBe('POST')
   expect(init?.body).toBe('SELECT 1')
   expect(init?.headers).toEqual({ Authorization: 'Bearer secret-token-123' })
-  // A redirect would carry the token to another host.
-  expect(init?.redirect).toBe('error')
+  // A redirect would carry the token to another host. Workers accepts only
+  // `follow` and `manual` (`error` throws a TypeError when the request is
+  // made), so the redirect is received, not followed.
+  expect(init?.redirect).toBe('manual')
 })
+
+test.each([301, 302, 307, 308])(
+  'F40-AC17: Given the API answers a redirect (%i), When it is asked, Then it is a failure with that status, and the token is not sent on',
+  async (status) => {
+    const send = vi.fn(
+      async () =>
+        new Response(null, {
+          status,
+          headers: { Location: 'https://elsewhere.invalid/' },
+        }),
+    )
+    const error = await queryAnalytics(
+      request,
+      send as unknown as typeof fetch,
+    ).catch((thrown: unknown) => thrown)
+    expect(error).toBeInstanceOf(AnalyticsApiError)
+    expect((error as AnalyticsApiError).status).toBe(status)
+    expect(send).toHaveBeenCalledTimes(1)
+  },
+)
 
 test.each([400, 401, 403, 429, 500, 503])(
   'F40-AC17: Given the API answers %i, When it is asked, Then it fails with the status only, and neither the token nor the answer is in the error',

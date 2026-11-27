@@ -141,7 +141,7 @@ Workers Analytics Engine は、書き込みが多いと、書くときと読む�
 | `day.ts` | 純粋 | UTC の日(`Day`)、日の足し引き、写す日の選び方(`daysToCopy`) |
 | `day-query.ts` | 純粋 | 1 日ぶんを読む SQL(`dayQuery`)。表の名前と日は、文に入れるので検査する |
 | `day-rows.ts` | 純粋 | API の応答を行に読む(`parseDayResponse`)。1 行でも形が違えば、応答の全部を断る。数と、数の形をした文字列を受け取る |
-| `analytics-client.ts` | client | SQL API への POST(`queryAnalytics`)。これだけが通信する。200 以外は状態だけを持つ例外。redirect は追わない。20 秒で切る |
+| `analytics-client.ts` | client | SQL API への POST(`queryAnalytics`)。これだけが通信する。200 以外は状態だけを持つ例外。redirect は追わない(`manual` で受け、3xx は 200 でないので失敗にする。Workers は `redirect: 'error'` を実装せず、渡すと TypeError になる)。20 秒で切る |
 | `daily-store.ts` | store | 写し終えた日を読む、1 日を置き換えて書く(`replaceDay`)、最後に写した日を読む |
 | `daily-routes.ts` | routes | `copyMetrics`(cron の処理)、`copySettingsOf`(足りない設定を調べる)。日ごとの失敗は、ほかの日を止めず、最後に `CopyFailedError` で処理を失敗にする |
 
