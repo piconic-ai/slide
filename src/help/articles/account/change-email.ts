@@ -13,7 +13,7 @@ export default defineArticle({
           アドレスを変えたいとき、受信箱に入れなくなったときは、<a
             href="/contact"
             >お問い合わせ</a
-          >からご連絡ください。個別に対応します。
+          >からご連絡ください。本人であることを確かめたうえで、個別に対応します。
         </p>
         <p>
           メールアドレスは、自分の「設定」の「アカウント」にだけ出ます。ほかの利用者には見えません。表示する場面は、運営の画面に出る場面も含めて、<a
@@ -28,7 +28,8 @@ export default defineArticle({
     body: () =>
       html`<p>
           If you want to change it, or can no longer open your inbox, please
-          <a href="/contact">contact us</a>. We handle each case individually.
+          <a href="/contact">contact us</a>. After checking that it is you, we
+          handle each case individually.
         </p>
         <p>
           Your email address is shown only on your own “Settings”, under

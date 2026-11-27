@@ -228,4 +228,11 @@ describe('the wording of the articles that was read through', () => {
       expect(`${text.lead}${text.body}`).not.toMatch(/招待|invit/iu)
     }
   })
+
+  test('F36-AC55: Given the article on changing the email address, When it speaks of asking the operator, Then it says the operator first checks that it is the person, in both languages', async () => {
+    const ja = await render('account/change-email', 'ja')
+    expect(ja.body).toContain('本人であることを確かめたうえで')
+    const en = await render('account/change-email', 'en')
+    expect(en.body).toContain('After checking that it is you')
+  })
 })
