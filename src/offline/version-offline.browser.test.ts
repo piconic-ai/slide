@@ -72,22 +72,35 @@ const deckFrame = async (page: Page, id: string) => {
   return page.frames().find((f) => f.url().startsWith(origin(id))) as Frame
 }
 
-/** What the viewer will do once its script exists: ask the frame to keep the version. */
+/**
+ * What the viewer will do once its script exists: ask the frame to keep the
+ * version. The frame's address is set before its script listens, so a message
+ * sent at once can be dropped. The viewer asks again when the frame loads;
+ * the test asks again until the frame answers.
+ */
 async function askToKeep(page: Page, id: string) {
   await deckFrame(page, id)
-  await page.evaluate(
-    ([target, type]) => {
-      const frame = document.querySelector<HTMLIFrameElement>('iframe#deck')
-      frame?.contentWindow?.postMessage({ type }, target as string)
-    },
-    [origin(id), OFFLINE_MESSAGE.register],
-  )
+  const answer = async () =>
+    (await seenOf(page)).find((m) => m.data.type === OFFLINE_MESSAGE.state)
   await expect
-    .poll(async () =>
-      (await seenOf(page)).find((m) => m.data.type === OFFLINE_MESSAGE.state),
+    .poll(
+      async () => {
+        const answered = await answer()
+        if (answered) return answered
+        await page.evaluate(
+          ([target, type]) => {
+            const frame =
+              document.querySelector<HTMLIFrameElement>('iframe#deck')
+            frame?.contentWindow?.postMessage({ type }, target as string)
+          },
+          [origin(id), OFFLINE_MESSAGE.register],
+        )
+        return undefined
+      },
+      { timeout: 20_000, interval: 500 },
     )
     .toBeTruthy()
-  return (await seenOf(page)).find((m) => m.data.type === OFFLINE_MESSAGE.state)
+  return answer()
 }
 
 const withContext = async (use: (context: BrowserContext) => Promise<void>) => {
