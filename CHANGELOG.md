@@ -1,5 +1,16 @@
 # Changelog
 
+## [v0.4.8](https://github.com/piconic-ai/slide/compare/v0.4.7...v0.4.8) - 2026-11-27
+
+- カードの「フォロー中」の印を、出どころが変わったときに追わせる by @kfly8 in https://github.com/piconic-ai/slide/pull/728
+- Turn pages by swipe and tap for slides that know only the keyboard by @kfly8 in https://github.com/piconic-ai/slide/pull/729
+- 仕様: 同じリンクでスライドが集まる(F45)を足す(1/5) by @kfly8 in https://github.com/piconic-ai/slide/pull/732
+- 仕様: 正規化した URL の使い道を広げる(F27、2/5) by @kfly8 in https://github.com/piconic-ai/slide/pull/733
+- 仕様: イベントのページを、リンクのページに置き換える(F29、F24、F23、F32、3/5) by @kfly8 in https://github.com/piconic-ai/slide/pull/734
+- 仕様: コミュニティのタブを「リンク」にし、種類を問わず入れる(F30、4/5) by @kfly8 in https://github.com/piconic-ai/slide/pull/735
+- 仕様: コミュニティに入ったスライドの知らせを、種類を問わないリンクに合わせる(F20、F31、F33、5/5) by @kfly8 in https://github.com/piconic-ai/slide/pull/736
+- アップロードしたアバターの R2 読み出しを Workers Cache の内側に置く by @kfly8 in https://github.com/piconic-ai/slide/pull/731
+
 ## [v0.4.7](https://github.com/piconic-ai/slide/compare/v0.4.6...v0.4.7) - 2026-11-27
 
 - Slidev のスライドで、ページ番号つきの URL を働かせる by @kfly8 in https://github.com/piconic-ai/slide/pull/718
