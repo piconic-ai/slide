@@ -33,6 +33,8 @@ type Served = Readonly<{
   body: BodyInit
   contentType: string
   source: FaceSource
+  /** The edge cache's answer (`HIT`, `MISS`), or `none` when it was not asked. */
+  edgeCache: string
 }>
 
 /** A person with no picture, and a name that names nobody, answer the same. */
@@ -51,6 +53,7 @@ const fromKept = (kept: CachedGravatar): Served | null =>
         body: kept.picture.body,
         contentType: kept.picture.contentType,
         source: { kind: 'gravatar', at: kept.kept.at },
+        edgeCache: 'none',
       }
     : null
 
@@ -85,6 +88,7 @@ async function gravatarFace(
         body: answer.bytes as BodyInit,
         contentType: answer.contentType,
         source: { kind: 'gravatar', at: now },
+        edgeCache: 'none',
       }
     : null
 }
@@ -124,6 +128,7 @@ async function uploadedFace(
       stored.headers.get('Content-Type') ?? undefined,
     ),
     source: { kind: 'uploaded', at },
+    edgeCache: stored.headers.get('Cf-Cache-Status') ?? 'none',
   }
 }
 
@@ -166,6 +171,8 @@ faceRoutes.get('/avatars/:userId', async (c) => {
     headers: {
       ...IMAGE_HEADERS,
       'Content-Type': served.contentType,
+      // Shows whether the bytes came from the edge cache, for operators.
+      'X-Content-Cache': served.edgeCache,
       'Cache-Control': faceCacheControl(
         c.req.query('v'),
         served.source,

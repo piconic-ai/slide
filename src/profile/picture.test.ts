@@ -537,12 +537,18 @@ class FakeWorkersCache {
   async fetch(request: Request): Promise<Response> {
     const key = new URL(request.url).pathname
     const hit = this.entries.get(key)
-    if (hit) return hit.clone()
+    if (hit) {
+      const again = new Response(hit.clone().body, hit)
+      again.headers.set('Cf-Cache-Status', 'HIT')
+      return again
+    }
     this.misses.push(key)
     const response = await serveFacePicture(platform.env.UPLOADS, request)
     if (/\bpublic\b/.test(response.headers.get('Cache-Control') ?? ''))
       this.entries.set(key, response.clone())
-    return response
+    const fresh = new Response(response.body, response)
+    fresh.headers.set('Cf-Cache-Status', 'MISS')
+    return fresh
   }
 }
 
@@ -563,6 +569,8 @@ test('F28-AC49: Given an uploaded picture behind the edge cache, When it is aske
   const second = await getVia(cache, path)
   expect(first.status).toBe(200)
   expect(cache.misses).toHaveLength(1)
+  expect(first.headers.get('x-content-cache')).toBe('MISS')
+  expect(second.headers.get('x-content-cache')).toBe('HIT')
   expect(cache.misses[0]).toMatch(new RegExp(`/${OWNER_ID}/\\d+$`))
   const bytes = async (r: Response) => Buffer.from(await r.arrayBuffer())
   expect((await bytes(second)).equals(await bytes(first))).toBe(true)
