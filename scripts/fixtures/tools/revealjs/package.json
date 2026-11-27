@@ -1,0 +1,7 @@
+{
+  "name": "revealjs-fixture",
+  "private": true,
+  "dependencies": {
+    "reveal.js": "6.0.2"
+  }
+}
