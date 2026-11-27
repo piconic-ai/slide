@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.4.2](https://github.com/piconic-ai/slide/compare/v0.4.1...v0.4.2) - 2026-11-27
+
+- 計測の集計が Workers で失敗する不具合を直す(redirect: 'error' は使えない) by @kfly8 in https://github.com/piconic-ai/slide/pull/664
+- 計測の確認手順を直す(SELECT DISTINCT、キーチェーン、参照元、タイムラインの確かめ方) by @kfly8 in https://github.com/piconic-ai/slide/pull/665
+- フォローされているときに表示し、ボタンをフォローバックにする by @kfly8 in https://github.com/piconic-ai/slide/pull/663
+
 ## [v0.4.1](https://github.com/piconic-ai/slide/compare/v0.4.0...v0.4.1) - 2026-11-26
 
 - docs: タイムラインのスライドを、カードの中でめくれるようにする仕様(F44-AC27〜30、F25-AC12) by @kfly8 in https://github.com/piconic-ai/slide/pull/648
