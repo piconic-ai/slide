@@ -35,6 +35,7 @@ import { recordFrom } from '../metrics/record-routes'
 import { shareRoutes } from '../share/routes'
 import { evictRoutes } from '../offline/evict-routes'
 import { eventRoutes } from '../events/routes'
+import { linkPageRoutes } from '../links/link-page-routes'
 import { communityForms } from '../communities/routes'
 import { communityListRoutes } from '../communities/list-routes'
 import { communityEditForms } from '../communities/edit-routes'
@@ -183,6 +184,7 @@ app.route('/api/slides', publicationApi)
 app.route('/', evictRoutes)
 app.route('/', shareRoutes)
 app.route('/', eventRoutes)
+app.route('/', linkPageRoutes)
 app.route('/', communityForms)
 app.route('/', communityListRoutes)
 app.route('/', communityEditForms)

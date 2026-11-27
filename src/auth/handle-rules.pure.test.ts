@@ -88,6 +88,13 @@ test.each(['communities', 'events', 'blocks', 'edit'])(
   },
 )
 
+test('F30-AC74: Given the word "link" of the pages of links, When it is checked as a handle of a person or a community, Then it is refused as reserved, so no profile at /@link hides a route', () => {
+  expect(checkHandle('link')).toEqual({ kind: 'refused', reason: 'reserved' })
+  expect(checkHandle('Link').kind).toBe('refused')
+  // A handle that only begins like the word is free.
+  expect(checkHandle('links').kind).toBe('valid')
+})
+
 test.each(['my', 'slides'])(
   'F28-AC114: Given the word %j of the owner pages, When it is checked as a handle of a person or a community, Then it is refused as reserved',
   (word) => {
