@@ -6,6 +6,7 @@ import { uploadFiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   seedDeck,
+  seedDeployment,
   seedPublic,
   signIn,
   TEST_ORIGIN,
@@ -19,10 +20,11 @@ const env = {
   CONTENT_ORIGIN: 'https://content.example',
 } as unknown as Env
 let id = ''
+let owner = ''
 
 beforeAll(async () => {
   await applyMigrations(db)
-  await signIn(env)
+  owner = await signIn(env)
   id = await seedPublic(db, 'talk', 1, '<Talk> & "friends"')
   await drizzle(db)
     .insert(uploadFiles)
@@ -88,6 +90,22 @@ test('F37-AC14: Given the viewer of a deck that is not public, When it is opened
   const page = await response.text()
   expect(page).not.toContain('data-stored-band')
   expect(page).not.toContain('data-offline-shell')
+})
+
+test('F37-AC21: Given a public deck, When its viewer is opened, Then the response names the version it shows', async () => {
+  const response = await get('/@owner/talk')
+  expect(response.status).toBe(200)
+  expect(response.headers.get('X-Slide-Content-Origin')).toBe(
+    `https://d-${id}.content.example`,
+  )
+})
+
+test("F37-AC21: Given the author's own preview of a deck, When it is opened, Then the response names no version", async () => {
+  await seedDeployment(db, 'draft')
+  const response = await get('/@owner/draft', { Cookie: owner })
+  expect(response.status).toBe(200)
+  expect(response.headers.get('Cache-Control')).toContain('no-store')
+  expect(response.headers.get('X-Slide-Content-Origin')).toBeNull()
 })
 
 test('F03-AC63: Given the viewer, When it is opened, Then it still frames only its own version and itself', async () => {

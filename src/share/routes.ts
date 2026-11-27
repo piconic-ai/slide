@@ -77,6 +77,7 @@ import {
 } from '../profile/communities-store'
 import { readSuspension } from '../publication/suspension-store'
 import { alternateLinks, LANG_PARAM, langOfTag } from '../site/i18n'
+import { CONTENT_ORIGIN_HEADER } from '../offline/limits'
 import { z } from 'zod'
 import type { DeckSlug } from '../decks/deck-id'
 import { recordFrom } from '../metrics/record-routes'
@@ -584,6 +585,10 @@ function setViewerHeaders<E extends { Bindings: Env }>(
     c.header('Cache-Control', 'private, no-store')
     c.header('X-Robots-Tag', 'noindex')
   }
+  // The version a reader is shown, so a kept shell of another version, which
+  // the viewer could not replace, is dropped (F37-AC21). Not for the author's
+  // preview: it names no version, and a kept shell is dropped for it.
+  if (offlineOf(preview, base)) c.header(CONTENT_ORIGIN_HEADER, contentOrigin)
   c.header('Link', alternateLinks(c.env.PUBLIC_ORIGIN, url))
 }
 

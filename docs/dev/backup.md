@@ -104,9 +104,9 @@ lifecycle は、元から消されたかどうかを知らないので、30 日�
 
 ## binding
 
-`wrangler.jsonc` に `UPLOADS_BACKUP` を**足していない**。足せば、`wrangler deploy` は、そのバケットが無い環境(本番はバケットを依頼者が作る)で、binding の先が無いまま Worker を上げることになる。名前を付けた存在しないバケットの扱いは、Wrangler の公式の設定の文書([Configuration](https://developers.cloudflare.com/workers/wrangler/configuration/)、2026-11-26 に確かめた)に書かれていない。書かれているのは、`bucket_name` を省くと deploy がバケットを作ること(名前に Worker の名前が付く)だけである。本番へ deploy して確かめることはできない(deploy も本番への接触も禁じられている)ので、失敗する前提で、足さない。
+`wrangler.jsonc` に `UPLOADS_BACKUP` を足した(2026-11-27。バケット `slide-uploads-backup` を、依頼者が作ったあと)。**バケットが無いまま deploy すると、binding の先が無いまま Worker を上げることになる**。名前を付けた存在しないバケットの扱いは、Wrangler の公式の設定の文書([Configuration](https://developers.cloudflare.com/workers/wrangler/configuration/)、2026-11-26 に確かめた)に書かれていない。そのため、足すのは、バケットを作ったあとだけにする(手順は [deploy.md](deploy.md#r2-をバックアップから戻す))。
 
-足す行は、依頼者がバケットを作った後に、[手順](deploy.md#r2-をバックアップから戻す)に従って足す。足すまで、`env.UPLOADS_BACKUP` は無く、処理は何もしない(`runBackup` は、無ければ何も読まず、何も書かずに終わる)。テストは、別の設定(`src/backups/test-wrangler.jsonc`)で、2 つのローカルのバケットを使う。
+型は `worker-configuration.d.ts`(`wrangler types --include-runtime=false` で作る)が持つ。以前は、binding が無くてもよい形で `src/env.d.ts` に置いていたが、足したので消した。バケットの設定を外すと、処理は何もしない(`runBackup` は、無ければ何も読まず、何も書かずに終わる)。テストは、別の設定(`src/backups/test-wrangler.jsonc`)で、2 つのローカルのバケットを使う。
 
 ## 費用の見当
 

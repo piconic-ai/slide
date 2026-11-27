@@ -8,7 +8,7 @@ import {
   VIEWER_CACHE,
 } from './limits'
 import { isFresh, outcomeOf, shellPolicy } from './policy'
-import { evictKey, recordPath } from './records'
+import { evictKey, isSuperseded, recordPath } from './records'
 import type { CacheLike } from './version-worker'
 
 /** What the viewer's worker needs from the browser, so its decisions can be tried without one. */
@@ -99,12 +99,33 @@ async function forget(deps: ViewerWorkerDeps, key: string): Promise<void> {
 }
 
 /**
+ * Drops the shell kept for a deck when the service, answering now, shows
+ * something else (F37-AC21): another version (including one that could not be
+ * stored), or a view that is not kept at all, such as the author's preview.
+ * The version it showed is put on the list to clear by `forget`. A deck with
+ * no shell kept is left alone. A shell the viewer has just written for the
+ * version shown is the same origin, so it stays (F37-AC6).
+ */
+async function forgetIfSuperseded(
+  deps: ViewerWorkerDeps,
+  key: string,
+  shownOrigin: string | null,
+): Promise<void> {
+  const viewers = await deps.openCache(VIEWER_CACHE)
+  const entry = await viewers.match(key)
+  if (!entry) return
+  const kept = entry.headers.get(CONTENT_ORIGIN_HEADER) ?? ''
+  if (isSuperseded(kept, shownOrigin)) await forget(deps, key)
+}
+
+/**
  * Answers a move to a share URL (D-91 to D-93): the service first, always.
  * What it sends is shown as it is; the viewer is the service's own page, made
  * for this reader, and is never kept. Only when the service does not answer
  * (no connection, 429, 5xx) is the shell of that deck shown, if one was kept
  * and is not a day old, and when there is none, what the service sent. A deck
- * the service withdraws is forgotten.
+ * the service withdraws is forgotten, and so is one the service answers with
+ * another version, or with none (F37-AC21).
  */
 export async function respondViewer(
   deps: ViewerWorkerDeps,
@@ -126,8 +147,29 @@ export async function respondViewer(
   if (outcome === 'purge') deps.waitUntil(forget(deps, key).catch(() => {}))
   else if (outcome === 'fallback')
     return (await keptShell(deps, key).catch(() => null)) ?? answer
+  else if (answersInPlace(answer, request))
+    deps.waitUntil(
+      forgetIfSuperseded(
+        deps,
+        key,
+        answer.headers.get(CONTENT_ORIGIN_HEADER),
+      ).catch(() => {}),
+    )
   return answer
 }
+
+/**
+ * Whether a 200 is the answer for this very page, to be compared with the
+ * kept shell: not one that came by a redirect, and not the small page of a
+ * link a deck follows inside its own frame.
+ */
+const answersInPlace = (
+  answer: Readonly<{ status: number; redirected: boolean }>,
+  request: Readonly<{ destination: string }>,
+) =>
+  answer.status === 200 &&
+  !answer.redirected &&
+  request.destination !== 'iframe'
 
 /** Keeps the shell's script as the service sent it, so the shell runs without a connection. */
 async function keepScript(deps: ViewerWorkerDeps, answer: Response) {

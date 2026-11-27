@@ -1,6 +1,9 @@
 import { html } from 'hono/html'
 import { defineArticle } from '../../article'
 
+/** "1 day" or "2 days": the unit follows the number, which the code may change. */
+const days = (count: number) => `${count} ${count === 1 ? 'day' : 'days'}`
+
 export default defineArticle({
   order: 40,
   form: 'howto',
@@ -14,7 +17,7 @@ export default defineArticle({
       html`<ol>
           <li>
             通信できるうちに、読みたいスライドの共有 URL
-            を開き、表示されるまで待ちます。開いたときに、ブラウザーに保存されます。
+            を開き、表示されるまで待ちます。開いたときに、ブラウザに保存されます。
           </li>
           <li>
             通信が切れたら、同じ URL
@@ -48,12 +51,12 @@ export default defineArticle({
             日のあいだ読めることがあります。
           </li>
           <li>
-            ブラウザーが、サイトのデータの保存を止めている設定(プライベートな閲覧など)では、保存されません。そのときも、スライドはこれまでどおり表示され、エラーは出ません。
+            ブラウザが、サイトのデータの保存を止めている設定(プライベートな閲覧など)では、保存されません。そのときも、スライドはこれまでどおり表示され、エラーは出ません。
           </li>
         </ul>
         <h2>保存したものを消す</h2>
         <p>
-          画面に、消すボタンはありません。ブラウザーの設定で、「サイトのデータを消す」から、slide.community
+          画面に、消すボタンはありません。ブラウザの設定で、「サイトのデータを消す」から、slide.community
           と slideusercontent.com
           のデータを消します。スライドの保存の本体は、slideusercontent.com
           のほうです。
@@ -78,7 +81,7 @@ export default defineArticle({
     title: 'Read slides when you have no connection',
     lead: (n) =>
       html`A public slide you have opened once can be read again for
-      ${n.offlineDays} day without a connection, by opening the same URL.`,
+      ${days(n.offlineDays)} without a connection, by opening the same URL.`,
     body: (n) =>
       html`<ol>
           <li>
@@ -105,8 +108,8 @@ export default defineArticle({
             opened cannot be read without a connection.
           </li>
           <li>
-            Once ${n.offlineDays} day has passed since the service last answered
-            for it, it cannot be read.
+            Once it has been ${days(n.offlineDays)} since the service last
+            answered for it, it cannot be read.
           </li>
           <li>
             Up to ${n.offlineSlides} slides are kept. When you open more, the
@@ -122,7 +125,7 @@ export default defineArticle({
             hid them, what was kept is dropped when you open them online. While
             you are offline there is no way to know that, so slides whose
             publishing the author stopped may still be readable on a device that
-            opened them, for ${n.offlineDays} day.
+            opened them, for ${days(n.offlineDays)}.
           </li>
           <li>
             If your browser has stopped sites from keeping data (private
@@ -148,7 +151,7 @@ export default defineArticle({
           <li>Safari: Settings → Privacy → Manage Website Data</li>
         </ul>
         <p>
-          What is older than ${n.offlineDays} day, or beyond the
+          What is older than ${days(n.offlineDays)}, or beyond the
           ${n.offlineSlides} slides, is dropped by itself the next time you open
           a slide.
         </p>`,

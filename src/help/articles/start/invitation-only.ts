@@ -17,7 +17,7 @@ export default defineArticle({
   },
   en: {
     title: 'Check whether you are invited',
-    lead: (n) =>
+    lead: () =>
       html`Only email addresses the operators registered can sign in.`,
     body: () =>
       html`<p>

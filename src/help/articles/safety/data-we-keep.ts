@@ -14,7 +14,7 @@ export default defineArticle({
           >プライバシーポリシー</a
         >と、<a href="/privacy/external">「外部への送信」</a
         >に書いてあります。`,
-    body: () =>
+    body: (n) =>
       html`<h2>どこで読むか</h2>
         <ul>
           <li>
@@ -32,6 +32,26 @@ export default defineArticle({
         </p>
         <ul>
           ${ADDRESS_EXPOSURES.map((exposure) => html`<li>${exposure.scene.ja}</li>`)}
+        </ul>
+        <h2>ヘルプの検索で記録するもの</h2>
+        <p>
+          ヘルプの検索で、合う記事が 0
+          件だった語は、記事に足りないものを知るために記録します。合う記事があった検索の語は、記録しません。
+        </p>
+        <ul>
+          <li>語は、${n.searchTermChars} 文字までに切って記録します。</li>
+          <li>
+            メールアドレス、IP アドレス、web
+            の住所、鍵のような長い英数字の並びの形をした語は、記録しません。
+          </li>
+          <li>
+            だれが探したかは、記録しません。アカウント、IP アドレス、Cookie
+            は記録に入りません。
+          </li>
+          <li>
+            もとの記録は、最大 3
+            か月で消えます。語ごとの件数の集計は、そのあとも残ります。
+          </li>
         </ul>
         <h2>自分でできること</h2>
         <ul>
@@ -70,7 +90,7 @@ export default defineArticle({
       html`What information is kept, what it is used for and where it is sent
         are written in the <a href="/privacy">Privacy Policy</a> and in
         <a href="/privacy/external">External transmission</a>.`,
-    body: () =>
+    body: (n) =>
       html`<p>Both texts are in Japanese only.</p>
         <h2>Where to read</h2>
         <ul>
@@ -91,6 +111,30 @@ export default defineArticle({
         </p>
         <ul>
           ${ADDRESS_EXPOSURES.map((exposure) => html`<li>${exposure.scene.en}</li>`)}
+        </ul>
+        <h2>What is recorded from the help search</h2>
+        <p>
+          When a help search finds no article, the words searched for are
+          recorded, to see what the articles lack. The words of a search that
+          finds an article are not recorded.
+        </p>
+        <ul>
+          <li>
+            The words are cut to ${n.searchTermChars} characters when they are
+            recorded.
+          </li>
+          <li>
+            Words that look like an email address, an IP address, a web address
+            or a long key are not recorded.
+          </li>
+          <li>
+            Who searched is not recorded: no account, IP address or cookie goes
+            into the record.
+          </li>
+          <li>
+            The original records are deleted after 3 months at most. The counts
+            kept for each word stay after that.
+          </li>
         </ul>
         <h2>What you can do yourself</h2>
         <ul>
