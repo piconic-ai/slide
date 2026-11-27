@@ -16,7 +16,7 @@ export default defineArticle({
   },
   en: {
     title: 'Follow a community',
-    lead: (n) =>
+    lead: () =>
       html`Press “Follow” on a community’s page, and new slides in it appear
       under “Following” on your top page while you are signed in.`,
     body: () =>

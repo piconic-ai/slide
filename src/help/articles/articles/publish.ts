@@ -30,9 +30,9 @@ export default defineArticle({
   en: {
     title: 'Publish an article, or stop publishing it',
     lead: () =>
-      html`An article is a draft until you publish it, and only the author can
-      check it in the viewer.`,
-    body: (n) =>
+      html`Press “Publish the article” in the “Article” area to publish it, and
+      “Stop publishing the article” to stop.`,
+    body: () =>
       html`<ul>
         <li>
           Before it is published, it is a draft. It is saved by itself, and only
@@ -41,8 +41,8 @@ export default defineArticle({
         <li>
           Press “Publish the article” in the “Article” area of the slide’s edit
           page, and it appears under the slides in the viewer for as long as the
-          slides are public (what is kept is published, not the box of the
-          article page).
+          slides are public. What is published is the text that was saved, not
+          what is still in the box on the edit page.
         </li>
         <li>
           What you change after publishing is saved by itself as an edit of its

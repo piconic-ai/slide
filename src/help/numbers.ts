@@ -2,6 +2,7 @@ import { MAX_OTHER_DECKS } from '../articles/embed-decks'
 import { MAX_ARTICLE_CHARS } from '../articles/markdown'
 import { CODE_ATTEMPTS, CODE_LENGTH, CODE_SECONDS } from '../auth/login-policy'
 import { EXPORT_SLIDES_PER_PAGE } from '../exports/list-view'
+import { MAX_TERM_CHARS } from '../metrics/term'
 import { MAX_ZIP_BYTES, MAX_ZIP_FILES } from '../exports/zip-plan'
 import { FILE_URL_SECONDS } from '../mcp/file-url'
 import { FILES_PAGE_SIZE } from '../mcp/files-page'
@@ -96,6 +97,7 @@ export const helpNumbers = (signup: SignupMode = 'invitation') =>
     newAuthorDays: NEW_AUTHOR_DEFAULTS.days,
     newAuthorPerDay: NEW_AUTHOR_DEFAULTS.perDay,
     newAuthorWindowHours: placementWindowOf(0).seconds / 3600,
+    searchTermChars: MAX_TERM_CHARS,
   })
 
 export type HelpNumbers = ReturnType<typeof helpNumbers>

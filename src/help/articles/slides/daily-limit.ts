@@ -14,7 +14,7 @@ export default defineArticle({
     body: (n) =>
       html`<ol>
           <li>
-            「今日はこれ以上置けません」の下に出ている日時(日本時間)を見ます。その日時から、また新しいスライドを置けます。
+            「今日はこれ以上置けません」と出た文章の終わりにある日時(日本時間)を見ます。その日時から、また新しいスライドを置けます。
           </li>
           <li>
             その日時になったら、もう一度スライドをドロップします。AI
@@ -64,7 +64,7 @@ export default defineArticle({
         </ul>`,
   },
   en: {
-    title: 'When it says “You can’t put up any more today”',
+    title: "When it says “You can't put up any more today”",
     lead: (n) =>
       html`For the first ${n.newAuthorDays} days after you register, you can put
       up ${n.newAuthorPerDay} new slides in ${n.newAuthorWindowHours} hours, so
@@ -72,8 +72,9 @@ export default defineArticle({
     body: (n) =>
       html`<ol>
           <li>
-            Read the time (Japan time) under “You can't put up any more today”.
-            From that time you can put up a new slide again.
+            Read the time (Japan time) at the end of the message that says “You
+            can't put up any more today”. From that time you can put up a new
+            slide again.
           </li>
           <li>
             When that time comes, drop the slides once more. If an AI agent puts
