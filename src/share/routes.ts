@@ -409,9 +409,9 @@ type DeckPath = Extract<SharePath, { kind: 'deck' | 'page' }>
  * What `Sec-Fetch-Dest` says of a load of the page itself. `empty` is one
  * too: the viewer's Service Worker asks for every move to a share URL with a
  * fetch of its own, which reaches the service as `empty` in every browser,
- * as a script's fetch does (#683). The two cannot be told apart, and need
- * not be: the scripts of this origin are the service's own, and another
- * site's fetch does not carry the author's session.
+ * as a script's fetch does. The two cannot be told apart, and need not be:
+ * the scripts of this origin are the service's own, and another site's
+ * fetch does not carry the author's session.
  */
 const PAGE_LOADS: ReadonlySet<string | undefined> = new Set([
   undefined,
