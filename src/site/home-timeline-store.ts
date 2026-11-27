@@ -21,6 +21,8 @@ import {
 import { deckSlugSchema } from '../decks/deck-id'
 import { personColumns, toPerson, type Person } from '../follows/store'
 import { notMutedBy } from '../mutes/store'
+import { authorFaceJoins, authorFaceSelect } from '../profile/author-face-store'
+import { authorAvatarUrl, authorFaceColumns } from '../profile/face'
 import { notHidden } from '../publication/takedown-store'
 import { handleSchema } from '../share/handle'
 import { COMMUNITY_COLORS } from './cover-pattern'
@@ -35,6 +37,7 @@ const followingRow = z.object({
   deploymentId: z.string(),
   coverPath: z.string().nullable(),
   viaPerson: z.number().int(),
+  ...authorFaceColumns.shape,
   communityHandle: handleSchema.nullable(),
   communityName: z.string().nullable(),
   communityColor: z.enum(COMMUNITY_COLORS).nullable(),
@@ -92,8 +95,10 @@ export async function listFollowingSlides(
           AND ${follows.followee_user_id} = ${decks.owner_user_id}) AS viaPerson,
       via.communityHandle AS communityHandle,
       via.communityName AS communityName,
-      via.communityColor AS communityColor
+      via.communityColor AS communityColor,
+      ${authorFaceSelect}
     FROM ${accounts}
+    ${authorFaceJoins}
     JOIN ${decks} ON ${decks.owner_user_id} = ${accounts.user_id}
     JOIN ${deployments} ON ${deployments.id} = ${decks.public_deployment_id}
       AND ${deployments.deck_id} = ${decks.id}
@@ -127,6 +132,7 @@ export async function listFollowingSlides(
       readyAt: row.readyAt,
       deploymentId: row.deploymentId,
       coverPath: row.coverPath,
+      authorAvatarUrl: authorAvatarUrl(row),
       viaPerson: row.viaPerson === 1,
       community:
         row.communityHandle === null ||

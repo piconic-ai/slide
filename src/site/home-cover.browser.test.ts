@@ -160,7 +160,7 @@ test('F03-AC10: Given a cover that cannot be read, When the top page opens, Then
   const face = card.locator('.deck-cover-name')
   // The list replaces its placeholders, then the image fails and is hidden.
   await expect.poll(() => face.textContent(), SETTLE).toBe('Talk')
-  const image = card.locator('img[data-cover]')
+  const image = card.locator('.card-cover img[data-cover]')
   await expect.poll(() => image.isHidden(), SETTLE).toBe(true)
   expect(await face.isVisible()).toBe(true)
   // The face is white on the stage colour, centred in the cover.
@@ -170,13 +170,13 @@ test('F03-AC10: Given a cover that cannot be read, When the top page opens, Then
       return [style.color, style.fontSize, style.fontWeight, style.textAlign]
     }),
   ).toEqual(['rgb(255, 255, 255)', '13px', '700', 'center'])
-  await card.locator('a.timeline-card-title').click()
+  await card.locator('a.icon-link').click()
   await page.waitForURL(`${TEST_ORIGIN}/@owner/talk`)
   await page.unrouteAll({ behavior: 'ignoreErrors' })
   await page.close()
 }, 20000)
 
-test('F03-AC42, F03-AC46, F03-AC48, F03-AC177: Given a generated cover still on its way and a supplied cover, When both images load, Then they fill their covers, the card keeps its size, and each card’s title opens its viewer (the cover turns the card, F44-AC27)', async () => {
+test('F03-AC42, F03-AC46, F03-AC48, F03-AC177: Given a generated cover still on its way and a supplied cover, When both images load, Then they fill their covers, the card keeps its size, and each card’s link opens its viewer (the cover turns the card, F44-AC27)', async () => {
   shotFails = false
   let arrive = () => {}
   holdCovers = new Promise<void>((resolve) => (arrive = resolve))
@@ -218,7 +218,7 @@ test('F03-AC42, F03-AC46, F03-AC48, F03-AC177: Given a generated cover still on 
     )
     expect(errors).toEqual([])
 
-    await card.locator('.timeline-card-title').click()
+    await card.locator('a.icon-link').click()
     await page.waitForURL(`${TEST_ORIGIN}/@owner/talk`)
     await page.goBack()
     await expect
@@ -227,7 +227,7 @@ test('F03-AC42, F03-AC46, F03-AC48, F03-AC177: Given a generated cover still on 
     await page
       .locator('.timeline-list .timeline-card')
       .nth(1)
-      .locator('.timeline-card-title')
+      .locator('a.icon-link')
       .click()
     await page.waitForURL(`${TEST_ORIGIN}/@owner/pictured`)
     await page.unrouteAll({ behavior: 'ignoreErrors' })

@@ -14,6 +14,8 @@ import {
 import { deckSlugSchema } from '../decks/deck-id'
 import { notBlockedBy } from '../blocks/store'
 import { notMutedBy } from '../mutes/store'
+import { authorFaceJoins, authorFaceSelect } from '../profile/author-face-store'
+import { authorAvatarUrl, authorFaceColumns } from '../profile/face'
 import { notHidden } from '../publication/takedown-store'
 import { handleSchema } from '../share/handle'
 import { COMMUNITY_COLORS, type CommunityColor } from '../site/cover-pattern'
@@ -27,6 +29,7 @@ const feedRow = z.object({
   publishedAt: z.number().int(),
   deploymentId: z.string(),
   coverPath: z.string().nullable(),
+  ...authorFaceColumns.shape,
   communityHandle: handleSchema,
   communityName: z.string(),
   communityColor: z.enum(COMMUNITY_COLORS),
@@ -44,6 +47,8 @@ export type FollowedCommunityTalk = Readonly<{
   readyAt: number
   deploymentId: string
   coverPath: string | null
+  /** Where the author's picture is served from. */
+  authorAvatarUrl: string
   community: Readonly<{
     handle: z.infer<typeof handleSchema>
     name: string
@@ -75,6 +80,7 @@ const followedTalkRows = (viewer: string) => {
         ${deployments.title} AS title, ${publishedAt} AS publishedAt,
         ${deployments.id} AS deploymentId,
         ${deployments.cover_path} AS coverPath,
+        ${authorFaceSelect},
         ${handles.handle} AS communityHandle,
         ${communities.name} AS communityName,
         ${communities.color} AS communityColor,
@@ -89,6 +95,7 @@ const followedTalkRows = (viewer: string) => {
       JOIN ${relatedLinks} ON ${relatedLinks.id} = ${relatedLinkEvents.link_id}
       JOIN ${decks} ON ${decks.id} = ${relatedLinks.deck_id}
       JOIN ${accounts} ON ${accounts.user_id} = ${decks.owner_user_id}
+      ${authorFaceJoins}
       JOIN ${deployments} ON ${deployments.id} = ${decks.public_deployment_id}
         AND ${deployments.deck_id} = ${decks.id}
         AND ${deployments.state} = 'ready'
@@ -115,6 +122,7 @@ export async function listFollowedCommunityTalks(
   const after = query.after
   const rows = await drizzle(database).all(sql`
     SELECT handle, slug, title, publishedAt, deploymentId, coverPath,
+      authorUserId, uploadedAt, useGravatar, gravatarAt,
       communityHandle, communityName, communityColor
     FROM (${followedTalkRows(query.viewer)})
     ${
@@ -137,6 +145,7 @@ export async function listFollowedCommunityTalks(
       readyAt: row.publishedAt,
       deploymentId: row.deploymentId,
       coverPath: row.coverPath,
+      authorAvatarUrl: authorAvatarUrl(row),
       community: {
         handle: row.communityHandle,
         name: row.communityName,

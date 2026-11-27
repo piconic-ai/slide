@@ -11,6 +11,7 @@ const talk = (n: number): FollowedCommunityTalk => ({
   readyAt: 1_700_000_000 + n,
   deploymentId: `7ae11c67-633f-4f21-b2b1-80af8410742${n}`,
   coverPath: n === 2 ? 'cover.png' : null,
+  authorAvatarUrl: '/avatars/u1?v=g',
   community: {
     handle: handleSchema.parse('kanagawapm'),
     name: 'Kanagawa.pm 🐪',
