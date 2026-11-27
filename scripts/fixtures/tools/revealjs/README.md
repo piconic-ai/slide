@@ -9,7 +9,8 @@ turn (F03-AC187 to F03-AC190).
   `index.html` is the starter's defaults (no hash option, so reveal.js does
   not write the address). The others differ in how they initialize reveal.js:
   `hash.html` (`hash: true`), `one-based.html` (`hashOneBasedIndex: true`),
-  `fragments.html` (page 3 shows two lines one at a time).
+  `fragments.html` (page 3 shows two lines one at a time), `vertical.html` and
+  `vertical-edges.html` (slides one above the other; F03-AC199 to F03-AC201).
 - Tool and version: `reveal.js@6.0.2`, locked in `package-lock.json`. The
   files of its `dist/` that the pages use are copied into each output.
 - Outputs: `dist/` (from `index.html`, with a theme) and `dist-<name>/` (from
