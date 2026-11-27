@@ -663,10 +663,23 @@ addEventListener('message', (event) => {
     history.replaceState(history.state, '', path + location.search)
   } catch {}
 })
-// A page of these slides shown as an image in the article: pressing it moves
-// the slides above to that page, then brings them into view. Only the page
-// number is sent, as the fragment the slides' own script reads (`/#3`); the
-// frame is not touched from here. Without this script the link opens the
+// The requests to move to a page that wait for the slides' answer, by their
+// number: the fallback move of each is cancelled when its answer comes, or
+// when a newer request is made (only the latest is of the reader's interest).
+const waiting = new Map()
+let requests = 0
+addEventListener('message', (event) => {
+  const main = slidesFrame()
+  if (!main || event.source !== main.contentWindow) return
+  if (event.origin !== slidesOrigin(main)) return
+  if (event.data?.type !== 'slide:opened') return
+  clearTimeout(waiting.get(event.data.id))
+  waiting.delete(event.data.id)
+})
+// A page of these slides shown as an image in the article: pressing it asks
+// the slides above to move to that page, then brings them into view. The
+// request is a message the slides' page script answers (it knows how the tool
+// that made them keeps its pages). Without this script the link opens the
 // page's own viewer, which shows the same page.
 document.addEventListener('click', (event) => {
   const link =
@@ -679,14 +692,28 @@ document.addEventListener('click', (event) => {
   const page = Number(link.dataset.articlePage)
   if (!main || !Number.isInteger(page) || page < 1 || page > 9999) return
   event.preventDefault()
+  for (const timer of waiting.values()) clearTimeout(timer)
+  waiting.clear()
+  const id = ++requests
+  main.contentWindow.postMessage(
+    { type: 'slide:open', page, id },
+    slidesOrigin(main),
+  )
+  // Slides that run no page script (a piece of HTML the service serves as it
+  // was put up) cannot answer; they are moved as they always were, by the
+  // address of the top of the version with the page as the fragment.
   const target = `${slidesOrigin(main)}/#${page}`
-  // The fragment changes in place; a frame whose location cannot be set
-  // from here is given the address as its source.
-  try {
-    main.contentWindow.location.replace(target)
-  } catch {
-    main.src = target
-  }
+  waiting.set(
+    id,
+    setTimeout(() => {
+      waiting.delete(id)
+      try {
+        main.contentWindow.location.replace(target)
+      } catch {
+        main.src = target
+      }
+    }, 500),
+  )
   const still = matchMedia('(prefers-reduced-motion: reduce)').matches
   main.scrollIntoView({ block: 'start', behavior: still ? 'auto' : 'smooth' })
 })

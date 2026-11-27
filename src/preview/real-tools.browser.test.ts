@@ -6,12 +6,14 @@ import { afterAll, beforeAll, expect, test } from 'vitest'
 import {
   chromium,
   type Browser,
+  type Frame,
   type FrameLocator,
   type Page,
   type Route,
 } from 'playwright'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
+import { keepArticle } from '../articles/store'
 import { uploadFiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import { DEFAULT_UPLOAD_LIMITS } from '../uploads/limits'
@@ -180,6 +182,8 @@ async function builtOf(tool: {
 }
 
 let browser: Browser
+/** The version each slide was stored as, by slug. */
+const deployments = new Map<string, string>()
 const inventories = new Map<
   string,
   ReturnType<typeof parseInventoryStructure>
@@ -196,7 +200,41 @@ beforeAll(async () => {
     const built = await builtOf(tool)
     const id = await seedPublic(db, tool.slug, index + 1, tool.slug)
     inventories.set(tool.slug, await store(id, built))
+    deployments.set(tool.slug, id)
+    // An article with pages 3 and 5 of the slides as images (F03-AC193).
+    await keepArticle(db, {
+      deckId: tool.slug,
+      status: 'published',
+      citations: [],
+      now: 5,
+      body: [
+        '# Notes',
+        `${TEST_ORIGIN}/@owner/${tool.slug}/3`,
+        `${TEST_ORIGIN}/@owner/${tool.slug}/5`,
+      ].join('\n\n'),
+    })
   }
+  // A piece of HTML with no document around it: the service serves it as it
+  // was put up, with no page script in it (F03-AC153).
+  const piece = await seedPublic(db, 'piece', 90, 'piece')
+  inventories.set(
+    'piece',
+    await store(
+      piece,
+      new Map([['index.html', Buffer.from('<h1>piece</h1>')]]),
+    ),
+  )
+  await keepArticle(db, {
+    deckId: 'piece',
+    status: 'published',
+    citations: [],
+    now: 5,
+    body: [
+      '# Notes',
+      `${TEST_ORIGIN}/@owner/piece/3`,
+      `${TEST_ORIGIN}/@owner/piece/5`,
+    ].join('\n\n'),
+  })
   browser = await openTestBrowser(chromium)
 })
 afterAll(async () => {
@@ -388,6 +426,186 @@ test.each(['suraido', 'suraido-plain'])(
         .poll(() => wordsShown(deck), { timeout: 20000 })
         .toEqual(['alpha'])
       await page.waitForURL((url) => url.pathname === `/@owner/${slug}`)
+    })
+  },
+  60000,
+)
+
+// The article's images of pages move the slides, as the address does when
+// they are opened (F03-AC193). Each is pressed after the other, so the move
+// is made in slides that are already running.
+test.each([
+  ['suraido.js', 'suraido', ['charlie', 'echo', 'charlie']],
+  ['reveal.js', 'revealjs', ['charlie', 'echo', 'charlie']],
+  ['Slidev', 'slidev', ['charlie', 'echo', 'charlie']],
+])(
+  'F03-AC193: Given the real output of %s with an article holding images of pages 3 and 5, When the reader presses them in turn, Then the slides move to page 3, 5 and 3 again, and the address follows',
+  async (_name, slug, words) => {
+    await withPage(async (page) => {
+      // The viewer scrolls to the slides smoothly: a click made while it
+      // moves can miss, which is not what is checked here.
+      await page.emulateMedia({ reducedMotion: 'reduce' })
+      await page.goto(`${TEST_ORIGIN}/@owner/${slug}`)
+      const deck = page.frameLocator('iframe#deck')
+      await expect
+        .poll(() => wordsShown(deck), { timeout: 20000 })
+        .toEqual(['alpha'])
+      // Let the slides settle where they put their own address.
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+      for (const [at, pressed] of [3, 5, 3].entries()) {
+        // The link's own click, as the page's script sees it: pressing it by
+        // its place on the screen can miss while the viewer scrolls.
+        await page
+          .getByRole('link', { name: `スライドの ${pressed} ページへ移る` })
+          .first()
+          .evaluate((link) => (link as HTMLElement).click())
+        await expect
+          .poll(() => wordsShown(deck), { timeout: 20000 })
+          .toEqual([words[at]])
+        await page.waitForURL(
+          (url) => url.pathname === `/@owner/${slug}/${pressed}`,
+        )
+      }
+    })
+  },
+  60000,
+)
+
+// Slides of no tool the service reads (peitho keeps its page in the query, as
+// the slides were opened; Marp in the fragment) are moved as before: by the
+// address of the top of the version with the page as the fragment.
+test.each([
+  ['peitho', 'body'],
+  ['marp', '.bespoke-marp-active section'],
+])(
+  'F03-AC193: Given the real output of %s with an article holding images of pages 3 and 5, When the reader presses them in turn, Then the slides move to page 3, 5 and 3 again',
+  async (slug, shown) => {
+    await withPage(async (page) => {
+      await page.emulateMedia({ reducedMotion: 'reduce' })
+      await page.goto(`${TEST_ORIGIN}/@owner/${slug}`)
+      const deck = page.frameLocator('iframe#deck')
+      await expect
+        .poll(() => deck.locator(shown).innerText(), { timeout: 20000 })
+        .toContain('alpha')
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+      for (const [pressed, word] of [
+        [3, 'charlie'],
+        [5, 'echo'],
+        [3, 'charlie'],
+      ] as const) {
+        await page
+          .getByRole('link', { name: `スライドの ${pressed} ページへ移る` })
+          .first()
+          .evaluate((link) => (link as HTMLElement).click())
+        await expect
+          .poll(() => deck.locator(shown).innerText(), { timeout: 20000 })
+          .toContain(word)
+      }
+    })
+  },
+  60000,
+)
+
+test('F03-AC193: Given the article’s images of pages 3 and 5 pressed within half a second, When the slides answer both, Then neither is moved again by the address afterwards', async () => {
+  await withPage(async (page) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await page.goto(`${TEST_ORIGIN}/@owner/revealjs`)
+    const deck = page.frameLocator('iframe#deck')
+    await expect
+      .poll(() => wordsShown(deck), { timeout: 20000 })
+      .toEqual(['alpha'])
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+    await page.evaluate(() => {
+      for (const n of [3, 5])
+        document
+          .querySelector<HTMLElement>(`a[data-article-page="${n}"]`)!
+          .click()
+    })
+    await expect
+      .poll(() => wordsShown(deck), { timeout: 20000 })
+      .toEqual(['echo'])
+    // Past the wait for an answer: a move by the address would show here.
+    await new Promise((resolve) => setTimeout(resolve, 1200))
+    expect(new URL(frameAt(page), 'https://x').hash).toBe('')
+  })
+}, 60000)
+
+test('F03-AC193: Given a piece of HTML the service serves without its page script, When the reader presses the article’s images of pages 3 and 5, Then the slides are moved to /#3 and /#5 as they always were', async () => {
+  await withPage(async (page) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await page.goto(`${TEST_ORIGIN}/@owner/piece`)
+    const deck = page.frameLocator('iframe#deck')
+    await expect
+      .poll(() => deck.locator('h1').innerText(), { timeout: 20000 })
+      .toBe('piece')
+    for (const pressed of [3, 5]) {
+      await page
+        .getByRole('link', { name: `スライドの ${pressed} ページへ移る` })
+        .first()
+        .evaluate((link) => (link as HTMLElement).click())
+      await expect
+        .poll(() => new URL(frameAt(page), 'https://x').hash, {
+          timeout: 10000,
+        })
+        .toBe(`#${pressed}`)
+    }
+  })
+}, 60000)
+
+const OPENS_AT_THREE = [
+  ['suraido.js', 'suraido'],
+  ['reveal.js', 'revealjs'],
+  ['Slidev', 'slidev'],
+]
+
+/** Which pages' words are on show in a frame. */
+async function wordsIn(frame: Frame) {
+  const text = await frame
+    .locator('body')
+    .innerText()
+    .catch(() => '')
+  return WORDS.filter((word) => text.includes(word))
+}
+
+test.each(OPENS_AT_THREE)(
+  'F03-AC194: Given the real output of %s, When its version is opened as the page itself at /#3, as the capture of the page image does, Then page 3 shows',
+  async (_name, slug) => {
+    await withPage(async (page) => {
+      await page.goto(`https://d-${deployments.get(slug)}.content.example/#3`)
+      await expect
+        .poll(() => wordsIn(page.mainFrame()), { timeout: 20000 })
+        .toEqual(['charlie'])
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+      expect(await wordsIn(page.mainFrame())).toEqual(['charlie'])
+    })
+  },
+  60000,
+)
+
+test.each(OPENS_AT_THREE)(
+  'F03-AC198: Given the real output of %s in an embed on another site, When /embed/@owner/<slug>/3 is opened, Then page 3 shows',
+  async (_name, slug) => {
+    await withPage(async (page) => {
+      await page.route('https://blog.example/post', (route) =>
+        route.fulfill({
+          contentType: 'text/html',
+          body: `<!doctype html><title>post</title><iframe src="${TEST_ORIGIN}/embed/@owner/${slug}/3" width="800" height="500"></iframe>`,
+        }),
+      )
+      await page.goto('https://blog.example/post')
+      const slides = () =>
+        page.frames().find((frame) => frame.url().includes('.content.example'))
+      await expect
+        .poll(
+          async () => {
+            const frame = slides()
+            return frame ? wordsIn(frame) : []
+          },
+          { timeout: 20000 },
+        )
+        .toEqual(['charlie'])
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+      expect(await wordsIn(slides()!)).toEqual(['charlie'])
     })
   },
   60000,

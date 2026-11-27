@@ -10,6 +10,10 @@ export const PAGE_SCRIPT_PATH = '/_preview/pages.js'
 
 /** The message a slide posts to the viewer when its page changes. */
 export const PAGE_MESSAGE = 'slide:page'
+/** The viewer's request that the slides move to a page, with its `page`. */
+export const OPEN_MESSAGE = 'slide:open'
+/** The slides' answer to OPEN_MESSAGE: they took the request, with its `id`. */
+export const OPENED_MESSAGE = 'slide:opened'
 /** The viewer's question, for a viewer that started listening late. */
 export const PAGE_REQUEST = 'slide:page-request'
 
@@ -47,7 +51,11 @@ export const pageScript = (viewerOrigin: string) => `(() => {
   const running = Symbol.for(${JSON.stringify(RUNNING)})
   if (window[running]) return
   Object.defineProperty(window, running, { value: true })
-  if (parent === window || parent !== top) return
+  // Only slides the viewer shows directly tell their page. A capture of the
+  // page image (the slides are the top document) and an embed on another site
+  // (their parent is not the top) are opened at a page too, so the tool's own
+  // reading below still runs; they tell nobody.
+  const viewed = parent !== window && parent === top
   ${STORED_AT_PLACEHOLDER}
   ${READING_SOURCE}
   // What a slide tool shows, once the script has recognised the tool by its
@@ -57,10 +65,18 @@ export const pageScript = (viewerOrigin: string) => `(() => {
   const pageOf = () => tool ? tool.pageOf() : pageIn(location.search, location.hash)
   // The page the reader was sent to, as the address said when this ran.
   const requested = requestedIn(location.hash)
+  // Once a tool is recognised: the page the reader was sent to is opened,
+  // and the viewer is told the page.
+  const startTool = () => {
+    if (requested !== null) tool.open(requested)
+    tell()
+  }
+  // The hash this script set itself, which is not a request.
+  let ours = null
   let told = 0
   const tell = () => {
     const page = pageOf()
-    if (page === null || page === told) return
+    if (!viewed || page === null || page === told) return
     told = page
     parent.postMessage({ type: ${JSON.stringify(PAGE_MESSAGE)}, page }, ${JSON.stringify(viewerOrigin)})
   }
@@ -73,15 +89,28 @@ export const pageScript = (viewerOrigin: string) => `(() => {
     }
   }
   const announce = () => {
+    if (!viewed) return
     if (storedAt > 0) parent.postMessage({ type: ${JSON.stringify(OFFLINE_MESSAGE.stored)}, at: storedAt }, ${JSON.stringify(viewerOrigin)})
   }
   addEventListener('message', (event) => {
-    if (event.source !== parent || event.origin !== ${JSON.stringify(viewerOrigin)}) return
+    if (!viewed || event.source !== parent || event.origin !== ${JSON.stringify(viewerOrigin)}) return
     const type = event.data?.type
     if (type === ${JSON.stringify(PAGE_REQUEST)}) {
       told = 0
       tell()
       announce()
+    } else if (type === ${JSON.stringify(OPEN_MESSAGE)}) {
+      // The article's image of a page (F03-AC193). A tool is told in its own
+      // way; for slides of no known tool the page goes where it is read from.
+      const asked = numberOf(String(event.data.page))
+      if (asked === null) return
+      parent.postMessage({ type: ${JSON.stringify(OPENED_MESSAGE)}, page: asked, id: event.data.id }, ${JSON.stringify(viewerOrigin)})
+      // For slides of no known tool the address is where the page is read
+      // from, as it was before the service knew any tool: the version's top
+      // with the page as the fragment, which drops what a tool such as
+      // peitho keeps in the query.
+      if (tool) tool.open(asked)
+      else location.replace(location.origin + '/#' + asked)
     } else if (type === ${JSON.stringify(OFFLINE_MESSAGE.register)}) {
       import(${JSON.stringify(FRAME_SCRIPT_PATH)})
         .then((frame) => frame.startFrame())
@@ -110,19 +139,20 @@ export const pageScript = (viewerOrigin: string) => `(() => {
         const at = deck.getIndices()
         return pageOfSlide(columnsOf(), at.h, at.v)
       },
+      open: (page) => {
+        const slide = slideOfPage(columnsOf(), page)
+        if (!slide) return
+        // Without the slides' move from one to another, which would show, and
+        // at the first step of the slide: going back to a slide, reveal.js
+        // shows all its fragments unless told which one.
+        const slides = document.querySelector('.reveal .slides')
+        slides.classList.add('no-transition')
+        deck.slide(slide.h, slide.v, -1)
+        void slides.offsetWidth
+        slides.classList.remove('no-transition')
+      },
     }
-    const slide = requested === null ? null : slideOfPage(columnsOf(), requested)
-    if (slide) {
-      // Without the slides' move from one to another, which would show, and
-      // at the first step of the slide: going back to a slide, reveal.js
-      // shows all its fragments unless told which one.
-      const slides = document.querySelector('.reveal .slides')
-      slides.classList.add('no-transition')
-      deck.slide(slide.h, slide.v, -1)
-      void slides.offsetWidth
-      slides.classList.remove('no-transition')
-    }
-    tell()
+    startTool()
   }
   document.addEventListener('ready', startReveal)
   document.addEventListener('slidechanged', tell)
@@ -136,10 +166,18 @@ export const pageScript = (viewerOrigin: string) => `(() => {
   // '/1', so the page asked for is put into the path first.
   const startSlidev = () => {
     if (tool || !document.querySelector('meta[property="slidev:version"]')) return
-    tool = { pageOf: () => slidevPageIn(location.pathname, location.hash) }
-    if (requested !== null && location.pathname === '/')
-      history.replaceState(history.state, '', slidevPathOf(requested) + location.search)
-    tell()
+    tool = {
+      pageOf: () => slidevPageIn(location.pathname, location.hash),
+      // Its router reads the path. Before it runs, the path is enough (it
+      // sends '/' on to '/1', so the page asked for is set first); once it
+      // runs, it is told of the new path as it is of the back button: an
+      // event without a state of its own makes it go to the address.
+      open: (page) => {
+        history.replaceState(history.state, '', slidevPathOf(page) + location.search)
+        dispatchEvent(new PopStateEvent('popstate', { state: null }))
+      },
+    }
+    startTool()
   }
   const observer = new MutationObserver(() => {
     startSlidev()
@@ -168,10 +206,15 @@ export const pageScript = (viewerOrigin: string) => `(() => {
   }
   const startSuraido = () => {
     if (tool || !isSuraido()) return
-    tool = { pageOf: () => suraidoPageIn(location.hash) }
-    if (requested !== null && suraidoPageIn(location.hash) !== requested)
-      location.replace(location.pathname + location.search + suraidoHashOf(requested))
-    tell()
+    tool = {
+      pageOf: () => suraidoPageIn(location.hash),
+      open: (page) => {
+        if (suraidoPageIn(location.hash) === page) return
+        ours = suraidoHashOf(page)
+        location.replace(location.pathname + location.search + ours)
+      },
+    }
+    startTool()
   }
   const suraidoWatch = new MutationObserver(() => {
     startSuraido()
@@ -185,7 +228,13 @@ export const pageScript = (viewerOrigin: string) => `(() => {
     startSuraido()
     suraidoWatch.disconnect()
   })
-  addEventListener('hashchange', tell)
+  // Each event carries its own address: two changes close together are two
+  // events, and the document's address is already the later one. A hash this
+  // script set for a tool is not a request of anyone's.
+  addEventListener('hashchange', (event) => {
+    if (new URL(event.newURL).hash === ours) ours = null
+    tell()
+  })
   addEventListener('popstate', tell)
   tell()
   announce()

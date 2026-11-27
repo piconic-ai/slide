@@ -114,8 +114,8 @@ test('Given the pages’ revision, When a page’s key is made, Then the cover�
   expect(PAGE_SHOT_REVISION).not.toBe(COVER_SHOT_REVISION)
   expect(shotUrl(cover)).toBe(`https://cover-shots.internal/v1/${ID}`)
   expect(shotTag(cover)).toBe(`cover-v1-${ID}`)
-  expect(shotUrl(page(6))).toBe(`https://cover-shots.internal/p1/${ID}/6`)
-  expect(shotTag(page(6))).toBe(`page-p1-${ID}-6`)
+  expect(shotUrl(page(6))).toBe(`https://cover-shots.internal/p2/${ID}/6`)
+  expect(shotTag(page(6))).toBe(`page-p2-${ID}-6`)
 })
 
 test.each([
@@ -128,21 +128,21 @@ test.each([
   ['a page under the cover’s revision', `${shotUrl(cover)}/6`],
   [
     'a cover under the pages’ revision',
-    `https://cover-shots.internal/p1/${ID}`,
+    `https://cover-shots.internal/p2/${ID}`,
   ],
   ['an old revision of a page', `https://cover-shots.internal/p0/${ID}/6`],
   [
     'a page past the last one taken',
-    `https://cover-shots.internal/p1/${ID}/201`,
+    `https://cover-shots.internal/p2/${ID}/201`,
   ],
-  ['page zero', `https://cover-shots.internal/p1/${ID}/0`],
-  ['a zero-padded page', `https://cover-shots.internal/p1/${ID}/06`],
+  ['page zero', `https://cover-shots.internal/p2/${ID}/0`],
+  ['a zero-padded page', `https://cover-shots.internal/p2/${ID}/06`],
   ['a page with a query', `${shotUrl(page(6))}?x=1`],
   ['a path past the page', `${shotUrl(page(6))}/x`],
   ['a trailing slash after the page', `${shotUrl(page(6))}/`],
   [
     'a page of something that is no deployment',
-    'https://cover-shots.internal/p1/talk/6',
+    'https://cover-shots.internal/p2/talk/6',
   ],
 ])(
   'Given an internal URL with %s, When parsed, Then it names no image',

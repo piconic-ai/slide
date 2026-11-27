@@ -95,7 +95,7 @@ test('F05-AC5: Given a public deck, When the image of its page 6 is asked for, T
   expect(response.status).toBe(200)
   expect(response.headers.get('Content-Type')).toBe('image/jpeg')
   expect(response.headers.get('Cache-Control')).toBe('no-cache')
-  expect(response.headers.get('ETag')).toBe(`W/"page-p1-${id}-6"`)
+  expect(response.headers.get('ETag')).toBe(`W/"page-p2-${id}-6"`)
   expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff')
   expect(await response.text()).toBe('jpeg of #6')
   expect(asked).toEqual([`https://d-${id}.content.example/#6`])
@@ -360,7 +360,7 @@ test('F05-AC12, F05-AC20: Given the internal cache, When the image of one page i
   ])
 
   expect(responses.map((response) => response.status)).toEqual([200, 200])
-  expect(keys).toEqual([`/p1/${id}/6`, `/p1/${id}/6`])
+  expect(keys).toEqual([`/p2/${id}/6`, `/p2/${id}/6`])
   expect(asked).toEqual([`https://d-${id}.content.example/#6`])
 })
 
@@ -459,7 +459,7 @@ test('F05-AC19, F05-AC20: Given the internal cache and a deck whose pages used u
 
   expect(await again.text()).toBe('jpeg of #1')
   expect(asked).toHaveLength(before)
-  expect(stored()).not.toContain(`/p1/${id}/${PAGE_SHOTS_PER_MINUTE + 1}`)
+  expect(stored()).not.toContain(`/p2/${id}/${PAGE_SHOTS_PER_MINUTE + 1}`)
 })
 
 test('Given the Worker configuration, When the budget of new page images is read, Then it is the small per-deployment budget the tests count on', () => {
