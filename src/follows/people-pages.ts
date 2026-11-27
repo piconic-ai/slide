@@ -71,9 +71,11 @@ const personRow = (
         // Without a name the handle already stands as one.
         person.name === null
           ? ''
-          : html`<span class="person-handle">@${person.handle}</span>`
+          : html`<span class="person-handle"
+              >@${person.handle}${followsYou ? followsYouBadge(lang) : ''}</span
+            >`
       }
-      ${followsYou ? followsYouBadge(lang) : ''}
+      ${person.name === null && followsYou ? followsYouBadge(lang) : ''}
     </span>
     ${followForm(state, person.handle, back, lang, true, followsYou)}
   </li>`

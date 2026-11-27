@@ -39,7 +39,7 @@ test('F21-AC8: Given a person with a name and a picture, When their row is drawn
     '<a class="person-name" href="/@bob"\n        >Bob &lt;script&gt;alert(1)&lt;/script&gt; &amp; co</a',
   )
   expect(row).not.toContain('<script>')
-  expect(row).toContain('<span class="person-handle">@bob</span>')
+  expect(row).toMatch(/<span class="person-handle"\s*>@bob\s*<\/span\s*>/)
   // The picture hides itself when it cannot be read, and the letter shows.
   expect(row).toMatch(
     /<span class="person-face" aria-hidden="true"\s*>B<img\s+data-cover\s+src="\/avatars\/2"/,
