@@ -155,13 +155,17 @@ test('F42-AC17: Given a new author and 50 starts at once, When they all run, The
   const results = await Promise.all(
     Array.from({ length: 50 }, () => browserNew()),
   )
+  // Name every distinct answer, so a failure shows which one was wrong.
+  const answers = new Map<string, number>()
+  for (const { status, body } of results) {
+    const key = `${status} ${body.code ?? 'created'}`
+    answers.set(key, (answers.get(key) ?? 0) + 1)
+  }
+  expect(Object.fromEntries(answers)).toEqual({
+    '201 created': 3,
+    '429 new_author_limit': 47,
+  })
   expect(await db.$count(decks)).toBe(3)
-  expect(results.filter((result) => result.status === 201)).toHaveLength(3)
-  const refused = results.filter((result) => result.status !== 201)
-  expect(refused.every((result) => result.status === 429)).toBe(true)
-  expect(
-    refused.every((result) => result.body.code === 'new_author_limit'),
-  ).toBe(true)
 })
 
 test('F42-AC20: Given a new author at the limit, When an agent and the page each start a new slide, Then both are refused with the same reason and the same time', async () => {
