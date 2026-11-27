@@ -49,7 +49,11 @@ export const pageScript = (viewerOrigin: string) => `(() => {
   const running = Symbol.for(${JSON.stringify(RUNNING)})
   if (window[running]) return
   Object.defineProperty(window, running, { value: true })
-  if (parent === window || parent !== top) return
+  // Only slides the viewer shows directly tell their page. A capture of the
+  // page image (the slides are the top document) and an embed on another site
+  // (their parent is not the top) are opened at a page too, so the tool's own
+  // reading below still runs; they tell nobody.
+  const viewed = parent !== window && parent === top
   ${STORED_AT_PLACEHOLDER}
   ${READING_SOURCE}
   // What a slide tool shows, once the script has recognised the tool by its
@@ -70,7 +74,7 @@ export const pageScript = (viewerOrigin: string) => `(() => {
   let told = 0
   const tell = () => {
     const page = pageOf()
-    if (page === null || page === told) return
+    if (!viewed || page === null || page === told) return
     told = page
     parent.postMessage({ type: ${JSON.stringify(PAGE_MESSAGE)}, page }, ${JSON.stringify(viewerOrigin)})
   }
@@ -83,10 +87,10 @@ export const pageScript = (viewerOrigin: string) => `(() => {
     }
   }
   const announce = () => {
-    if (storedAt > 0) parent.postMessage({ type: ${JSON.stringify(OFFLINE_MESSAGE.stored)}, at: storedAt }, ${JSON.stringify(viewerOrigin)})
+    if (viewed && storedAt > 0) parent.postMessage({ type: ${JSON.stringify(OFFLINE_MESSAGE.stored)}, at: storedAt }, ${JSON.stringify(viewerOrigin)})
   }
   addEventListener('message', (event) => {
-    if (event.source !== parent || event.origin !== ${JSON.stringify(viewerOrigin)}) return
+    if (!viewed || event.source !== parent || event.origin !== ${JSON.stringify(viewerOrigin)}) return
     const type = event.data?.type
     if (type === ${JSON.stringify(PAGE_REQUEST)}) {
       told = 0

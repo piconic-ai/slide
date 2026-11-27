@@ -226,10 +226,10 @@ test('F05-AC11: Given a deck stopped while the browser was open on a page, When 
 })
 
 test.each([
-  ['a page past the last one taken', (id: string) => `/p1/${id}/201`],
-  ['page zero', (id: string) => `/p1/${id}/0`],
+  ['a page past the last one taken', (id: string) => `/p2/${id}/201`],
+  ['page zero', (id: string) => `/p2/${id}/0`],
   ['a page under the cover’s revision', (id: string) => `/v1/${id}/6`],
-  ['a cover under the pages’ revision', (id: string) => `/p1/${id}`],
+  ['a cover under the pages’ revision', (id: string) => `/p2/${id}`],
 ])(
   'F05-AC9: Given an internal URL that names %s, When it is taken, Then no browser runs and nothing is kept',
   async (_case, path) => {

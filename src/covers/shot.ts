@@ -10,7 +10,7 @@ export const COVER_SHOT_REVISION = 'v1'
  * The same for the image of one page. Pages have a revision of their own,
  * so changing how a page is taken leaves every cover in the cache.
  */
-export const PAGE_SHOT_REVISION = 'p1'
+export const PAGE_SHOT_REVISION = 'p2'
 
 /** The last page taken as an image; later pages show the cover. */
 export const MAX_SHOT_PAGE = 200

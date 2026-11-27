@@ -6,6 +6,7 @@ import { afterAll, beforeAll, expect, test } from 'vitest'
 import {
   chromium,
   type Browser,
+  type Frame,
   type FrameLocator,
   type Page,
   type Route,
@@ -154,6 +155,8 @@ const REVEAL = [
 ]
 
 let browser: Browser
+/** The version each slide was stored as, by slug. */
+const deployments = new Map<string, string>()
 const inventories = new Map<
   string,
   ReturnType<typeof parseInventoryStructure>
@@ -172,6 +175,7 @@ beforeAll(async () => {
     for (const path of 'apart' in tool ? tool.apart : []) built.delete(path)
     const id = await seedPublic(db, tool.slug, index + 1, tool.slug)
     inventories.set(tool.slug, await store(id, built))
+    deployments.set(tool.slug, id)
     // An article with pages 3 and 5 of the slides as images (F03-AC193).
     await keepArticle(db, {
       deckId: tool.slug,
@@ -412,6 +416,65 @@ test.each([
           (url) => url.pathname === `/@owner/${slug}/${pressed}`,
         )
       }
+    })
+  },
+  60000,
+)
+
+const OPENS_AT_THREE = [
+  ['suraido.js', 'suraido'],
+  ['reveal.js', 'revealjs'],
+  ['Slidev', 'slidev'],
+]
+
+/** Which pages' words are on show in a frame. */
+async function wordsIn(frame: Frame) {
+  const text = await frame
+    .locator('body')
+    .innerText()
+    .catch(() => '')
+  return WORDS.filter((word) => text.includes(word))
+}
+
+test.each(OPENS_AT_THREE)(
+  'F03-AC194: Given the real output of %s, When its version is opened as the page itself at /#3, as the capture of the page image does, Then page 3 shows',
+  async (_name, slug) => {
+    await withPage(async (page) => {
+      await page.goto(`https://d-${deployments.get(slug)}.content.example/#3`)
+      await expect
+        .poll(() => wordsIn(page.mainFrame()), { timeout: 20000 })
+        .toEqual(['charlie'])
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+      expect(await wordsIn(page.mainFrame())).toEqual(['charlie'])
+    })
+  },
+  60000,
+)
+
+test.each(OPENS_AT_THREE)(
+  'F03-AC198: Given the real output of %s in an embed on another site, When /embed/@owner/<slug>/3 is opened, Then page 3 shows',
+  async (_name, slug) => {
+    await withPage(async (page) => {
+      await page.route('https://blog.example/post', (route) =>
+        route.fulfill({
+          contentType: 'text/html',
+          body: `<!doctype html><title>post</title><iframe src="${TEST_ORIGIN}/embed/@owner/${slug}/3" width="800" height="500"></iframe>`,
+        }),
+      )
+      await page.goto('https://blog.example/post')
+      const slides = () =>
+        page.frames().find((frame) => frame.url().includes('.content.example'))
+      await expect
+        .poll(
+          async () => {
+            const frame = slides()
+            return frame ? wordsIn(frame) : []
+          },
+          { timeout: 20000 },
+        )
+        .toEqual(['charlie'])
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+      expect(await wordsIn(slides()!)).toEqual(['charlie'])
     })
   },
   60000,
