@@ -97,6 +97,8 @@ export const VIEWER_ATTRIBUTE = {
   evict: 'data-offline-evict',
   /** The origin of the content domain, on the pages that run the offline script. */
   contentBase: 'data-content-base',
+  /** On the viewer's root: "true" when no write or prune of the list is queued or running. */
+  listIdle: 'data-offline-list-idle',
 } as const
 
 /**

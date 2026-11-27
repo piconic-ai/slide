@@ -138,8 +138,38 @@ export function startViewer(root: ParentNode): void {
       },
       origin,
     )
+    // Whether the list is at rest: no write or prune is queued or running, and
+    // the page's own prune has been asked for. The page says so on its root, so
+    // a caller that must act on the list (a test, a later tab) can wait for
+    // it, instead of guessing how long the steps take.
+    let pending = 0
+    let pruneAsked = false
+    const report = () => {
+      document.documentElement.setAttribute(
+        VIEWER_ATTRIBUTE.listIdle,
+        String(pending === 0 && pruneAsked),
+      )
+    }
+    const track = (work: Promise<unknown>) => {
+      pending++
+      report()
+      return work
+        .catch(() => {})
+        .then(() => {
+          pending--
+          report()
+        })
+    }
+    report()
+    // The frame says it is stored each time it is asked, and the viewer asks
+    // twice (at once, and when the frame has loaded). The shell is the same,
+    // so it is written once: a second write, late, would bring back a deck
+    // the service withdrew in the meantime (F37-AC7 to AC9).
+    let written = false
     listen(slidesFrame, (from) => {
-      if (from === origin) shells.keep(shell, path, origin).catch(() => {})
+      if (from !== origin || written) return
+      written = true
+      void track(shells.keep(shell, path, origin))
     })
     navigator.serviceWorker
       .register(
@@ -159,7 +189,10 @@ export function startViewer(root: ParentNode): void {
     // with the first paint. A deck whose version could not be stored never
     // keeps a shell, and would otherwise leave its origin on the list
     // (F37-AC22). This module is loaded late, so the load may have passed.
-    const clear = () => void shells.prune().catch(() => {})
+    const clear = () => {
+      pruneAsked = true
+      void track(shells.prune())
+    }
     if (document.readyState === 'complete') clear()
     else addEventListener('load', clear, { once: true })
   } catch {}
