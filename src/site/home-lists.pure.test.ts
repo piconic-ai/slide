@@ -28,10 +28,25 @@ test('Given five slides of followed people read, When the list is made, Then all
     handle: 'bob',
     slug: 'a',
     authorHref: '/@bob',
+    authorAvatarUrl: null,
     publishedAt: '1970-01-01T00:01:40.000Z',
     coverUrl: '/covers/d-a.jpg',
     citedBy: 0,
   })
+})
+
+test('Given the picture address of an author, When the list is made, Then their cards carry it, and an author without one carries none', () => {
+  const faces = new Map([['bob', '/avatars/u1?v=g']])
+  const { following } = toHomeLists(
+    [followed('a'), { ...followed('b'), handle: handleSchema.parse('amy') }],
+    base,
+    new Map(),
+    faces,
+  )
+  expect(following.map((deck) => deck.authorAvatarUrl)).toEqual([
+    '/avatars/u1?v=g',
+    null,
+  ])
 })
 
 test('F21-AC52: Given nobody followed, or no content origin, When the list is made, Then it is empty, or comes without covers', () => {

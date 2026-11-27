@@ -19,12 +19,15 @@ export const toHomeLists = (
   contentBase: URL | null,
   /** How many decks cite each, by `handle/slug`; a deck left out has none. */
   citedBy: ReadonlyMap<string, number> = new Map(),
+  /** Each author's picture, by handle. */
+  faces: ReadonlyMap<string, string> = new Map(),
 ): HomeLists => ({
   following: following.map((deck) =>
     toRecentDeck(
       deck,
       contentBase,
       citedBy.get(citedKey(deck.handle, deck.slug)),
+      faces.get(deck.handle) ?? null,
     ),
   ),
 })

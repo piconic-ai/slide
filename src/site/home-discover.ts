@@ -103,6 +103,8 @@ export const toFollowingDecks = (
   contentBase: URL | null,
   /** How many decks cite each, by `handle/slug`; a deck left out has none. */
   citedBy: ReadonlyMap<string, number> = new Map(),
+  /** Each author's picture, by handle. */
+  faces: ReadonlyMap<string, string> = new Map(),
 ): readonly FollowingDeck[] =>
   slides.flatMap((slide) => {
     const source = sourceOf({
@@ -120,6 +122,7 @@ export const toFollowingDecks = (
           slide,
           contentBase,
           citedBy.get(citedKey(slide.handle, slide.slug)),
+          faces.get(slide.handle) ?? null,
         ),
         source,
       },

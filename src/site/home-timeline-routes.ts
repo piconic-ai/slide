@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { currentOwner } from '../auth/owner-middleware'
 import { readCitedCounts } from '../citations/pair-store'
+import { readAuthorFaces } from '../profile/author-faces-store'
 import { listNewCommunities } from '../communities/list-store'
 import { contentBaseOf } from '../preview/config'
 import {
@@ -39,7 +40,11 @@ homeTimelineRoutes.get('/api/home/following-slides', async (c) => {
     slides.map((slide) => slide.handle),
     owner.userId,
   )
-  return c.json(toFollowingDecks(slides, contentBaseOf(c.env), citedBy))
+  const faces = await readAuthorFaces(
+    c.env.DB,
+    slides.map((slide) => slide.handle),
+  )
+  return c.json(toFollowingDecks(slides, contentBaseOf(c.env), citedBy, faces))
 })
 
 /**

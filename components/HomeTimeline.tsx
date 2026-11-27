@@ -16,7 +16,6 @@ import {
   watchLeaving,
 } from '../src/site/flip-frame'
 import { flipFramePath } from '../src/site/home-flip'
-import { dayFormats } from '../src/share/dates'
 import type { RecentDeck } from '../src/share/recent'
 import type { HomeDiscover } from '../src/site/home-discover'
 import {
@@ -318,16 +317,24 @@ export function HomeTimeline(props: HomeTimelineProps) {
                   </a>
                 </div>
                 <p className="card-meta">
-                  <a href={item.deck.authorHref}>@{item.deck.handle}</a>
+                  <a className="card-author" href={item.deck.authorHref}>
+                    <span className="card-author-face" aria-hidden="true">
+                      {item.deck.handle.slice(0, 1).toUpperCase()}
+                      {item.deck.authorAvatarUrl ? (
+                        <img
+                          data-cover
+                          src={item.deck.authorAvatarUrl}
+                          alt=""
+                          loading="lazy"
+                          referrerpolicy="no-referrer"
+                        />
+                      ) : null}
+                    </span>
+                    @{item.deck.handle}
+                  </a>
                   {item.deck.source?.kind === 'person' ? (
                     <span className="source-label">{t.followedAuthor}</span>
                   ) : null}
-                  <span aria-hidden="true">·</span>
-                  <time datetime={item.deck.publishedAt}>
-                    {dayFormats[props.lang].format(
-                      new Date(item.deck.publishedAt),
-                    )}
-                  </time>
                   {citedCountText(item.deck.citedBy, props.lang) ===
                   null ? null : (
                     <span className="card-cited">

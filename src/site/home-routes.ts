@@ -7,6 +7,7 @@ import { contentBaseOf } from '../preview/config'
 import { RECENT_DECKS_SHOWN } from '../share/list-pages'
 import { citedKey } from '../citations/cited-count'
 import { readCitedCounts } from '../citations/pair-store'
+import { readAuthorFaces } from '../profile/author-faces-store'
 import { toRecentDeck } from '../share/recent'
 import { listPublicDecks } from '../share/store'
 import { HOME_ASSET_PATHS } from './home-assets'
@@ -102,9 +103,18 @@ homeRoutes.get('/api/public/slides', async (c) => {
     decks.map((deck) => deck.handle),
     owner?.userId ?? null,
   )
+  const faces = await readAuthorFaces(
+    c.env.DB,
+    decks.map((deck) => deck.handle),
+  )
   return c.json(
     decks.map((deck) =>
-      toRecentDeck(deck, base, citedBy.get(citedKey(deck.handle, deck.slug))),
+      toRecentDeck(
+        deck,
+        base,
+        citedBy.get(citedKey(deck.handle, deck.slug)),
+        faces.get(deck.handle) ?? null,
+      ),
     ),
   )
 })
@@ -150,7 +160,11 @@ homeRoutes.get('/api/home', async (c) => {
     following.map((deck) => deck.handle),
     owner.userId,
   )
-  return c.json(toHomeLists(following, contentBaseOf(c.env), citedBy))
+  const faces = await readAuthorFaces(
+    c.env.DB,
+    following.map((deck) => deck.handle),
+  )
+  return c.json(toHomeLists(following, contentBaseOf(c.env), citedBy, faces))
 })
 
 /**
@@ -177,5 +191,9 @@ homeRoutes.get('/api/home/communities', async (c) => {
     talks.map((talk) => talk.handle),
     owner.userId,
   )
-  return c.json(toHomeCommunities(talks, contentBaseOf(c.env), citedBy))
+  const faces = await readAuthorFaces(
+    c.env.DB,
+    talks.map((talk) => talk.handle),
+  )
+  return c.json(toHomeCommunities(talks, contentBaseOf(c.env), citedBy, faces))
 })

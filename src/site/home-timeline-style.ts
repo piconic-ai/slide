@@ -143,6 +143,36 @@ export const timelineStyle = html`<style>
   .timeline-card .card-source a {
     color: inherit;
   }
+  .timeline-card .card-author {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+  .card-author-face {
+    position: relative;
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    overflow: hidden;
+    border-radius: var(--radius-full);
+    background: var(--border);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .card-author-face img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .card-author-face img[hidden] {
+    display: none;
+  }
   .timeline-card .source-label {
     padding: 0 8px;
     border-radius: var(--radius-full);
