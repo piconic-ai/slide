@@ -44,7 +44,13 @@
       "database_id": "8461532c-0fca-4eea-9513-d0ff800c0385",
     },
   ],
-  "r2_buckets": [{ "binding": "UPLOADS", "bucket_name": "slide-uploads" }],
+  "r2_buckets": [
+    { "binding": "UPLOADS", "bucket_name": "slide-uploads" },
+    // The daily copy of the stored slide files, kept for 30 days after the
+    // original is gone (docs/dev/backup.md). The bucket must exist before this
+    // is deployed, and it is private with no lifecycle rule.
+    { "binding": "UPLOADS_BACKUP", "bucket_name": "slide-uploads-backup" },
+  ],
   // Counts of what is used, written by src/metrics (docs/dev/metrics.md).
   // The dataset is made by its first write. Without this binding the service
   // runs as before and the operator's metrics page says it is not set up.
