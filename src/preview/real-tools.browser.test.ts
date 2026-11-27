@@ -158,6 +158,27 @@ const REVEAL = [
   },
 ]
 
+/** The files of a tool's built output, as they are put up. */
+async function builtOf(tool: {
+  dir?: string
+  dist?: string
+  apart?: string[]
+  plain?: boolean
+}) {
+  const dir = tool.dist ? `revealjs/${tool.dist}` : `${tool.dir}/dist`
+  const built = await readBuilt(join(TOOLS_DIR, dir))
+  for (const path of tool.apart ?? []) built.delete(path)
+  if (tool.plain) {
+    for (const [path, bytes] of built)
+      if (path.endsWith('.js'))
+        built.set(
+          path,
+          Buffer.from(bytes.toString().replaceAll('suraido-pad', 'pad-plain')),
+        )
+  }
+  return built
+}
+
 let browser: Browser
 const inventories = new Map<
   string,
@@ -172,18 +193,7 @@ beforeAll(async () => {
     ...REVEAL,
     ...SLIDEV,
   ].entries()) {
-    const dir = 'dist' in tool ? `revealjs/${tool.dist}` : `${tool.dir}/dist`
-    const built = await readBuilt(join(TOOLS_DIR, dir))
-    for (const path of 'apart' in tool ? tool.apart : []) built.delete(path)
-    if ('plain' in tool)
-      for (const [path, bytes] of built)
-        if (path.endsWith('.js'))
-          built.set(
-            path,
-            Buffer.from(
-              bytes.toString().replaceAll('suraido-pad', 'pad-plain'),
-            ),
-          )
+    const built = await builtOf(tool)
     const id = await seedPublic(db, tool.slug, index + 1, tool.slug)
     inventories.set(tool.slug, await store(id, built))
   }
