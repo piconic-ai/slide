@@ -5,26 +5,27 @@
 // shows the band when a stored version is on screen. Nothing here throws: a
 // browser that cannot do this leaves the viewer as it is.
 import {
-  CONTENT_ORIGIN_HEADER,
-  EVICT_CACHE,
   EVICT_PATH,
   MANAGEMENT_EVICT_PATH,
   isVersionOrigin,
   OFFLINE_MESSAGE,
-  STORED_AT_HEADER,
   VIEWER_ATTRIBUTE,
-  VIEWER_CACHE,
   WORKER_ASSET_PATH,
 } from './limits'
-import { singleFlight } from './single-flight'
-import {
-  evictedOrigin,
-  evictKey,
-  planPrune,
-  type ViewerRecord,
-} from './records'
+import { shellKeeper, type ShellCache } from './viewer-shells'
 
 const EVICT_WAIT_MS = 10_000
+
+/** The browser's cache, by address, as the list of kept decks uses it. */
+const shellCache = async (name: string): Promise<ShellCache> => {
+  const cache = await caches.open(name)
+  return {
+    keys: () => cache.keys(),
+    match: (key) => cache.match(key),
+    put: (key, response) => cache.put(key, response),
+    delete: (key) => cache.delete(key),
+  }
+}
 
 const supported = () => {
   try {
@@ -111,91 +112,6 @@ function evictFrame(origin: string): Promise<boolean> {
   })
 }
 
-async function recordsOf(cache: Cache): Promise<ViewerRecord[]> {
-  const records: ViewerRecord[] = []
-  for (const request of await cache.keys()) {
-    const entry = await cache.match(request)
-    records.push({
-      key: request.url,
-      storedAt: Number(entry?.headers.get(STORED_AT_HEADER)),
-      origin: entry?.headers.get(CONTENT_ORIGIN_HEADER) ?? '',
-    })
-  }
-  return records
-}
-
-/**
- * Drops what may no longer be shown (a day passed, beyond 20 versions), puts
- * those versions' origins on the list to clear, and clears every origin on
- * the list that is not one still kept. A version it cannot reach now (no
- * connection) stays on the list for the next time.
- */
-async function prune(contentBase: string) {
-  const viewers = await caches.open(VIEWER_CACHE)
-  const evictions = await caches.open(EVICT_CACHE)
-  const { keep, evict } = planPrune(await recordsOf(viewers), Date.now())
-  for (const record of evict) {
-    if (isVersionOrigin(record.origin, contentBase))
-      await evictions.put(
-        evictKey(location.origin, record.origin),
-        new Response('', {
-          headers: { [STORED_AT_HEADER]: String(Date.now()) },
-        }),
-      )
-    await viewers.delete(record.key)
-  }
-  const stillKept = new Set(keep.map((record) => record.origin))
-  for (const request of await evictions.keys()) {
-    const origin = evictedOrigin(location.origin, request.url)
-    if (
-      origin === null ||
-      !isVersionOrigin(origin, contentBase) ||
-      stillKept.has(origin)
-    ) {
-      await evictions.delete(request)
-    } else if (await evictFrame(origin)) await evictions.delete(request)
-  }
-}
-
-/**
- * `prune`, never twice at once: it runs when a version is kept and when a
- * viewer has loaded, and two runs side by side would clear the same origin
- * twice.
- */
-const pruneOnce = singleFlight(prune)
-
-/** Writes what is needed to open this deck later without a connection, once its frame has kept the version. */
-async function keepShell(
-  shell: string,
-  path: string,
-  origin: string,
-  contentBase: string,
-) {
-  const viewers = await caches.open(VIEWER_CACHE)
-  const key = `${location.origin}${path}`
-  const before = await viewers.match(key)
-  await viewers.put(
-    key,
-    new Response(shell, {
-      headers: {
-        'Content-Type': 'text/html; charset=utf-8',
-        [STORED_AT_HEADER]: String(Date.now()),
-        [CONTENT_ORIGIN_HEADER]: origin,
-      },
-    }),
-  )
-  // The deck now has another version: the one it had is no longer wanted.
-  const previous = before?.headers.get(CONTENT_ORIGIN_HEADER)
-  if (previous && previous !== origin && isVersionOrigin(previous, contentBase))
-    await (
-      await caches.open(EVICT_CACHE)
-    ).put(
-      evictKey(location.origin, previous),
-      new Response('', { headers: { [STORED_AT_HEADER]: String(Date.now()) } }),
-    )
-  await pruneOnce(contentBase)
-}
-
 export function startViewer(root: ParentNode): void {
   try {
     if (!supported()) return
@@ -212,9 +128,18 @@ export function startViewer(root: ParentNode): void {
     if (!slides || !shell || !path || !src) return
     const origin = new URL(src, location.href).origin
     if (!isVersionOrigin(origin, contentBase)) return
+    const shells = shellKeeper(
+      {
+        managementOrigin: location.origin,
+        contentBase,
+        now: Date.now,
+        openCache: shellCache,
+        clearVersion: evictFrame,
+      },
+      origin,
+    )
     listen(slidesFrame, (from) => {
-      if (from === origin)
-        keepShell(shell, path, origin, contentBase).catch(() => {})
+      if (from === origin) shells.keep(shell, path, origin).catch(() => {})
     })
     navigator.serviceWorker
       .register(
@@ -232,9 +157,9 @@ export function startViewer(root: ParentNode): void {
     // What the service stopped showing is cleared once the page has loaded,
     // and the page's load waits for the slides' frame, so it never competes
     // with the first paint. A deck whose version could not be stored never
-    // reaches `keepShell`, and would otherwise leave its origin on the list
+    // keeps a shell, and would otherwise leave its origin on the list
     // (F37-AC22). This module is loaded late, so the load may have passed.
-    const clear = () => void pruneOnce(contentBase).catch(() => {})
+    const clear = () => void shells.prune().catch(() => {})
     if (document.readyState === 'complete') clear()
     else addEventListener('load', clear, { once: true })
   } catch {}
