@@ -1368,6 +1368,31 @@ test.each([
             }),
           )
         const before = await measure()
+        // When a row moves, say which one and in what state it was measured,
+        // so a failure on a loaded machine can be told apart from a real shift.
+        const expectStill = async () => {
+          const now = await measure()
+          if (JSON.stringify(now) === JSON.stringify(before)) return
+          const state = await page.evaluate(() => ({
+            scroll: [scrollX, scrollY],
+            fonts: document.fonts.status,
+            rows: [
+              ...document.querySelectorAll(
+                '.share-menu .menu-items > :not([hidden])',
+              ),
+            ].map((element) => ({
+              element: `${element.tagName.toLowerCase()} ${(element.textContent ?? '').trim().slice(0, 24)}`,
+              transform: getComputedStyle(element).transform,
+              animations: element.getAnimations().length,
+              hover: element.matches(':hover'),
+              active: element.matches(':active'),
+              focus: element.matches(':focus'),
+            })),
+          }))
+          throw new Error(
+            `The share menu moved: ${JSON.stringify({ before, now, ...state })}`,
+          )
+        }
         const buttons = page.locator('.share-menu [data-copy]:visible')
         expect(await buttons.count()).toBe(3)
         for (let index = 0; index < 3; index++) {
@@ -1375,7 +1400,7 @@ test.each([
           await expect
             .poll(() => page.locator('#share-status').textContent())
             .not.toBe('')
-          expect(await measure()).toEqual(before)
+          await expectStill()
           // The pressed button keeps no frame of its own while it says so:
           // a press with the mouse leaves no outline, as only the keyboard
           // draws one.
@@ -1388,7 +1413,7 @@ test.each([
               ]),
           ).toEqual(['none', false])
           await page.mouse.move(0, 0)
-          expect(await measure()).toEqual(before)
+          await expectStill()
         }
       },
     )
