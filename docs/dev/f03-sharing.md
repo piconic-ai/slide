@@ -211,12 +211,13 @@ iOS Safari・Android Chrome の実機と、本番の Cloudflare 経由での表�
 
 | ツール(版) | ページの持ち方 | `/@handle/slug/3`(枠に `/#3`)を開く | 右矢印を 1 回押す | 判定の手がかりの候補 |
 | --- | --- | --- | --- | --- |
-| suraido.js(0.5.0) | fragment に 0 始まりの番号(`#2` が 3 ページ目)。`history.replaceState` で書く | 4 ページ目が出る | 5 ページ目が出て、枠は `/#4`。アドレスバーは `/@handle/slug/4`(1 つ小さい) | ビルドした `index.html` には印がない(`<div id="root">` と、名前に hash の付いた script だけ)。動き出した後の DOM に、`data-suraido-*` の属性と `suraido-*` の class が付く |
+| suraido.js(0.5.0) | fragment に 0 始まりの番号(`#2` が 3 ページ目)。`history.replaceState` で書く | 4 ページ目が出る | 5 ページ目が出て、枠は `/#4`。アドレスバーは `/@handle/slug/4`(1 つ小さい) | ビルドした `index.html` には印がない(`<div id="root">` と、名前に hash の付いた script と CSS だけ)。ビルドした CSS が、`--suraido-*` のカスタムプロパティを 28 種類定義している(`:root` にもある)。動き出した後の DOM に、`data-suraido-*` の属性と `suraido-*` の class が付く |
 | reveal.js(6.0.2、既定の設定) | `#/h/v/f`(0 始まり)。既定(`hash` を指定しない)では、めくっても URL を書かない | 4 ページ目が出る(`#3` を 0 始まりで読む) | 5 ページ目が出て、枠は `/#3` のまま。アドレスバーは `/@handle/slug/3` のまま | markup の `.reveal` の中の `.slides`。script を `<script src>` で読むスライドには global の `Reveal` があり、`getIndices`、`getHorizontalSlides`、`getVerticalSlides`、`slidechanged` の event を持つ |
 | Slidev(`@slidev/cli` 53.2.0) | path(`/3`、1 始まり)。`/` を `/1` に直す | 1 ページ目が出る。枠は `/1#3`(`#3` は読まれない) | 2 ページ目が出て、枠は `/2`(fragment は消える)。アドレスバーは `/@handle/slug`(fragment が空なので、1 ページ目と受け取る) | `index.html` の `<meta property="slidev:version" content="53.2.0">` |
 
-手がかりは候補で、決めていない。suraido.js の判定と、Slidev の `routerMode: hash` は、仕様の未決事項である。実装のときに確かめることは、次のとおり。
+手がかりは候補で、決めていない。Slidev の `routerMode: hash` は、仕様の未決事項である。実装のときに確かめることは、次のとおり。
 
+- suraido.js は、実行時に判定する(2026-11-27、依頼者)。差し込む script が、動き出した後の印(`--suraido-*`、`data-suraido-*`)を見て判定し、ページ番号を読み替える。差し込む script は `<head>` の先頭で動き、その時点では、CSS の `<link>` も bundle の script も、まだ読まれていない。そこで確かめること: suraido.js が渡された `#3` を読んで描く前に、判定を済ませられるか。済ませられないとき、開いた直後の表示がどう見えるか(4 ページ目が出てから 3 ページ目に直るのか、どのくらいの間か)と、その間に viewer へ別の番号を伝えないか。見え方は、仕様の未決事項である。置いたときに判定して覚えておく案は、後に回した。
 - reveal.js の縦のスライドは、読む順の通し番号をページ番号にする(F03-AC199〜F03-AC201)。上の表の fixture は、縦のスライドを持たない。縦のスライドを持つ出力を fixture に足し、読む順の番号を何から読むかを確かめる(候補は、fixture の `dist/reveal.js` にある `getSlidePastCount`。reveal.js 自身のスライド番号の表示が使っている)。
 - reveal.js を ES module で読み込むスライドには、global の `Reveal` がない。そのスライドで、表示中のページを何から読むか(`.slides` の中の `section.present` など)。
 - 差し込む script は、いまは `viewerOrigin` だけを持ち、どのスライドにも同じ文字列である。`index.html` の `ETag` は、その文字列のハッシュで決まる(`injectedValidator`)。配信の側で判定して、ツールごとに違う文字列を差し込むなら、`ETag` の決め方も変わる。script の中で判定するなら、変わらない。
