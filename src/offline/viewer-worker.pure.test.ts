@@ -224,6 +224,105 @@ describe('F37-AC10: a shell past its day takes its version with it', () => {
   })
 })
 
+describe('F37-AC21: a deck the service shows as something else is forgotten', () => {
+  const OTHER = 'https://d-223e4567-e89b-12d3-a456-426614174000.content.example'
+  const shows = (origin: string | null, status = 200) =>
+    basic(
+      viewerPage(
+        status,
+        origin === null ? {} : { [CONTENT_ORIGIN_HEADER]: origin },
+      ),
+    )
+  const open = async (path = '/@a/talk', request = navigate(path)) => {
+    const answer = await respondViewer(w.deps, request)
+    await w.settle()
+    return answer
+  }
+
+  test('Given a kept shell of version A, When the service answers 200 showing B, Then the shell is dropped and A is put on the list to clear', async () => {
+    keepShell()
+    w.state.service = () => shows(OTHER)
+    const shown = await open()
+    expect(await shown.text()).toBe('<h1>live viewer</h1>')
+    expect(w.diskOf(VIEWER_CACHE).size).toBe(0)
+    expect([...w.diskOf(EVICT_CACHE).keys()]).toEqual([
+      evictKey(ORIGIN, VERSION),
+    ])
+    w.state.service = offline
+    expect((await open()).type).toBe('error')
+  })
+
+  test('F37-AC1, AC6: Given a kept shell of A, When 200 shows A, Then it stays and nothing is listed', async () => {
+    keepShell()
+    w.state.service = () => shows(VERSION)
+    await open()
+    expect(w.diskOf(VIEWER_CACHE).has(`${ORIGIN}/@a/talk`)).toBe(true)
+    expect(w.diskOf(EVICT_CACHE).size).toBe(0)
+    w.state.service = offline
+    expect(await (await open()).text()).toBe(SHELL)
+  })
+
+  test("Given a kept shell, When 200 names no version (the author's preview), Then it is dropped", async () => {
+    keepShell()
+    w.state.service = () => shows(null)
+    await open()
+    expect(w.diskOf(VIEWER_CACHE).size).toBe(0)
+    expect([...w.diskOf(EVICT_CACHE).keys()]).toEqual([
+      evictKey(ORIGIN, VERSION),
+    ])
+  })
+
+  test('Given no shell, When 200, Then nothing is listed', async () => {
+    w.state.service = () => shows(OTHER)
+    await open()
+    expect(w.diskOf(VIEWER_CACHE).size).toBe(0)
+    expect(w.diskOf(EVICT_CACHE).size).toBe(0)
+  })
+
+  test('Given a kept shell, When the 200 came by a redirect, Then it stays', async () => {
+    keepShell()
+    w.state.service = () => {
+      const answer = shows(OTHER)
+      Object.defineProperty(answer, 'redirected', { value: true })
+      return answer
+    }
+    await open()
+    expect(w.diskOf(VIEWER_CACHE).has(`${ORIGIN}/@a/talk`)).toBe(true)
+    expect(w.diskOf(EVICT_CACHE).size).toBe(0)
+  })
+
+  test("Given a kept shell, When the 200 is the page of a link a deck follows in its own frame, Then it stays: that page is no view of the deck's version", async () => {
+    keepShell()
+    w.state.service = () => shows(null)
+    const request = new Request(`${ORIGIN}/@a/talk`)
+    Object.defineProperty(request, 'destination', { value: 'iframe' })
+    await open('/@a/talk', request)
+    expect(w.diskOf(VIEWER_CACHE).has(`${ORIGIN}/@a/talk`)).toBe(true)
+  })
+
+  test('Given a kept shell of a deck, When another deck shows 200 of another version, Then the first stays', async () => {
+    keepShell()
+    w.state.service = () => shows(OTHER)
+    await open('/@a/other')
+    expect(w.diskOf(VIEWER_CACHE).has(`${ORIGIN}/@a/talk`)).toBe(true)
+  })
+
+  test('Given a kept shell, When the service answers 304 or 206, Then it stays', async () => {
+    keepShell()
+    for (const status of [304, 206]) {
+      w.state.service = () =>
+        basic(
+          new Response(null, {
+            status,
+            headers: { 'Cache-Control': 'no-cache' },
+          }),
+        )
+      await open()
+    }
+    expect(w.diskOf(VIEWER_CACHE).has(`${ORIGIN}/@a/talk`)).toBe(true)
+  })
+})
+
 describe('what the shell may name', () => {
   test.each([
     'https://evil.example',
