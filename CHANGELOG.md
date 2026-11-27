@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.4.7](https://github.com/piconic-ai/slide/compare/v0.4.6...v0.4.7) - 2026-11-27
+
+- Slidev のスライドで、ページ番号つきの URL を働かせる by @kfly8 in https://github.com/piconic-ai/slide/pull/718
+- トップページのカードで、表紙が作者の行に重ねて出る不具合を直す by @kfly8 in https://github.com/piconic-ai/slide/pull/727
+
 ## [v0.4.6](https://github.com/piconic-ai/slide/compare/v0.4.5...v0.4.6) - 2026-11-27
 
 - fix: F37-AC4 の保存依頼を、返信が来るまで尋ね直す by @kfly8 in https://github.com/piconic-ai/slide/pull/688

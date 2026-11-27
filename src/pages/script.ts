@@ -198,6 +198,29 @@ export const pageScript = (viewerOrigin: string) => `(() => {
   document.addEventListener('slidechanged', tell)
   addEventListener('load', startReveal)
   startReveal()
+  // Slidev. Its only sign is a meta in the head (<meta property=
+  // "slidev:version">), and this script runs before the head is read, so the
+  // meta is waited for as the parser adds it: Slidev's own module runs only
+  // after the whole document is parsed, so the address can be set before it
+  // starts. Its router reads the path, not the fragment, and sends '/' on to
+  // '/1', so the page asked for is put into the path first.
+  const startSlidev = () => {
+    if (tool || !document.querySelector('meta[property="slidev:version"]')) return
+    tool = { pageOf: () => slidevPageIn(location.pathname, location.hash) }
+    if (requested !== null && location.pathname === '/')
+      history.replaceState(history.state, '', slidevPathOf(requested) + location.search)
+    tell()
+  }
+  const observer = new MutationObserver(() => {
+    startSlidev()
+    if (tool) observer.disconnect()
+  })
+  observer.observe(document, { childList: true, subtree: true })
+  addEventListener('DOMContentLoaded', () => {
+    startSlidev()
+    observer.disconnect()
+  })
+  startSlidev()
   addEventListener('hashchange', tell)
   addEventListener('popstate', tell)
   tell()

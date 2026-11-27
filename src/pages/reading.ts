@@ -41,4 +41,14 @@ export const READING_SOURCE = `
     const last = columns.length - 1
     return last < 0 ? null : { h: last, v: columns[last] - 1 }
   }
+
+  // Slidev keeps the page in the path (/3, from 1). Its other routes (the
+  // presenter's, the overview) and its hash mode (#/3) tell no page.
+  const slidevPageIn = (pathname, hash) => {
+    if (hash.startsWith('#/')) return null
+    if (pathname === '/') return 1
+    const spelled = /^\\/([1-9][0-9]{0,3})\\/?$/.exec(pathname)
+    return spelled ? Number(spelled[1]) : null
+  }
+  const slidevPathOf = (page) => '/' + page
 `

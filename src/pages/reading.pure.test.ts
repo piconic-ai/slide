@@ -2,19 +2,28 @@ import { describe, expect, it } from 'vitest'
 import { READING_SOURCE } from './reading'
 
 // The text the page script holds, run with plain values.
-const { pageIn, requestedIn, numberOf, pageOfSlide, slideOfPage } =
-  new Function(
-    `${READING_SOURCE}; return { numberOf, pageIn, requestedIn, pageOfSlide, slideOfPage }`,
-  )() as {
-    numberOf: (text: string) => number | null
-    pageIn: (search: string, hash: string) => number | null
-    requestedIn: (hash: string) => number | null
-    pageOfSlide: (columns: number[], h: number, v: number) => number | null
-    slideOfPage: (
-      columns: number[],
-      page: number,
-    ) => { h: number; v: number } | null
-  }
+const {
+  pageIn,
+  requestedIn,
+  numberOf,
+  pageOfSlide,
+  slideOfPage,
+  slidevPageIn,
+  slidevPathOf,
+} = new Function(
+  `${READING_SOURCE}; return { numberOf, pageIn, requestedIn, pageOfSlide, slideOfPage, slidevPageIn, slidevPathOf }`,
+)() as {
+  slidevPageIn: (pathname: string, hash: string) => number | null
+  slidevPathOf: (page: number) => string
+  numberOf: (text: string) => number | null
+  pageIn: (search: string, hash: string) => number | null
+  requestedIn: (hash: string) => number | null
+  pageOfSlide: (columns: number[], h: number, v: number) => number | null
+  slideOfPage: (
+    columns: number[],
+    page: number,
+  ) => { h: number; v: number } | null
+}
 
 describe('pageIn: the page of a slide that gives no sign of its tool', () => {
   it.each([
@@ -167,5 +176,42 @@ describe('pageOfSlide and slideOfPage: slides one above the other', () => {
           slideOfPage(shape, page)!.v,
         ),
       ).toBe(page)
+  })
+})
+
+describe('slidevPageIn and slidevPathOf: Slidev keeps the page in the path', () => {
+  it.each([
+    ['/', '', 1],
+    ['/1', '', 1],
+    ['/3', '', 3],
+    ['/3/', '', 3],
+    ['/9999', '', 9999],
+  ])(
+    'F03-AC191: Given the path %j, When it is read, Then the page is %j',
+    (pathname, hash, page) => {
+      expect(slidevPageIn(pathname, hash)).toBe(page)
+    },
+  )
+
+  it.each([
+    ['/0', ''],
+    ['/10000', ''],
+    ['/03', ''],
+    ['/presenter/3', ''],
+    ['/overview', ''],
+    ['/entry', ''],
+    ['/3/extra', ''],
+    ['/index.html', ''],
+    ['/', '#/3'],
+    ['/', '#/'],
+  ])(
+    'Given the path %j and the fragment %j, When it is read, Then no page is told (other routes, hash mode)',
+    (pathname, hash) => {
+      expect(slidevPageIn(pathname, hash)).toBeNull()
+    },
+  )
+
+  it('F03-AC191: Given a page asked for, When its path is made, Then it is the path Slidev reads', () => {
+    expect(slidevPathOf(3)).toBe('/3')
   })
 })

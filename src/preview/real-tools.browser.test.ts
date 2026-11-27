@@ -127,20 +127,6 @@ const RECORDED: {
   apart: string[]
   seen: Observed
 }[] = [
-  {
-    slug: 'slidev',
-    dir: 'slidev',
-    apart: ['_redirects'],
-    // Slidev keeps the page in the path (/2); the fragment it was opened with
-    // is dropped when it redirects to /1, so the viewer is told nothing more.
-    seen: {
-      opened: ['alpha'],
-      openedFrame: '/1#3',
-      turned: ['bravo'],
-      turnedFrame: '/2',
-      address: '/@owner/slidev',
-    },
-  },
   // suraido.js counts pages from 0 in the fragment (#3 is the fourth page),
   // and writes it with history.replaceState as the reader turns pages.
   {
@@ -163,6 +149,12 @@ const RECORDED: {
  * reveal.js: its defaults, which do not write the address; `hash: true`,
  * which writes it from 0; `hashOneBasedIndex: true`, which counts from 1.
  */
+const SLIDEV = [
+  // `_redirects` is left out of the upload until the service takes a build
+  // with it as it is (#710); it is no part of what is checked here.
+  { slug: 'slidev', dir: 'slidev', apart: ['_redirects'] },
+]
+
 const REVEAL = [
   { slug: 'revealjs', dist: 'dist', acs: 'F03-AC187, F03-AC188' },
   {
@@ -202,7 +194,12 @@ const inventories = new Map<
 beforeAll(async () => {
   await applyMigrations(db)
   await signIn(env)
-  for (const [index, tool] of [...TOOLS, ...RECORDED, ...REVEAL].entries()) {
+  for (const [index, tool] of [
+    ...TOOLS,
+    ...RECORDED,
+    ...REVEAL,
+    ...SLIDEV,
+  ].entries()) {
     const dir = 'dist' in tool ? `revealjs/${tool.dist}` : `${tool.dir}/dist`
     const built = await readBuilt(join(TOOLS_DIR, dir))
     for (const path of 'apart' in tool ? tool.apart : []) built.delete(path)
@@ -248,7 +245,7 @@ async function withPage(use: (page: Page) => Promise<void>) {
   }
 }
 
-test.each([...TOOLS, ...RECORDED, ...REVEAL])(
+test.each([...TOOLS, ...RECORDED, ...REVEAL, ...SLIDEV])(
   'F22-AC6: Given the $slug fixture, When it is read as an upload, Then it is within the limits of one version',
   ({ slug }) => {
     const inventory = inventories.get(slug)!
@@ -353,6 +350,28 @@ test.each(REVEAL.filter((_, index) => index < 3))(
   },
   60000,
 )
+
+test('F03-AC191, F03-AC192: Given the real output of Slidev, When the reader opens /@owner/slidev/3 and turns a page, Then page 3 shows with the address at 3, and going on shows page 4 with the address at /4', async () => {
+  await withPage(async (page) => {
+    await page.goto(`${TEST_ORIGIN}/@owner/slidev/3`)
+    const deck = page.frameLocator('iframe#deck')
+    await expect
+      .poll(() => wordsShown(deck), { timeout: 20000 })
+      .toEqual(['charlie'])
+    // Slidev redirects a path of its own after it starts: let it settle.
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+    expect(await wordsShown(deck)).toEqual(['charlie'])
+    expect(addressOf(page)).toBe('/@owner/slidev/3')
+    expect(new URL(frameAt(page), 'https://x').pathname).toBe('/3')
+    await pressInDeck(page, 'ArrowRight')
+    await expect
+      .poll(() => wordsShown(deck), { timeout: 20000 })
+      .toEqual(['delta'])
+    await page.waitForURL((url) => url.pathname === '/@owner/slidev/4')
+    await pressInDeck(page, 'ArrowLeft')
+    await page.waitForURL((url) => url.pathname === '/@owner/slidev/3')
+  })
+}, 60000)
 
 /** The page of each slide of the vertical fixtures, by the word it shows. */
 const PAGE_OF_WORD: Record<string, number> = {
