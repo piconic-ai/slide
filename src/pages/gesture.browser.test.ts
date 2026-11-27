@@ -366,3 +366,17 @@ test('F03-AC207: Given a code block that scrolls sideways, When the reader swipe
     expect(await page_()).toBe('1')
   })
 }, 60000)
+
+test('F03-AC205: Given slides that know only the keyboard, When the reader taps again before the first tap has turned the page, Then both turn it and a later tap still turns it', async () => {
+  await onPhone('viewer', 'keys', async ({ cdp, frame, page_ }) => {
+    const box = await frame()
+    const right = within(box, 0.9, 0.6)
+    // The second touch begins while the first is still waiting to be turned.
+    await touch(cdp, [right])
+    await touch(cdp, [right])
+    await expect.poll(page_).toBe('3')
+    await new Promise((resolve) => setTimeout(resolve, SETTLED))
+    await touch(cdp, [right])
+    await expect.poll(page_).toBe('4')
+  })
+}, 60000)

@@ -142,6 +142,8 @@ export const pageScript = (viewerOrigin: string) => `(() => {
   let touch = null
   let spoiled = false
   let latched = false
+  // When the service last sent a key, by performance.now().
+  let sentAt = -1
   const chainOf = (element) => {
     const chain = []
     for (let at = element; at instanceof Element; at = at.parentElement) {
@@ -161,6 +163,7 @@ export const pageScript = (viewerOrigin: string) => `(() => {
   const selecting = () => String(getSelection() ?? '') !== ''
   const press = (turn) => {
     const { key, code, keyCode } = keyOf(turn)
+    sentAt = performance.now()
     const event = new KeyboardEvent('keydown', { key, code, keyCode, which: keyCode, bubbles: true, cancelable: true })
     // An engine that leaves the legacy codes out of the init is given them.
     if (event.keyCode !== keyCode) Object.defineProperty(event, 'keyCode', { value: keyCode })
@@ -170,7 +173,7 @@ export const pageScript = (viewerOrigin: string) => `(() => {
   addEventListener('touchstart', (event) => {
     spoiled = event.touches.length > 1
     const first = event.changedTouches[0]
-    touch = spoiled || !first ? null : { x: first.clientX, y: first.clientY, t: event.timeStamp, page: pageOf(), element: event.target }
+    touch = spoiled || !first ? null : { x: first.clientX, y: first.clientY, t: event.timeStamp, page: pageOf(), element: event.target, began: performance.now() }
   }, { passive: true })
   addEventListener('touchcancel', () => {
     touch = null
@@ -190,7 +193,7 @@ export const pageScript = (viewerOrigin: string) => `(() => {
     if (gesture.tap ? tappedForItself(chain) : scrollsAcross(chain)) return
     if (!mayTurn(tool, began.page, latched)) return
     setTimeout(() => {
-      if (afterSettling(began.page, pageOf()) === 'send') press(gesture.turn)
+      if (afterSettling(began.page, pageOf(), sentAt > began.began) === 'send') press(gesture.turn)
       else latched = true
     }, SETTLE_MS)
   }, { passive: true })

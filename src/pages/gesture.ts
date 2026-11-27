@@ -54,8 +54,12 @@ export const GESTURE_SOURCE = `
 
   // What to do once the slides have had their time: send the key when the
   // page is as it was, and nothing when the slides turned it themselves
-  // (they have a touch of their own, and are left to it from then on).
-  const afterSettling = (before, after) => after === before ? 'send' : 'left-to-the-slides'
+  // (they have a touch of their own, and are left to it from then on). A
+  // page that changed after the service itself sent a key since the touch
+  // began is no sign of the slides' own: the touches overlapped, and the
+  // change is the service's.
+  const afterSettling = (before, after, sentSince) =>
+    after === before || sentSince ? 'send' : 'left-to-the-slides'
 
   // Whether the service may turn pages for these slides at all: only when
   // the page is known, and no tool that has its own touch is in use.

@@ -160,7 +160,7 @@ iOS Safari は、touch の処理が登録された場所にだけ touch を送�
 
 キーボードでしか送れない資料(touch の処理がない資料)には、サービスが差し込む script がスワイプとタップを補う（F03-AC202〜F03-AC208、`src/pages/gesture.ts`・`src/pages/script.ts`）。タップは `click` ではなく `touchstart`・`touchend` から判定する。iOS は `window` に付けた `click` を出さないが、viewer と埋め込みのページが iframe に passive な `touchstart` を登録しているので、資料の `window` には touch が届くためである。次へ・前へは、資料の `document.body` に `ArrowRight`・`ArrowLeft` の `keydown`（`key`・`code`・`keyCode`・`which` を付けたもの）を送る。
 
-- **二重送りの防ぎ方。** 資料が自前の touch 操作を持つかは、解析して決めない。操作の後 80ms（`SETTLE_MS`）待ち、ページ番号が操作の前と同じならキーを送る。変わっていたら、資料が自分で送ったとみなして、その文書では以後送らない。ページ番号は、`tell` と同じ `pageOf()` で読む（fragment、または reveal.js などの adapter）。
+- **二重送りの防ぎ方。** 資料が自前の touch 操作を持つかは、解析して決めない。操作の後 80ms（`SETTLE_MS`）待ち、ページ番号が操作の前と同じならキーを送る。変わっていたら、資料が自分で送ったとみなして、その文書では以後送らない。ページ番号は、`tell` と同じ `pageOf()` で読む（fragment、または reveal.js などの adapter）。操作が重なって、待っている間に別の操作が始まったときは、その間にサービス自身がキーを送っていれば、ページの変化を資料自身のものとみなさず、キーを送る(`afterSettling` の `sentSince`)。みなすと、速く連打しただけで補正が止まる。
 - **対象。** `tool === null`（reveal.js のような自前の touch を持つ既知のツールでない）で、ページ番号が分かる資料だけである。
 - **送らない操作。** リンク・ボタン・入力欄・動画・`cursor: pointer` の要素の上のタップ、縦のスワイプ、指 2 本以上、拡大中、テキスト選択中、横にスクロールできる要素（`overflow-x` が `auto`・`scroll` で、中身が幅を超えるもの）の上で始まったスワイプ。判定の純粋な部分（`gestureOf`、`tappedForItself`、`scrollsAcross`、`afterSettling`、`mayTurn`、`keyOf`）は `GESTURE_SOURCE` にあり、`src/pages/gesture.pure.test.ts` が同じ text を動かして確かめる。
 - **埋め込みでも動く。** これまで script は、スライドが viewer の直下にないとき（`parent !== top`）に何もせず終わっていた。いまは、枠の中（`parent !== window`）なら動かし、ページを viewer に伝える部分と、viewer の問い合わせに答える部分だけを、`parent === top` のときに限る。他の site に置いた埋め込みでも、補正が動く。

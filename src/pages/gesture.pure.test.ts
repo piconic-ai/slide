@@ -32,6 +32,7 @@ const {
   afterSettling: (
     before: number,
     after: number | null,
+    sentSince: boolean,
   ) => 'send' | 'left-to-the-slides'
   mayTurn: (
     tool: object | null,
@@ -182,13 +183,22 @@ describe('scrollsAcross', () => {
 
 describe('afterSettling', () => {
   it('F03-AC205: Given the page is as it was, When the time is up, Then the key is sent', () => {
-    expect(afterSettling(3, 3)).toBe('send')
+    expect(afterSettling(3, 3, false)).toBe('send')
   })
 
   it.each([4, 2, null])(
     'F03-AC205: Given the slides turned the page to %s themselves, When the time is up, Then nothing is sent',
     (after) => {
-      expect(afterSettling(3, after)).toBe('left-to-the-slides')
+      expect(afterSettling(3, after, false)).toBe('left-to-the-slides')
+    },
+  )
+})
+
+describe('afterSettling: touches that overlap', () => {
+  it.each([4, 2, null])(
+    'F03-AC205: Given the page changed to %s after the service itself sent a key since the touch began, When the time is up, Then the key is still sent, since the change is the service’s',
+    (after) => {
+      expect(afterSettling(3, after, true)).toBe('send')
     },
   )
 })
