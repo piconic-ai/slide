@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { MAX_ARTICLE_CHARS } from '../articles/markdown'
 import { listOwnDecks } from '../decks/own-decks-store'
 import { resolveDeck } from '../decks/store'
+import { withoutHostingConfig } from '../uploads/ignored-files'
 import { parseInventoryStructure } from '../uploads/inventory'
 import { readHandle } from '../share/store'
 import { TITLE_SCAN_BYTES, titleOf } from '../uploads/title'
@@ -201,10 +202,17 @@ const putSlide = (
 
 type ListedFile = Readonly<{ path: string; size: number; sha256: string }>
 
-/** The inventory of the files an agent lists, or null when it is not one. */
+/**
+ * The inventory of the files an agent lists, or null when it is not one.
+ * `_redirects` and `_headers` at the top are left out first: they are not
+ * part of the slide, so no URL is planned for them (F22-AC52, F22-AC54).
+ */
 function inventoryOf(files: readonly ListedFile[]) {
   try {
-    return parseInventoryStructure({ entry: 'index.html', files })
+    return parseInventoryStructure({
+      entry: 'index.html',
+      files: withoutHostingConfig(files),
+    })
   } catch {
     return null
   }

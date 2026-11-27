@@ -114,6 +114,37 @@ test('F23-AC24: Given HTML put up through replace_slide, with or without the pag
   }
 })
 
+test('F22-AC52, F22-AC54: Given the two hosting settings at the top of the files, When replace_slide is called, Then it is accepted and the version holds neither', async () => {
+  const put = await callTool(client, 'replace_slide', {
+    slide: 'draft',
+    files: [
+      { path: '_redirects', text: '/* /index.html 200' },
+      { path: 'index.html', text: page('With settings') },
+      { path: '_headers', text: '/*\n  X-A: b' },
+    ],
+  })
+
+  expect(put.isError).toBe(false)
+  const rows = await db
+    .select({ path: uploadFiles.path })
+    .from(uploadFiles)
+    .where(eq(uploadFiles.deployment_id, String(put.data.uploadId)))
+  expect(rows.map(({ path }) => path)).toEqual(['index.html'])
+})
+
+test('F22-AC51: Given a hosting setting below the top, When replace_slide is called, Then it is refused', async () => {
+  const put = await callTool(client, 'replace_slide', {
+    slide: 'draft',
+    files: [
+      { path: 'index.html', text: page('Nested') },
+      { path: 'sub/_redirects', text: 'x' },
+    ],
+  })
+
+  expect(put.isError).toBe(true)
+  expect(put.data).toMatchObject({ error: 'invalid_files' })
+})
+
 test.each([
   ['another author’s slide', 'secret'],
   ['a slide that does not exist', 'no-such-slide'],
