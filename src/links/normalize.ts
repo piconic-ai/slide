@@ -40,18 +40,19 @@ function commonPage(url: URL): ComparedPage {
 }
 
 /**
- * The form two related links are compared in: two addresses of the same page
- * have the same form, even when they are written differently. It is used only
- * to tell whether a slide has a link already, never shown nor followed.
- * `href` is an address as parseHttpsUrl keeps it. The common rules and the
- * rules of each site are in `url-rules.ts`.
+ * An address as it is compared, with more query names left out than the
+ * compared form leaves out: `alsoDropped` names them for the address's site.
  */
-export function normalizedUrlOf(href: string): string {
+export function comparedUrlOf(
+  href: string,
+  alsoDropped: (site: SiteRule | undefined) => readonly string[],
+): string {
   const common = commonPage(new URL(href))
   const site = siteOf(common.host)
   const dropped = [
     ...(site?.hrefDroppedQuery ?? []),
     ...(site?.comparedWithout ?? []),
+    ...alsoDropped(site),
   ]
   const kept = {
     ...common,
@@ -70,3 +71,15 @@ export function normalizedUrlOf(href: string): string {
   const search = query.length === 0 ? '' : `?${query.join('&')}`
   return `https://${page.host}${port}${page.path}${search}`
 }
+
+const NOTHING_MORE = () => []
+
+/**
+ * The form two related links are compared in: two addresses of the same page
+ * have the same form, even when they are written differently. It is used only
+ * to tell whether a slide has a link already, never shown nor followed.
+ * `href` is an address as parseHttpsUrl keeps it. The common rules and the
+ * rules of each site are in `url-rules.ts`.
+ */
+export const normalizedUrlOf = (href: string): string =>
+  comparedUrlOf(href, NOTHING_MORE)

@@ -7,7 +7,9 @@
  *
  * The migrations that build the compared form of the links already kept
  * repeat these rules in SQL. A change here needs a migration that builds the
- * form again.
+ * form again. The key links are gathered by (`gather.ts`, F45) is built from
+ * the same rules and kept as `gather_key`: a change to any rule here, or to
+ * `gatheredWithout`, needs a migration that builds `gather_key` again too.
  */
 
 /**
@@ -57,6 +59,12 @@ export type SiteRule = Readonly<{
   hrefDroppedQuery: readonly string[]
   /** Query names left out of the compared form only. */
   comparedWithout: readonly string[]
+  /**
+   * Query names left out only when links are gathered on one page (F45-AC5):
+   * where a video starts. They stay in the compared form, so one slide can
+   * keep two starts of one video (F27-AC74, F27-AC77).
+   */
+  gatheredWithout: readonly string[]
   /** The page an address of the site is compared as. */
   page: (page: ComparedPage) => ComparedPage
 }>
@@ -122,6 +130,7 @@ export const SITE_RULES: readonly SiteRule[] = [
     subdomains: true,
     hrefDroppedQuery: [],
     comparedWithout: [],
+    gatheredWithout: [],
     page: (page) =>
       /^\/event\/\d+(?:\/|$)/u.test(page.path)
         ? { ...page, host: 'connpass.com' }
@@ -134,6 +143,7 @@ export const SITE_RULES: readonly SiteRule[] = [
     subdomains: false,
     hrefDroppedQuery: ['tk'],
     comparedWithout: [],
+    gatheredWithout: [],
     page: (page) => ({
       ...page,
       host: 'luma.com',
@@ -148,6 +158,7 @@ export const SITE_RULES: readonly SiteRule[] = [
     subdomains: false,
     hrefDroppedQuery: [],
     comparedWithout: ['si', 'feature', 'pp'],
+    gatheredWithout: ['t'],
     page: (page) => {
       const id = youTubeVideo(page)
       return id === null
@@ -166,6 +177,7 @@ export const SITE_RULES: readonly SiteRule[] = [
     subdomains: false,
     hrefDroppedQuery: [],
     comparedWithout: [],
+    gatheredWithout: ['from'],
     page: (page) => {
       if (page.host !== 'nico.ms')
         return page.path.startsWith('/watch/')
@@ -183,6 +195,7 @@ export const SITE_RULES: readonly SiteRule[] = [
     subdomains: false,
     hrefDroppedQuery: [],
     comparedWithout: [],
+    gatheredWithout: [],
     page: vimeoPage,
   },
   {
@@ -191,6 +204,7 @@ export const SITE_RULES: readonly SiteRule[] = [
     subdomains: false,
     hrefDroppedQuery: [],
     comparedWithout: [],
+    gatheredWithout: [],
     page: (page) => ({ ...page, host: 'twitch.tv' }),
   },
   {
@@ -199,6 +213,7 @@ export const SITE_RULES: readonly SiteRule[] = [
     subdomains: false,
     hrefDroppedQuery: [],
     comparedWithout: [],
+    gatheredWithout: [],
     page: (page) => ({
       ...page,
       path: page.path.replace(/^\/embed\/([^/]+)$/u, '/share/$1'),
@@ -211,6 +226,7 @@ export const SITE_RULES: readonly SiteRule[] = [
     subdomains: true,
     hrefDroppedQuery: ['source'],
     comparedWithout: [],
+    gatheredWithout: [],
     page: same,
   },
 ]
