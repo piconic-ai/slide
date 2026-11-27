@@ -155,6 +155,20 @@ const RECORDED: {
       address: '/@owner/suraido/4',
     },
   },
+  // reveal.js reads the fragment it is opened with from 0 (#3 is the fourth
+  // page), and with its defaults does not write the address as pages turn.
+  {
+    slug: 'revealjs',
+    dir: 'revealjs',
+    apart: [],
+    seen: {
+      opened: ['delta'],
+      openedFrame: '/#3',
+      turned: ['echo'],
+      turnedFrame: '/#3',
+      address: '/@owner/revealjs/3',
+    },
+  },
 ]
 
 /** What a reader sees of slides of one of these tools, opened at page 3. */
@@ -219,7 +233,7 @@ async function withPage(use: (page: Page) => Promise<void>) {
   }
 }
 
-test.each(TOOLS)(
+test.each([...TOOLS, ...RECORDED])(
   'F22-AC6: Given the $slug fixture, When it is read as an upload, Then it is within the limits of one version',
   ({ slug }) => {
     const inventory = inventories.get(slug)!
