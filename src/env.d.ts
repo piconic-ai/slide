@@ -34,8 +34,6 @@ interface Env {
   // by `wrangler types`; delete its line here then, and keep treating it as
   // possibly absent.
   //
-  // Backup bucket for the stored slide files (work B).
-  UPLOADS_BACKUP?: R2Bucket
   // Usage counts (work A). The dataset to write is the binding ANALYTICS,
   // declared in worker-configuration.d.ts since wrangler.jsonc names it; it
   // is still read as possibly absent (src/metrics). A secret token and the

@@ -273,7 +273,7 @@ describe('the figures of the new articles are the code’s', () => {
 })
 
 describe('the article on deleting slides', () => {
-  test('F36-AC55: Given the article in each language, When it is read, Then the steps use the words of the deletion frame, and what deleting does is said', async () => {
+  test('F36-AC56: Given the article in each language, When it is read, Then the steps use the words of the deletion frame, and what deleting does is said', async () => {
     for (const lang of LANGS) {
       const frame = plainText(String(deletionFrame('talk', lang)))
       const { lead, body } = await render('slides/delete-slide', lang)
@@ -298,7 +298,7 @@ describe('the article on deleting slides', () => {
     }
   })
 
-  test('F36-AC55: Given the frame’s note and the article, When the hours are read, Then both say the number of the code, and the share URL, the article and the related links are said to go at once', async () => {
+  test('F36-AC56: Given the frame’s note and the article, When the hours are read, Then both say the number of the code, and the share URL, the article and the related links are said to go at once', async () => {
     const hours = START_WINDOW_SECONDS / 3600
     expect(numbers.deletedFilesHours).toBe(hours)
     const frame = {
@@ -327,7 +327,7 @@ describe('the article on deleting slides', () => {
       expect(plainText(en.body), phrase).toContain(phrase)
   })
 
-  test('F36-AC55: Given the article, When it speaks of the backups, Then it points at the privacy policy’s article on how long information is kept and names no number of days', async () => {
+  test('F36-AC56: Given the article, When it speaks of the backups, Then it points at the privacy policy’s article on how long information is kept and names no number of days', async () => {
     for (const lang of LANGS) {
       const { body } = await render('slides/delete-slide', lang)
       expect(body).toContain(`href="${legalHref('privacy', PRIVACY_KEEPING)}"`)
@@ -336,7 +336,7 @@ describe('the article on deleting slides', () => {
     }
   })
 
-  test('F36-AC55: Given the article, When the reader’s saved copy is read about, Then it takes the days of the code', async () => {
+  test('F36-AC56: Given the article, When the reader’s saved copy is read about, Then it takes the days of the code', async () => {
     const ja = plainText((await render('slides/delete-slide', 'ja')).body)
     expect(ja).toContain(
       `${numbers.offlineDays} 日のあいだ読めることがあります`,
@@ -345,7 +345,7 @@ describe('the article on deleting slides', () => {
     expect(en).toContain(`${numbers.offlineDays} day`)
   })
 
-  test('F36-AC56: Given the articles on the limits, When they are read, Then each links to the article on deleting in both languages, and the one on the number of slides has it among its related articles', async () => {
+  test('F36-AC57: Given the articles on the limits, When they are read, Then each links to the article on deleting in both languages, and the one on the number of slides has it among its related articles', async () => {
     for (const key of ['slides/limits', 'slides/daily-limit'])
       for (const lang of LANGS) {
         const { body } = await render(key, lang)
@@ -359,7 +359,7 @@ describe('the article on deleting slides', () => {
     expect(related.length).toBeLessThanOrEqual(3)
   })
 
-  test('F36-AC56: Given the help the upload message points at, When the reason is the number of slides, Then it leads to the limits article, which leads on to deleting', async () => {
+  test('F36-AC57: Given the help the upload message points at, When the reason is the number of slides, Then it leads to the limits article, which leads on to deleting', async () => {
     expect(failurePlace('deck_limit')).toBe('drop-limit')
     expect(
       findArticle(HELP_CATALOG, 'slides', 'limits')!.article.related,
