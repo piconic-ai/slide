@@ -99,7 +99,7 @@ const placeOf = (page: Page, card = 0) =>
     .locator('.timeline-card')
     .nth(card)
     .evaluate((element) =>
-      ['.timeline-card-title', '.card-meta a', '.icon-link', '.card-cover'].map(
+      ['.card-meta', '.card-meta a', '.icon-link', '.card-cover'].map(
         (selector) => {
           const box = element.querySelector(selector)!.getBoundingClientRect()
           return [box.x, box.y + window.scrollY, box.width, box.height]

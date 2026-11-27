@@ -78,7 +78,7 @@ async function openTop({ locale = 'ja-JP', failFirstList = false } = {}) {
 
 const titles = (page: Page) =>
   page
-    .locator('.timeline-list .timeline-card .timeline-card-title')
+    .locator('.timeline-list .timeline-card .deck-cover-name')
     .allTextContents()
 
 test('Given public decks, When an English reader opens the top page and switches to Japanese, Then the grid loads under the page CSP in the chosen language', async () => {
@@ -89,7 +89,7 @@ test('Given public decks, When an English reader opens the top page and switches
   expect(await titles(page)).toEqual(['<b>New</b> talk', 'Old talk'])
   expect(
     await page
-      .locator('.timeline-list a.timeline-card-title')
+      .locator('.timeline-list a.icon-link')
       .first()
       .getAttribute('href'),
   ).toBe('/@owner/new')
@@ -102,9 +102,11 @@ test('Given public decks, When an English reader opens the top page and switches
   expect(
     await page.locator('[role="tabpanel"]:visible .timeline-loading').count(),
   ).toBe(0)
-  const date = page.locator('.timeline-list time').first()
+  const author = page.locator('.timeline-list .card-author').first()
   expect(await page.locator('html').getAttribute('lang')).toBe('en')
-  expect(await date.textContent()).toBe('Jan 1, 1970')
+  expect(await author.textContent()).toContain('@owner')
+  expect(await author.locator('.card-author-face').count()).toBe(1)
+  expect(await page.locator('.timeline-list time').count()).toBe(0)
   expect(japaneseOutside(await page.content())).toEqual([])
   expect(errors).toEqual([])
 
@@ -113,7 +115,7 @@ test('Given public decks, When an English reader opens the top page and switches
   expect(await page.locator('html').getAttribute('lang')).toBe('ja')
   await page.goto(`${TEST_ORIGIN}/`)
   expect(await page.locator('html').getAttribute('lang')).toBe('ja')
-  await expect.poll(() => date.textContent()).toBe('1970年1月1日')
+  await expect.poll(() => author.textContent()).toContain('@owner')
   expect(errors).toEqual([])
   await page.close()
 })

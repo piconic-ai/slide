@@ -152,7 +152,7 @@ const order = (page: Page) =>
 test('F44-AC1, F44-AC2, F44-AC3: Given the top page, When it opens, Then two tabs stand under the drop frame, "すべて" is chosen, and the arrow keys move between them without changing the URL', async () => {
   const page = await openTop()
   const tabs = page.getByRole('tab')
-  expect(await tabs.allInnerTexts()).toEqual(['すべて', 'フォロー'])
+  expect(await tabs.allTextContents()).toEqual(['すべて', 'フォロー'])
   expect(await tabs.first().getAttribute('aria-selected')).toBe('true')
   await tabs.first().press('ArrowRight')
   expect(await tabs.nth(1).getAttribute('aria-selected')).toBe('true')
@@ -172,14 +172,16 @@ test('F44-AC4, F44-AC10, F44-AC11: Given public slides, When the top opens at 12
   const page = await openTop()
   const cards = panel(page).locator('.timeline-card')
   expect(await cards.count()).toBe(4)
-  expect(await cards.first().locator('.timeline-card-title').innerText()).toBe(
+  expect(await cards.first().locator('.deck-cover-name').textContent()).toBe(
     'Bob’s',
   )
   const first = (await cards.nth(0).boundingBox())!
   const second = (await cards.nth(1).boundingBox())!
   expect(second.y).toBe(first.y)
   expect(second.x).toBeGreaterThan(first.x)
-  const open = cards.first().getByRole('link', { name: 'ビューアーで開く' })
+  const open = cards
+    .first()
+    .getByRole('link', { name: 'Bob’s をビューアーで開く' })
   expect(await open.getAttribute('href')).toBe('/@bob/bobs')
   expect(await open.innerText()).toBe('')
   expect((await open.boundingBox())!.height).toBeGreaterThanOrEqual(44)
@@ -258,7 +260,7 @@ test('F44-AC13, F44-AC25: Given 105 slides, When the top opens and "show more" i
   await panel(page).getByRole('button', { name: 'もっと見る' }).click()
   await expect.poll(() => cards().count(), POLL).toBe(105)
   const hrefs = await cards()
-    .locator('.timeline-card-title')
+    .locator('a.icon-link')
     .evaluateAll((links) => links.map((link) => link.getAttribute('href')))
   expect(new Set(hrefs).size).toBe(105)
   expect(
@@ -285,9 +287,9 @@ test('F44-AC4, F44-AC17: Given Alice follows Carol, When she opens the top, Then
   await seedPublic(database, 'mine', 800, 'Mine')
   await follow(database, { follower: OWNER_ID, followee: CAROL, now: 1 })
   const page = await openTop({ cookie: owner })
-  expect(await panel(page).locator('.carousel-card').allInnerTexts()).toEqual([
-    expect.stringContaining('@bob'),
-  ])
+  expect(await panel(page).locator('.carousel-card').allTextContents()).toEqual(
+    [expect.stringContaining('@bob')],
+  )
   await page.close()
 })
 
@@ -425,7 +427,7 @@ test('F44-AC5, F44-AC7, F44-AC9: Given Alice follows Carol and a community, When
   await page.getByRole('tab', { name: 'フォロー' }).click()
   const cards = panel(page).locator('.timeline-card')
   await expect.poll(() => cards.count(), POLL).toBe(2)
-  expect(await cards.locator('.timeline-card-title').allInnerTexts()).toEqual([
+  expect(await cards.locator('.deck-cover-name').allTextContents()).toEqual([
     'Carol’s',
     'Bob’s talk',
   ])
@@ -464,8 +466,8 @@ test('F44-AC26: Given Alice follows nobody, When she follows Bob in the carousel
     .poll(
       () =>
         panel(page)
-          .locator('.timeline-card .timeline-card-title')
-          .allInnerTexts(),
+          .locator('.timeline-card .deck-cover-name')
+          .allTextContents(),
       POLL,
     )
     .toEqual(['Bob’s'])
@@ -502,8 +504,8 @@ test('F44-AC26: Given the "following" list is still on its way, When Alice follo
     .poll(
       () =>
         panel(page)
-          .locator('.timeline-card .timeline-card-title')
-          .allInnerTexts(),
+          .locator('.timeline-card .deck-cover-name')
+          .allTextContents(),
       POLL,
     )
     .toEqual(['Bob’s'])
@@ -542,8 +544,8 @@ test('F44-AC26: Given Alice follows nobody, When she follows a community in the 
     .poll(
       () =>
         panel(page)
-          .locator('.timeline-card .timeline-card-title')
-          .allInnerTexts(),
+          .locator('.timeline-card .deck-cover-name')
+          .allTextContents(),
       POLL,
     )
     .toEqual(['Bob’s talk'])
@@ -568,8 +570,8 @@ test('F44-AC26: Given Alice already follows Carol, When she follows Bob twice ov
     .poll(
       () =>
         panel(page)
-          .locator('.timeline-card .timeline-card-title')
-          .allInnerTexts(),
+          .locator('.timeline-card .deck-cover-name')
+          .allTextContents(),
       POLL,
     )
     .toEqual(['Bob’s', 'Carol’s'])

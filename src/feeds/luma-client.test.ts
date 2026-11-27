@@ -163,17 +163,21 @@ describe('asking Luma for a feed', () => {
 
   test('F33-AC11: Given a transport that never answers, When 10 seconds pass, Then the request is aborted and fails as a timeout', async () => {
     vi.useFakeTimers()
-    let signal: AbortSignal | undefined
+    // The request is kept, as a fetch in flight keeps it. The signal of a
+    // Request follows the signal it was made with only while the Request is
+    // alive (Node holds the link by a weak reference), so keeping just
+    // `request.signal` lets a garbage collection leave it unaborted.
+    let sent: Request | undefined
     const transport: FeedTransport = (request) => {
-      signal = request.signal
+      sent = request
       return new Promise<never>(() => {})
     }
     const answer = readLumaFeed(FEED, none, transport)
     await vi.advanceTimersByTimeAsync(9_999)
-    expect(signal?.aborted).toBe(false)
+    expect(sent?.signal.aborted).toBe(false)
     await vi.advanceTimersByTimeAsync(1)
     expect(await answer).toMatchObject({ kind: 'failed', reason: 'timeout' })
-    expect(signal?.aborted).toBe(true)
+    expect(sent?.signal.aborted).toBe(true)
   })
 
   test('F33-AC11: Given headers at once and a body that trickles past 10 seconds, When it is read, Then it fails as a timeout', async () => {

@@ -17,6 +17,7 @@ const slide = (
   readyAt: 1_700_000_000,
   deploymentId: '7ae11c67-633f-4f21-b2b1-80af84107421',
   coverPath: null,
+  authorAvatarUrl: '/avatars/u1?v=g',
   community: null,
   ...over,
 })
