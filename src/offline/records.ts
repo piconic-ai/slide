@@ -47,6 +47,14 @@ export function planPrune(
   }
 }
 
+/**
+ * Whether a kept shell no longer matches what the service shows (F37-AC21):
+ * another version's origin, or none at all (the author's own preview names no
+ * version). Only the same origin keeps the shell.
+ */
+export const isSuperseded = (keptOrigin: string, shownOrigin: string | null) =>
+  shownOrigin === null || shownOrigin !== keptOrigin
+
 /** The key under which a version's origin waits to be cleared. */
 export const evictKey = (managementOrigin: string, versionOrigin: string) =>
   `${managementOrigin}/_offline/evict/${encodeURIComponent(versionOrigin)}`

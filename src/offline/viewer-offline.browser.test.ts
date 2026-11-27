@@ -247,6 +247,29 @@ test('F37-AC5: Given a viewer opened once, When the service is back and a new ve
   })
 })
 
+test('F37-AC21: Given a viewer opened once, When the deck is replaced by a version that cannot be stored and is opened online, Then the old stored version is forgotten, and no stored version shows with no connection', async () => {
+  await withContext(async (context) => {
+    const page = await openKept(context)
+    // A piece of html gets no script from the service, so its frame never
+    // says it is stored: the viewer keeps nothing for this version.
+    const next = await seedDeployment(world.db, 'talk')
+    await world.putFiles(next, {
+      'index.html': ['text/html; charset=utf-8', '<h1 id="title">Piece</h1>'],
+    })
+    await orm
+      .update(decks)
+      .set({ public_deployment_id: next })
+      .where(eq(decks.id, 'talk'))
+    await page.goto(world.viewer('talk'))
+    await hasText(page.frameLocator('iframe#deck').locator('#title'), 'Piece')
+    await expect
+      .poll(async () => (await recordsOf(page)).length, { timeout: 20_000 })
+      .toBe(0)
+    offline(first, next)
+    await expect(page.goto(world.viewer('talk'))).rejects.toThrow()
+  })
+})
+
 const withdrawals: [string, () => Promise<unknown>][] = [
   [
     'F37-AC7 (made private)',

@@ -3,6 +3,7 @@ import { OFFLINE_MAX_AGE_MS, OFFLINE_MAX_VERSIONS } from './limits'
 import {
   evictedOrigin,
   evictKey,
+  isSuperseded,
   planPrune,
   recordPath,
   type ViewerRecord,
@@ -104,4 +105,21 @@ describe('the list of versions to clear', () => {
   ])('Given the key %s, Then it names no origin', (key) => {
     expect(evictedOrigin(MGMT, key)).toBeNull()
   })
+})
+
+describe('isSuperseded', () => {
+  const KEPT = 'https://d-1.content.example'
+  test.each([
+    [KEPT, KEPT, false],
+    [KEPT, 'https://d-2.content.example', true],
+    [KEPT, null, true],
+    [KEPT, '', true],
+    ['', '', false],
+    ['', null, true],
+  ])(
+    'F37-AC21: Given a kept origin %j, When the service shows %j, Then it is superseded: %s',
+    (kept, shown, superseded) => {
+      expect(isSuperseded(kept, shown)).toBe(superseded)
+    },
+  )
 })
