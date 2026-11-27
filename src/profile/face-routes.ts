@@ -1,6 +1,7 @@
-import { Hono } from 'hono'
+import { Hono, type Context } from 'hono'
 import {
   faceCacheControl,
+  facePictureUrl,
   isUserId,
   type FaceFacts,
   type FaceSource,
@@ -12,8 +13,8 @@ import {
   readCachedGravatar,
   type CachedGravatar,
 } from './gravatar-store'
+import { serveFacePicture } from './face-picture-store'
 import { servedPictureType } from './picture-policy'
-import { readPictureObject } from './picture-store'
 import { markGravatarAsked, readEmail, readFaceFacts } from './store'
 
 export const faceRoutes = new Hono<{ Bindings: Env }>()
@@ -32,6 +33,8 @@ type Served = Readonly<{
   body: BodyInit
   contentType: string
   source: FaceSource
+  /** The edge cache's answer (`HIT`, `MISS`), or `none` when it was not asked. */
+  edgeCache: string
 }>
 
 /** A person with no picture, and a name that names nobody, answer the same. */
@@ -50,6 +53,7 @@ const fromKept = (kept: CachedGravatar): Served | null =>
         body: kept.picture.body,
         contentType: kept.picture.contentType,
         source: { kind: 'gravatar', at: kept.kept.at },
+        edgeCache: 'none',
       }
     : null
 
@@ -84,22 +88,47 @@ async function gravatarFace(
         body: answer.bytes as BodyInit,
         contentType: answer.contentType,
         source: { kind: 'gravatar', at: now },
+        edgeCache: 'none',
       }
     : null
 }
 
-/** The picture the person uploaded, or null when its object is not there. */
+/** The cached entrypoint, or undefined where there is none (as in tests). */
+const cachedPictures = (c: Context) => {
+  try {
+    return (c.executionCtx as unknown as ExecutionContext).exports?.FacePictures
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * The picture the person uploaded, or null when its object is not there.
+ * D1 has already said which upload is current, so the bytes come from the
+ * internal cache under that upload's own key. Without the cached entrypoint
+ * the object is read each time.
+ */
 async function uploadedFace(
   env: Env,
+  pictures: ReturnType<typeof cachedPictures>,
   userId: string,
   at: number,
 ): Promise<Served | null> {
-  const stored = await readPictureObject(env.UPLOADS, userId)
-  if (!stored) return null
+  const internal = new Request(facePictureUrl(userId, at))
+  const stored = await (pictures
+    ? pictures.fetch(internal)
+    : serveFacePicture(env.UPLOADS, internal))
+  if (!stored.ok) {
+    await stored.body?.cancel()
+    return null
+  }
   return {
-    body: stored.body,
-    contentType: servedPictureType(stored.httpMetadata?.contentType),
+    body: stored.body ?? '',
+    contentType: servedPictureType(
+      stored.headers.get('Content-Type') ?? undefined,
+    ),
     source: { kind: 'uploaded', at },
+    edgeCache: stored.headers.get('Cf-Cache-Status') ?? 'none',
   }
 }
 
@@ -110,13 +139,14 @@ async function uploadedFace(
  */
 async function servedFace(
   env: Env,
+  pictures: ReturnType<typeof cachedPictures>,
   userId: string,
   facts: FaceFacts,
 ): Promise<Served | null> {
   const uploaded =
     facts.uploadedAt === null
       ? null
-      : await uploadedFace(env, userId, facts.uploadedAt)
+      : await uploadedFace(env, pictures, userId, facts.uploadedAt)
   if (uploaded) return uploaded
   return facts.useGravatar ? gravatarFace(env, userId, facts.gravatarAt) : null
 }
@@ -133,12 +163,16 @@ faceRoutes.get('/avatars/:userId', async (c) => {
   const userId = c.req.param('userId')
   if (!isUserId(userId)) return noPicture()
   const facts = await readFaceFacts(c.env.DB, userId)
-  const served = facts ? await servedFace(c.env, userId, facts) : null
+  const served = facts
+    ? await servedFace(c.env, cachedPictures(c), userId, facts)
+    : null
   if (!served) return noPicture()
   return new Response(served.body, {
     headers: {
       ...IMAGE_HEADERS,
       'Content-Type': served.contentType,
+      // Shows whether the bytes came from the edge cache, for operators.
+      'X-Content-Cache': served.edgeCache,
       'Cache-Control': faceCacheControl(
         c.req.query('v'),
         served.source,

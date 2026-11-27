@@ -59,6 +59,44 @@ export function faceVersion(source: FaceSource): string {
 export const facePath = (userId: string, source: FaceSource) =>
   `/avatars/${userId}?v=${faceVersion(source)}`
 
+/**
+ * Bumped whenever the bytes the internal entrypoint returns would change for
+ * the same upload, so old cache entries are never read again.
+ */
+export const FACE_CACHE_REVISION = 'v1'
+
+const FACE_INTERNAL_HOST = 'https://face-pictures.internal'
+
+/**
+ * The internal URL of one uploaded picture. Its path is the cache key: it
+ * names the person and the upload time (the picture's version), never the
+ * request host or the `v` a reader asked for. The caller builds it from the
+ * version D1 gives now, so a replaced picture is a new key.
+ */
+export const facePictureUrl = (userId: string, uploadedAt: number) =>
+  `${FACE_INTERNAL_HOST}/${FACE_CACHE_REVISION}/${userId}/${uploadedAt}`
+
+/** The upload an internal URL names, or null for any other URL. */
+export function parseFacePictureUrl(
+  url: string,
+): Readonly<{ userId: string; uploadedAt: number }> | null {
+  const { origin, pathname } = new URL(url)
+  if (origin !== FACE_INTERNAL_HOST) return null
+  const parts = pathname.slice(1).split('/')
+  const [revision, userId, at] = parts
+  if (parts.length !== 3 || revision !== FACE_CACHE_REVISION) return null
+  if (!isUserId(userId) || !/^(0|[1-9]\d{0,15})$/.test(at)) return null
+  return { userId, uploadedAt: Number(at) }
+}
+
+/**
+ * How long the edge may keep an uploaded picture's bytes. The key is the
+ * upload's own version, so the bytes behind it never change; a day bounds
+ * how long a picture that was taken away stays in the edge (the gateway
+ * asks D1 first and no longer asks for that version).
+ */
+export const FACE_EDGE_KEPT = 'public, max-age=86400'
+
 /** How long a browser may keep a picture: a year, without asking again. */
 export const FACE_KEPT = 'public, max-age=31536000, immutable'
 /** An answer a browser must ask for again each time it shows it. */

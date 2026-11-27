@@ -1,6 +1,7 @@
 import { WorkerEntrypoint } from 'cloudflare:workers'
 import server from './routes'
 import { takeCoverShot } from '../covers/serve-routes'
+import { serveFacePicture } from '../profile/face-picture-store'
 import { serveStoredFile } from '../preview/stored-file-store'
 
 /**
@@ -21,6 +22,16 @@ export class ContentFiles extends WorkerEntrypoint<Env> {
 export class CoverShots extends WorkerEntrypoint<Env> {
   override fetch(request: Request) {
     return takeCoverShot(this.env, request)
+  }
+}
+
+/**
+ * Uploaded profile pictures behind Workers Cache. Only the avatar route
+ * calls it, through ctx.exports after reading D1 for the current upload.
+ */
+export class FacePictures extends WorkerEntrypoint<Env> {
+  override fetch(request: Request) {
+    return serveFacePicture(this.env.UPLOADS, request)
   }
 }
 

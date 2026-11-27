@@ -13,6 +13,8 @@
     "ContentFiles": { "type": "worker", "cache": { "enabled": true } },
     // Screenshots of public decks' first slides; see src/covers.
     "CoverShots": { "type": "worker", "cache": { "enabled": true } },
+    // Uploaded profile pictures; see src/profile/face-picture-store.ts.
+    "FacePictures": { "type": "worker", "cache": { "enabled": true } },
   },
   "compatibility_date": "2026-11-05",
   "compatibility_flags": ["nodejs_als", "nodejs_compat"],
