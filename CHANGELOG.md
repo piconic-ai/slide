@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.4.5](https://github.com/piconic-ai/slide/compare/v0.4.4...v0.4.5) - 2026-11-27
+
+- dev-loop: main に追いついていなくても、通った branch は merge してよい by @kfly8 in https://github.com/piconic-ai/slide/pull/685
+- 作者の viewer を、管理の Service Worker を通しても出す by @kfly8 in https://github.com/piconic-ai/slide/pull/684
+
 ## [v0.4.4](https://github.com/piconic-ai/slide/compare/v0.4.3...v0.4.4) - 2026-11-27
 
 - ヘルプの記事の、事実と違う記述を直す(埋め込み、メールアドレス、Gravatar) by @kfly8 in https://github.com/piconic-ai/slide/pull/670
