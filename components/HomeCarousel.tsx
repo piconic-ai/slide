@@ -164,7 +164,9 @@ export function HomeCarousel(props: HomeCarouselProps) {
                       aria-label={
                         followed().includes('person:' + person.handle)
                           ? t.unfollowOf(`@${person.handle}`)
-                          : t.followOf(`@${person.handle}`)
+                          : person.followsYou
+                            ? t.followBackOf(`@${person.handle}`)
+                            : t.followOf(`@${person.handle}`)
                       }
                       aria-pressed={
                         followed().includes('person:' + person.handle)
@@ -176,7 +178,9 @@ export function HomeCarousel(props: HomeCarouselProps) {
                     >
                       {followed().includes('person:' + person.handle)
                         ? t.following
-                        : t.follow}
+                        : person.followsYou
+                          ? t.followBack
+                          : t.follow}
                     </button>
                   </span>
                 ) : (

@@ -347,8 +347,21 @@ describe('the carousels', () => {
       href: '/@bob',
       avatarUrl: expect.stringMatching(/^\/avatars\/2\?v=/),
       initial: 'B',
+      followsYou: false,
     })
     expect(JSON.stringify(bob)).not.toMatch(/bio-text|place-text|site\.example/)
+  })
+
+  test('F44-AC32: Given Bob follows Alice and Carol does not, When Alice reads the carousel, Then only Bob’s card is marked as following her, and nothing else of it comes', async () => {
+    await follow(db, { follower: BOB, followee: OWNER_ID, now: 5 })
+    const { people } = await discover(alice)
+    expect(people.map((person) => [person.handle, person.followsYou])).toEqual(
+      expect.arrayContaining([
+        ['bob', true],
+        ['carol', false],
+      ]),
+    )
+    expect((await discover('')).people.every((p) => !p.followsYou)).toBe(true)
   })
 
   test('F44-AC19: Given a person with no profile row, When the carousel reads them, Then their handle stands for the name', async () => {

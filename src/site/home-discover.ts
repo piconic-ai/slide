@@ -24,6 +24,11 @@ export type DiscoverPerson = Readonly<{
   /** Where their picture is served from; the initial shows under it. */
   avatarUrl: string | null
   initial: string
+  /**
+   * Whether they follow the reader. It only turns the button's words into
+   * "Follow back"; the card says nothing else of it (F21-AC68).
+   */
+  followsYou: boolean
 }>
 
 /** A community of the carousel (F44-AC20). */
@@ -54,6 +59,7 @@ export const toDiscoverPerson = (person: Person): DiscoverPerson => {
     href: profilePath(person.handle),
     avatarUrl: person.avatarUrl,
     initial: initialOf(name),
+    followsYou: person.followsViewer,
   }
 }
 

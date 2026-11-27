@@ -3,7 +3,7 @@ import { faceImage } from '../profile/face'
 import type { Handle } from '../share/handle'
 import { peoplePath, profilePath, type PeopleList } from '../share/path'
 import { messages, type Lang } from '../site/i18n'
-import { followForm } from './pages'
+import { followForm, followsYouBadge } from './pages'
 import {
   initialOf,
   neighbourPages,
@@ -56,8 +56,12 @@ const personRow = (
   reader: PeopleReader,
   back: string,
   lang: Lang,
-) =>
-  html`<li>
+) => {
+  const state = rowFollowState(person, reader)
+  // Only a reader who may follow them is told they follow the reader.
+  const followsYou =
+    person.followsViewer && (state === 'can-follow' || state === 'following')
+  return html`<li>
     ${face(person)}
     <span class="person-names">
       <a class="person-name" href="${profilePath(person.handle)}"
@@ -67,17 +71,15 @@ const personRow = (
         // Without a name the handle already stands as one.
         person.name === null
           ? ''
-          : html`<span class="person-handle">@${person.handle}</span>`
+          : html`<span class="person-handle"
+              >@${person.handle}${followsYou ? followsYouBadge(lang) : ''}</span
+            >`
       }
+      ${person.name === null && followsYou ? followsYouBadge(lang) : ''}
     </span>
-    ${followForm(
-      rowFollowState(person, reader),
-      person.handle,
-      back,
-      lang,
-      true,
-    )}
+    ${followForm(state, person.handle, back, lang, true, followsYou)}
   </li>`
+}
 
 /**
  * The people an author follows, or their followers, one page of them, with

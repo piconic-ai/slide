@@ -101,6 +101,7 @@ test('F21-AC8: Given a person with a profile and one without, When the list is r
       name: null,
       avatarUrl: `/avatars/${carol}?v=g`,
       followedByViewer: false,
+      followsViewer: false,
     },
     {
       userId: bob,
@@ -108,6 +109,7 @@ test('F21-AC8: Given a person with a profile and one without, When the list is r
       name: 'Bob <b>',
       avatarUrl: `/avatars/${bob}?v=g`,
       followedByViewer: false,
+      followsViewer: false,
     },
   ])
 })
@@ -276,6 +278,32 @@ test('F21-AC12: Given Dave follows Bob and not Carol, When Dave reads Alice’s 
   ])
   expect(await read(null)).toEqual([
     ['dave', false],
+    ['carol', false],
+    ['bob', false],
+  ])
+})
+
+test('F21-AC68: Given Bob follows Dave and Carol does not, When Dave reads Alice’s following, Then only Bob is marked as following Dave, and a visitor sees no mark', async () => {
+  await followAt(alice, bob, 10)
+  await followAt(alice, carol, 20)
+  // Dave following Carol is the other direction, and marks nobody.
+  await followAt(dave, carol, 30)
+  await followAt(bob, dave, 40)
+  const read = async (viewer: string | null) =>
+    (
+      await listPeople(database, {
+        of: alice,
+        list: 'following',
+        viewer,
+        limit: 10,
+        offset: 0,
+      })
+    ).map((person) => [person.handle, person.followsViewer])
+  expect(await read(dave)).toEqual([
+    ['carol', false],
+    ['bob', true],
+  ])
+  expect(await read(null)).toEqual([
     ['carol', false],
     ['bob', false],
   ])

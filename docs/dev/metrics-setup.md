@@ -48,12 +48,27 @@ wrangler secret put ANALYTICS_ACCOUNT_ID
 
 ## 4. 最初に 1 度、実際の API で確かめる
 
-設計の文書([確かめられなかったこと](metrics.md#確かめた公式の文書2026-11-26))の 4 つを、トークンを環境変数に入れて、手で確かめます。
+設計の文書([確かめられなかったこと](metrics.md#確かめた公式の文書2026-11-26))の 4 つを、手で確かめます。トークンの渡し方は、次の「確かめる前の準備」に従います。
+
+### 確かめる前の準備
+
+アカウントの番号は、`wrangler.jsonc` の `account_id` から取ります。
+
+```sh
+ACCOUNT_ID=$(grep -o '"account_id": *"[^"]*"' wrangler.jsonc | sed 's/.*: *"\(.*\)"/\1/')
+```
+
+読み取り用のトークンは、macOS のキーチェーンに置き、curl のコマンドの中で読みます(値をファイルにも変数にも残さない)。以降の例の `slide-analytics-token` は、例としてのサービス名です。各自がキーチェーンに付けたサービス名に読み替えます。
+
+- `security find-generic-password … -w` は、初回に、キーチェーンの許可を求めるダイアログが出る。
+- 必ず、コマンド置換 `$(…)` の中で使う。`echo` や `export` で、値を表示したり、環境に残したりしない。
+
+### 問い合わせ
 
 ```sh
 # 何が書かれているか(出来事ごとの推計の件数)
 curl -sS "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/analytics_engine/sql" \
-  -H "Authorization: Bearer $TOKEN" \
+  -H "Authorization: Bearer $(security find-generic-password -s slide-analytics-token -w)" \
   --data "SELECT index1 AS event, SUM(_sample_interval) AS events FROM slide_events GROUP BY event FORMAT JSON"
 ```
 
@@ -62,7 +77,7 @@ curl -sS "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/analytics_en
 
 ```sh
 curl -sS "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/analytics_engine/sql" \
-  -H "Authorization: Bearer $TOKEN" \
+  -H "Authorization: Bearer $(security find-generic-password -s slide-analytics-token -w)" \
   --data "SELECT count() AS rows FROM slide_events WHERE timestamp >= toDateTime('2026-11-26 00:00:00') AND timestamp < toDateTime('2026-11-27 00:00:00') FORMAT JSON"
 ```
 
@@ -70,19 +85,48 @@ curl -sS "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/analytics_en
 
 反映の後、実際の記録を 1 度見ます。次の結果に、IP アドレス、メールアドレス、利用者の番号が出てこないことを確かめます。
 
+Analytics Engine の SQL API は、`SELECT DISTINCT` を受け付けません(`selection used unsupported features` で断られる。2026-11-27 に本番で確かめた)。値の一覧は、`GROUP BY` で取ります。
+
 ```sh
 curl -sS "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/analytics_engine/sql" \
-  -H "Authorization: Bearer $TOKEN" \
-  --data "SELECT DISTINCT blob2 AS referrer FROM slide_events WHERE index1 = 'deck_opened' LIMIT 100 FORMAT JSON"
+  -H "Authorization: Bearer $(security find-generic-password -s slide-analytics-token -w)" \
+  --data "SELECT blob2 AS referrer, SUM(_sample_interval) AS opens FROM slide_events WHERE index1 = 'deck_opened' GROUP BY referrer ORDER BY opens DESC LIMIT 100 FORMAT JSON"
 ```
 
-同じ形で、`blob1`(検索の語)を `index1 = 'help_search_empty'` で見ます。
+参照元(`referrer`)は、次の 3 種類になります。
+
+- ホスト名。
+- `internal`: サービスの中からの移動。
+- 空: 参照元が分からない、または残さない。タイムラインのカードは同じサービスの中で開くので、ブラウザが参照元を送らず、空になることがある。
+
+IP アドレス、メールアドレス、パスつきの URL が出たら、プライバシーの決まり違反です。
+
+同じ形で、`blob1`(検索の語)を見ます。
+
+```sh
+curl -sS "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/analytics_engine/sql" \
+  -H "Authorization: Bearer $(security find-generic-password -s slide-analytics-token -w)" \
+  --data "SELECT blob1 AS term, SUM(_sample_interval) AS searches FROM slide_events WHERE index1 = 'help_search_empty' GROUP BY term ORDER BY searches DESC LIMIT 100 FORMAT JSON"
+```
 
 ## 6. 動いているかの見方
 
 - cron の `metrics_copy`(20 時 UTC。日本の朝 5 時)のログ(`{"event":"cron_task","task":"metrics_copy",…}`)に、`ok` と写した行数が出る。失敗は、翌日のメールに入る(`cron_failed`)。
-- 運営の画面の「計測」に、最後に写した日が出る。前の日になっていれば、動いている。
+- 集計が失敗しているとき、運営の画面の「最後に写した日」が古いままになり、ログに `metrics_day_failed` と出る。
+- 運営の画面(`https://admin.slide.community/metrics`)の「計測」に、最後に写した日が出る。朝 5 時(日本時間)の集計のあとに出る。「最後に写した日」が前の日なら、動いている。
 - 「未設定」が出るとき: 名前が出ている設定が足りない。上の 1 と 3 を見直す。
+
+### タイムラインの記録の確かめ方(F40-AC26)
+
+次の問い合わせで、`via` が `timeline` の行が出ることを確かめます。ページの `page`、ブログの `embed` とは別の行になります。
+
+```sh
+curl -sS "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/analytics_engine/sql" \
+  -H "Authorization: Bearer $(security find-generic-password -s slide-analytics-token -w)" \
+  --data "SELECT blob1 AS via, SUM(_sample_interval) AS opens, max(timestamp) AS last FROM slide_events WHERE index1 = 'deck_opened' AND timestamp > NOW() - INTERVAL '1' DAY GROUP BY via FORMAT JSON"
+```
+
+`opens` は、標本化を考慮した推計値で、実際の件数とは少し違うことがあります。
 
 ## 7. 止めたいとき
 

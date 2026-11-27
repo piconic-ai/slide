@@ -316,5 +316,11 @@ export const timelineStyle = html`<style>
   }
   .carousel-card-body .follow-form {
     margin-top: auto;
+    max-width: 100%;
+  }
+  /* "Follow back" must stay on one line in the narrow person card. */
+  .carousel-card-body .follow-form .button-secondary {
+    padding-inline: 12px;
+    white-space: nowrap;
   }
 </style>`

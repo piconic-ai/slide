@@ -38,7 +38,12 @@ test.each(['ja', 'en'] as const)(
       profileBody(
         { handle, profile: null, counts },
         slidesView,
-        { kind: 'reader', follow: 'signed-out', block: 'none' },
+        {
+          kind: 'reader',
+          follow: 'signed-out',
+          followsYou: false,
+          block: 'none',
+        },
         lang,
       ),
     )
@@ -131,7 +136,12 @@ test('F21-AC65: Given the list of communities is open, When the profile is rende
         reader: { kind: 'signed-out' },
         contentBase: null,
       },
-      { kind: 'reader', follow: 'signed-out', block: 'none' },
+      {
+        kind: 'reader',
+        follow: 'signed-out',
+        followsYou: false,
+        block: 'none',
+      },
       'ja',
     ),
   )
