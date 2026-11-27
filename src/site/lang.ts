@@ -19,7 +19,7 @@ import { withVary } from './vary'
  * decides; with none left the page is Japanese. Detection writes no cookie:
  * a public page answers without Set-Cookie unless the reader switched.
  */
-const detect = languageDetector({
+const detectAnywhere = languageDetector({
   supportedLanguages: [...LANGS],
   fallbackLanguage: DEFAULT_LANG,
   order: ['querystring', 'cookie', 'header'],
@@ -29,11 +29,30 @@ const detect = languageDetector({
 })
 
 /**
+ * Whether the whole query belongs to another site's address: under `/link/`
+ * the path and query name a link, so `lang` there is the link's own
+ * (F45-AC33). `/link` itself, where the footer's switch lands, is not one.
+ */
+const queryIsALink = (c: Context) => c.req.path.startsWith('/link/')
+
+const detectUnderLink = languageDetector({
+  supportedLanguages: [...LANGS],
+  fallbackLanguage: DEFAULT_LANG,
+  order: ['cookie', 'header'],
+  lookupCookie: LANG_COOKIE,
+  caches: false,
+})
+
+const detect: MiddlewareHandler = (c, next) =>
+  (queryIsALink(c) ? detectUnderLink : detectAnywhere)(c, next)
+
+/**
  * Keeps an explicit switch. Lax, not Strict, so the choice also applies when
  * a link from another site opens a shared deck.
  */
 const remember: MiddlewareHandler = async (c, next) => {
   await next()
+  if (queryIsALink(c)) return
   // The same match the detector made, so `?lang=EN` is kept as `en`.
   const chosen = langOfTag(c.req.query(LANG_PARAM))
   if (chosen)
