@@ -701,6 +701,7 @@ test('F21-AC68: Given Bob follows Alice, When Alice opens Bob’s profile before
   await bobFollowsAlice()
   const before = await (await get(profile)).text()
   expect(before).toContain('class="follows-you">フォローされています')
+  expect(before).toContain('aria-label="@bob さんをフォローバックする"')
   const form = submittedForm(before, '/follows', 'フォローバック')
   expect(form.values).toEqual({ handle: 'bob', slide: profile })
   expectRedirect(await post(form.action, form.values), profile)
@@ -713,7 +714,7 @@ test('F21-AC68: Given Bob follows Alice and she reads in English, When she opens
   await bobFollowsAlice()
   const page = await (await get(profile, `${alice}; ${LANG_COOKIE}=en`)).text()
   expect(page).toContain('class="follows-you">Follows you')
-  expect(page).toContain('Follow back')
+  expect(page).toContain('aria-label="Follow @bob back"')
 })
 
 test('F21-AC69: Given Bob follows Alice only, When Carol, a visitor, or Alice, who muted him, opens his profile, Then none is told he follows Alice, and the button stays Follow', async () => {

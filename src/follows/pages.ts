@@ -220,7 +220,8 @@ export function followForm(
         fields: { slide: back },
       },
       followName: named ? t.followOf(handle) : t.follow,
-      followBackName: named ? t.followBackOf(handle) : t.followBack,
+      // Follow back always names the person, as F21-AC68 asks.
+      followBackName: t.followBackOf(handle),
       releaseName: named ? t.releaseOf(handle) : t.release,
       prompt: 'follow',
     },
