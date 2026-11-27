@@ -89,7 +89,25 @@ async function store(id: string, built: Map<string, Buffer>) {
 
 /** What each tool's page 3 and page 4 show, by the word in the source. */
 const TOOLS = [
-  { slug: 'peitho', dir: 'peitho', three: 'charlie', four: 'delta' },
+  {
+    slug: 'peitho',
+    dir: 'peitho',
+    shown: 'body',
+    // peitho keeps the page in the query (?slide=N).
+    acs: 'F03-AC4, F03-AC143, F03-AC174',
+    three: 'charlie',
+    four: 'delta',
+  },
+  // One HTML file holding every page; the page on show is marked.
+  {
+    slug: 'marp',
+    dir: 'marp',
+    shown: '.bespoke-marp-active section',
+    // Marp keeps the page in the fragment (#N), the form the service reads first.
+    acs: 'F03-AC4, F03-AC143',
+    three: 'charlie',
+    four: 'delta',
+  },
 ]
 
 let browser: Browser
@@ -160,13 +178,13 @@ test.each(TOOLS)(
 )
 
 test.each(TOOLS)(
-  'F03-AC4, F03-AC143, F03-AC174: Given the real output of $slug, When the reader opens /@owner/$slug/3 and turns a page, Then page 3 shows and the address becomes /4',
-  async ({ slug, three, four }) => {
+  '$acs: Given the real output of $slug, When the reader opens /@owner/$slug/3 and turns a page, Then page 3 shows and the address becomes /4',
+  async ({ slug, shown, three, four }) => {
     await withPage(async (page) => {
       await page.goto(`${TEST_ORIGIN}/@owner/${slug}/3`)
       const deck = page.frameLocator('iframe#deck')
       await expect
-        .poll(() => deck.locator('body').innerText(), { timeout: 20000 })
+        .poll(() => deck.locator(shown).innerText(), { timeout: 20000 })
         .toContain(three)
       // Reading page 3 has not turned the address on its own.
       expect(new URL(page.url()).pathname).toBe(`/@owner/${slug}/3`)
@@ -177,7 +195,7 @@ test.each(TOOLS)(
         .locator('body')
         .dispatchEvent('keydown', { key: 'ArrowRight', bubbles: true })
       await expect
-        .poll(() => deck.locator('body').innerText(), { timeout: 20000 })
+        .poll(() => deck.locator(shown).innerText(), { timeout: 20000 })
         .toContain(four)
       await page.waitForURL((url) => url.pathname === `/@owner/${slug}/4`)
     })
