@@ -124,36 +124,61 @@ test('F39-AC28: Given a copy whose source came back with the same content before
   expect(await goneAtOf('a/0')).toBeNull()
 })
 
-test('F39-AC28: Given more expired copies than a run deletes, When the runs follow, Then they all go, a few at a time', async () => {
-  for (const key of ['a/0', 'a/1', 'a/2']) await put(key, key)
+/**
+ * The calls for a page that may copy one file and for one batch of deletions.
+ * A page with nothing to copy leaves two of them, too few for a second batch.
+ */
+const ONE_BATCH = pageCost(1) + EXPIRE_COST
+
+test('F39-AC28: Given more expired copies than one batch, When a run has the calls for them, Then they all go in that run', async () => {
+  for (const key of ['a/0', 'a/1', 'a/2', 'a/3', 'a/4']) await put(key, key)
   await runBackup(env, FIRST)
-  for (const key of ['a/0', 'a/1', 'a/2']) await source.delete(key)
+  for (const key of ['a/0', 'a/1', 'a/2', 'a/3', 'a/4'])
+    await source.delete(key)
   const found = at(27)
   await runBackup(env, found)
   const late = found + 31 * DAY
-  expect((await runBackup(env, late, { expireBatch: 2 })).expired).toBe(2)
-  expect(await keysOf(backup)).toHaveLength(1)
-  // An hourly run of the pass in progress is not what expires them: the
-  // next pass is, a day later.
-  expect((await runBackup(env, late + DAY, { expireBatch: 2 })).expired).toBe(1)
+  expect((await runBackup(env, late, { expireBatch: 2 })).expired).toBe(5)
   expect(await keysOf(backup)).toEqual([])
 })
 
-test('F39-AC28: Given more expired copies than a run deletes and no pass to run, When the hourly firings follow, Then they go within hours, not a day at a time', async () => {
+test('F39-AC28: Given more expired copies than the calls of a run delete, When the firings follow, Then the rest goes at the next hour, with no pass to run', async () => {
   for (const key of ['a/0', 'a/1', 'a/2']) await put(key, key)
   await runBackup(env, FIRST)
   for (const key of ['a/0', 'a/1', 'a/2']) await source.delete(key)
   const found = at(27)
   await runBackup(env, found)
   const late = found + 31 * DAY
-  expect((await runBackup(env, late, { expireBatch: 2 })).expired).toBe(2)
+  const small = { expireBatch: 2, budget: ONE_BATCH }
+  expect((await runBackup(env, late, small)).expired).toBe(2)
+  expect(await keysOf(backup)).toHaveLength(1)
   const before = await readState(DB)
   // The day's pass is done; the firing an hour later has no pass to run.
-  const idle = await runBackup(env, late + 60 * 60, { expireBatch: 2 })
+  const idle = await runBackup(env, late + 60 * 60, small)
   expect(idle).toEqual({ copied: 0, failed: 0, expired: 1 })
   expect(await keysOf(backup)).toEqual([])
   // It is not a run of the pass: what the operator sees of the runs stays.
   expect(await readState(DB)).toEqual(before)
+})
+
+test('F39-AC28: Given expired copies and no pass to run, When the time of a firing is up, Then it stops after one batch, and a firing with time deletes all the rest', async () => {
+  for (const key of ['a/0', 'a/1', 'a/2', 'a/3']) await put(key, key)
+  await runBackup(env, FIRST)
+  for (const key of ['a/0', 'a/1', 'a/2', 'a/3']) await source.delete(key)
+  const found = at(27)
+  await runBackup(env, found)
+  const hour = found + 31 * DAY + 60 * 60
+  // A clock that is past the deadline as soon as the firing looks again.
+  let tick = 0
+  const late = await runBackup(env, hour, {
+    expireBatch: 1,
+    now: () => (tick += 1000),
+    deadlineMs: 0,
+  })
+  expect(late.expired).toBe(1)
+  const next = await runBackup(env, hour + 60 * 60, { expireBatch: 1 })
+  expect(next.expired).toBe(3)
+  expect(await keysOf(backup)).toEqual([])
 })
 
 test('F39-AC28: Given a backup bucket that cannot delete and no pass to run, When an expired copy is due, Then the firing changes nothing and tells nothing, and the next pass deletes it', async () => {
@@ -163,7 +188,8 @@ test('F39-AC28: Given a backup bucket that cannot delete and no pass to run, Whe
   const found = at(27)
   await runBackup(env, found)
   const late = found + 31 * DAY
-  expect((await runBackup(env, late, { expireBatch: 1 })).expired).toBe(1)
+  const small = { expireBatch: 1, budget: ONE_BATCH }
+  expect((await runBackup(env, late, small)).expired).toBe(1)
   const before = await readState(DB)
   const down = envOf({ UPLOADS_BACKUP: failing(backup, 'delete', () => true) })
   const notify = vi.fn(async () => {})

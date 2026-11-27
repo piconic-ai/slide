@@ -40,7 +40,7 @@ export type BackupOptions = Readonly<{
   /** The clock for the run's deadline, in milliseconds. */
   now?: () => number
   deadlineMs?: number
-  /** The most copies one run deletes. */
+  /** The most copies one batch of a run deletes. */
   expireBatch?: number
   notify?: Notifier
 }>
@@ -129,27 +129,41 @@ async function walkPage(
   return { next, cost: pageCost(plan.copy.length) }
 }
 
+/** What a firing may still spend: calls to R2 and D1, and time. */
+type Spend = {
+  remaining: number
+  readonly now: () => number
+  readonly deadline: number
+}
+
+const spendOf = (options: BackupOptions): Spend => {
+  const now = options.now ?? Date.now
+  return {
+    remaining: options.budget ?? RUN_BUDGET,
+    now,
+    deadline: now() + (options.deadlineMs ?? RUN_DEADLINE_MS),
+  }
+}
+
 /**
  * Goes through the source from `start`, a page at a time, until the end, the
  * budget or the deadline. Each page is recorded, with the cursor, before the
- * next is read, so a stop anywhere is picked up by the next run.
+ * next is read, so a stop anywhere is picked up by the next run. The calls of
+ * one deletion of expired copies are kept back for after the walk.
  */
 async function walk(
   buckets: Buckets,
   start: string | null,
   at: number,
-  options: BackupOptions,
+  spend: Spend,
   tally: Tally,
 ): Promise<void> {
-  const now = options.now ?? Date.now
-  const deadline = now() + (options.deadlineMs ?? RUN_DEADLINE_MS)
-  let remaining = (options.budget ?? RUN_BUDGET) - EXPIRE_COST
   let cursor = start
   for (;;) {
-    const limit = pageLimit(remaining)
-    if (limit === 0 || now() > deadline) return
+    const limit = pageLimit(spend.remaining - EXPIRE_COST)
+    if (limit === 0 || spend.now() > spend.deadline) return
     const { next, cost } = await walkPage(buckets, cursor, limit, at, tally)
-    remaining -= cost
+    spend.remaining -= cost
     if (next.kind === 'stay') return
     tally.advanced = true
     if (next.kind === 'complete') return
@@ -176,24 +190,44 @@ async function attempt(tally: Tally, step: () => Promise<void>) {
   }
 }
 
+type ExpiryStores = Readonly<{ database: D1Database; backup: R2Bucket }>
+
 /**
- * What a firing with no pass to run does: it deletes expired copies that the
- * earlier runs left, so that more of them than one run deletes are gone
- * within hours and not a day at a time. The privacy policy states how long a
- * copy stays (article 8), and a batch a day would not keep to it after many
- * files were deleted at once. It records nothing and tells nothing: it is not
- * a run of the pass, and a failure here is met again, and told, by the next
- * one.
+ * Deletes the expired copies, one batch after another, until none is left or
+ * the calls or the time of the firing run out. The privacy policy states how
+ * long a copy stays (article 8), so what is due is not left for a later day
+ * while this firing can still delete it. The first batch is always tried:
+ * the walk keeps its calls back.
+ */
+async function expireAll(
+  stores: ExpiryStores,
+  at: number,
+  batch: number,
+  spend: Spend,
+  tally: Tally,
+): Promise<void> {
+  do {
+    const gone = await expireCopies(stores, at, batch)
+    spend.remaining -= EXPIRE_COST
+    tally.expired += gone
+    if (gone < batch) return
+  } while (spend.remaining >= EXPIRE_COST && spend.now() <= spend.deadline)
+}
+
+/**
+ * What a firing with no pass to run does: it deletes the expired copies, so
+ * that they go at the next hour and do not wait for the day's pass. It
+ * records nothing and tells nothing: it is not a run of the pass, and a
+ * failure here is met again, and told, by the next one.
  */
 async function expireLeftovers(
-  stores: Readonly<{ database: D1Database; backup: R2Bucket }>,
+  stores: ExpiryStores,
   at: number,
-  limit: number,
+  batch: number,
+  spend: Spend,
 ): Promise<BackupSummary> {
   const tally: Tally = { copied: 0, failed: 0, expired: 0, advanced: false }
-  await attempt(tally, async () => {
-    tally.expired = await expireCopies(stores, at, limit)
-  })
+  await attempt(tally, () => expireAll(stores, at, batch, spend, tally))
   const { copied, failed, expired } = tally
   if (expired > 0)
     console.log(JSON.stringify({ event: 'backup', copied, failed, expired }))
@@ -223,25 +257,17 @@ export async function runBackup(
   const state = await readState(env.DB)
   const plan = planRun(state, at)
   const expireBatch = options.expireBatch ?? EXPIRE_BATCH
+  const stores = { database: env.DB, backup: buckets.backup }
+  const spend = spendOf(options)
   if (plan.kind === 'idle')
-    return expireLeftovers(
-      { database: env.DB, backup: buckets.backup },
-      at,
-      expireBatch,
-    )
+    return expireLeftovers(stores, at, expireBatch, spend)
   const tally: Tally = { ...none, advanced: false }
   await attempt(tally, async () => {
     if (plan.kind === 'start') await startPass(env.DB, at)
     const cursor = plan.kind === 'continue' ? plan.cursor : null
-    await walk(buckets, cursor, at, options, tally)
+    await walk(buckets, cursor, at, spend, tally)
   })
-  await attempt(tally, async () => {
-    tally.expired = await expireCopies(
-      { database: env.DB, backup: buckets.backup },
-      at,
-      expireBatch,
-    )
-  })
+  await attempt(tally, () => expireAll(stores, at, expireBatch, spend, tally))
   const count = tellCount(tally, state, at)
   await finishRun(env.DB, { at, failed: tally.failed, told: count !== null })
   if (count !== null)

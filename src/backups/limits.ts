@@ -49,8 +49,8 @@ export const MAX_FAILURES_IN_PAGE = 5
 export const RUN_DEADLINE_MS = 10 * 60 * 1000
 
 /**
- * The most copies that are deleted at one firing of the task, which is
- * hourly: 12,000 a day, with a pass to run or without.
+ * The most copies one batch deletes. A firing deletes batch after batch
+ * while it has calls and time left, with a pass to run or without.
  */
 export const EXPIRE_BATCH = 500
 
