@@ -27,6 +27,12 @@ export default defineArticle({
         </ul>
         <p>
           フォルダそのもののドロップ、PDF、zip 以外の圧縮形式は受け取りません。
+        </p>
+        <p>
+          ビルドの出力にある <code>_redirects</code> と
+          <code>_headers</code>
+          は、置かれません。断らずに、無いものとして扱います。転送とヘッダーの設定は、slide
+          では働きません。
         </p>`,
   },
   en: {
@@ -50,6 +56,11 @@ export default defineArticle({
         <p>
           Dropping a folder itself, PDFs and archives other than zip are not
           accepted.
+        </p>
+        <p>
+          <code>_redirects</code> and <code>_headers</code> in a build's output
+          are not put up. They are left out without refusing the files, and
+          redirects and headers set in them do not work on slide.
         </p>`,
   },
 })
