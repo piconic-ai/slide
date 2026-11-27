@@ -36,7 +36,10 @@ export default defineArticle({
           </li>
           <li>新しい版への差し替えと、同じ送信のやり直しは、数えません。</li>
           <li>
-            消したスライドも、数えます。消して置き直しても、置ける本数は増えません。
+            消したスライドも、数えます。消して置き直しても、置ける本数は増えません(<a
+              href="/help/slides/delete-slide"
+              >スライドを削除する</a
+            >)。
           </li>
           <li>
             ブラウザから置いても、ドロップで置いても、AI
@@ -100,7 +103,8 @@ export default defineArticle({
           </li>
           <li>
             A slide you deleted still counts. Deleting and putting up again does
-            not make room.
+            not make room (<a href="/help/slides/delete-slide">Delete slides</a
+            >).
           </li>
           <li>
             The number and the time are the same whether you put slides up from
