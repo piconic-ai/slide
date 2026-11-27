@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { LANGS, type Lang } from '../site/i18n'
+import { MAX_TERM_CHARS, searchTermOf } from '../metrics/term'
 import { parseNewAuthorLimits } from '../uploads/new-author-limits'
 import type { HelpAim } from './aims'
 import { findArticle } from './catalog'
@@ -116,5 +117,38 @@ describe('the sign-up article and the article on asking the operator', () => {
     const en = await render('community/ask-us', 'en')
     expect(en.body).toContain('your own handle')
     expect(en.body).toContain('a community you manage')
+  })
+})
+
+describe('the article on the information we keep', () => {
+  test('F36-AC53: Given the article in each language, When it speaks of the help search, Then it says a search that found nothing is recorded, cut to the length the code keeps, and not one that found something', async () => {
+    const ja = await render('safety/data-we-keep', 'ja')
+    expect(ja.body).toContain('0 件だった語')
+    expect(ja.body).toContain(`${MAX_TERM_CHARS} 文字までに切って記録`)
+    expect(ja.body).toContain('合う記事があった検索の語は、記録しません')
+    const en = await render('safety/data-we-keep', 'en')
+    expect(en.body).toContain('finds no article')
+    expect(en.body).toContain(`cut to ${MAX_TERM_CHARS} characters`)
+    expect(en.body).toContain('finds an article are not recorded')
+  })
+
+  test('F36-AC53: Given the article, When it says what is not recorded, Then it names the forms of word the code refuses and says that no person is recorded', async () => {
+    const ja = await render('safety/data-we-keep', 'ja')
+    expect(ja.body).toContain('メールアドレス、IP アドレス')
+    expect(ja.body).toContain('だれが探したかは、記録しません')
+    const en = await render('safety/data-we-keep', 'en')
+    expect(en.body).toContain('look like an email address, an IP address')
+    expect(en.body).toContain('Who searched is not recorded')
+  })
+
+  test('F36-AC53: Given the words the article says are not kept, When the code is asked, Then it refuses an address, an IP address, a web address and a key, and keeps an ordinary word', () => {
+    for (const word of [
+      'me@example.com',
+      '192.168.0.1',
+      'https://example.com',
+      'abcdefghijklmnopqrstuvwxyz0123',
+    ])
+      expect(searchTermOf(word), word).toBeNull()
+    expect(searchTermOf('zip')).toBe('zip')
   })
 })
