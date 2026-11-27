@@ -100,7 +100,9 @@ export async function signPass(
 /**
  * Whether `value` is a good value of `kind` at `now` for the maintenance that
  * `held` names: well formed, not past its expiry, not claiming a longer life
- * than its kind has, and signed with this service's key. The signature is
+ * than its kind has, written in its one canonical form (the expiry without
+ * leading zeros, the signature as `signPass` encodes it), and signed with this
+ * service's key. The signature is
  * compared by the platform's own `verify`, which does not leak where it
  * differs.
  */
@@ -115,9 +117,14 @@ export async function verifyPass(
   if (!match || match[1] !== kind) return false
   const expiry = Number(match[2])
   if (!Number.isSafeInteger(expiry) || expiry <= now) return false
+  // Canonical text only: no leading zeros, so one value has one spelling.
+  if (String(expiry) !== match[2]) return false
   if (expiry > now + lifetimeOf(kind)) return false
   const signature = fromBase64url(match[3]!)
   if (!signature) return false
+  // The decoder drops the spare bits of the last character; refuse any
+  // spelling that does not encode back to itself.
+  if (base64url(signature.buffer) !== match[3]) return false
   return crypto.subtle.verify(
     'HMAC',
     await deriveKey(secret),

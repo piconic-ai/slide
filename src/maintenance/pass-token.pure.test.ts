@@ -73,6 +73,53 @@ describe('F38-AC19: the values of the entrance', () => {
       ).toBe(false)
   })
 
+  test('Given a pass whose expiry has a leading zero, When its signature is right for the number, Then it is refused', async () => {
+    const { value, expiresAt } = await signPass(SECRET, 'pass', HELD, NOW)
+    const [v, kind, , signature] = value.split('.') as [
+      string,
+      string,
+      string,
+      string,
+    ]
+    expect(await verifyPass(SECRET, value, 'pass', HELD, NOW)).toBe(true)
+    for (const zeros of ['0', '00', '000'])
+      expect(
+        await verifyPass(
+          SECRET,
+          `${v}.${kind}.${zeros}${expiresAt}.${signature}`,
+          'pass',
+          HELD,
+          NOW,
+        ),
+        zeros,
+      ).toBe(false)
+  })
+
+  test('Given a pass whose last signature character is another spelling of the same bytes, When it is checked, Then it is refused', async () => {
+    const { value } = await signPass(SECRET, 'pass', HELD, NOW)
+    const alphabet =
+      'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'
+    const last = value.at(-1)!
+    // 43 characters carry 258 bits for 256: the last one has 2 spare bits, so
+    // the three others that share its top 4 bits decode to the same bytes.
+    const index = alphabet.indexOf(last)
+    const siblings = [...alphabet].filter(
+      (c, i) => c !== last && i >> 2 === index >> 2,
+    )
+    expect(siblings).toHaveLength(3)
+    for (const sibling of siblings)
+      expect(
+        await verifyPass(
+          SECRET,
+          value.slice(0, -1) + sibling,
+          'pass',
+          HELD,
+          NOW,
+        ),
+        sibling,
+      ).toBe(false)
+  })
+
   test('Given a value made far too long-lived, When its signature is right, Then it is still refused', async () => {
     // A value of a minute cannot be made to last for a day, even by the service
     // itself: the check holds the value to the life of its kind.

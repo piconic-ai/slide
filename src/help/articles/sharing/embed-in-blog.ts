@@ -46,7 +46,8 @@ export default defineArticle({
           <li>
             ${SERVICE_NAME} には、読者の IP
             アドレス、ブラウザの種類、埋め込みが読み込まれたことが伝わります。ブラウザの既定では、埋め込み先のサイトの
-            origin(path は含みません)も届きます。読まれた回数は数えていません。
+            origin(path
+            は含みません)も届きます。読まれた回数は、だれが読んだかを記録せずに、合計の数として数えます。
           </li>
           <li>
             スライドが外部のサービスへ通信する作りなら、そのサービスにも IP
@@ -122,8 +123,8 @@ export default defineArticle({
           <li>
             ${SERVICE_NAME} learns the reader’s IP address, their browser and
             that the embed was loaded. By the browser’s default, the origin of
-            the embedding site (without its path) arrives too. Views are not
-            counted.
+            the embedding site (without its path) arrives too. Views are counted
+            only as a total; who read is not recorded.
           </li>
           <li>
             If the slides talk to other services, those services learn the IP
