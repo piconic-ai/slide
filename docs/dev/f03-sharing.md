@@ -325,4 +325,4 @@ viewer(`src/share/routes.ts`)が `og:image` に出す画像は、`src/share/cove
 - 画面の文言は、日本語と英語の両方を同じ構造で持つ。ボタンや見出しの名前は、画面の側の文言(`src/drops/text.ts`、`src/publication/panel.ts` など)に合わせる。画面の文言を変えたら、ヘルプも直す。
 - 画面からヘルプへのリンクは、記事の URL を指す(`/help/<狙い>/<記事>`)。いまは、記事の編集のページが `/help/articles/markdown` を、コミュニティを作るページが `/help/community/create-community` を、ブロックの確認のページが `/help/safety/block-user` を指す(フッターは `/help` を指す)。単独で置くリンクは、`helpArticleLink` で作り、押せる高さ 44px の `help-link` の class を持たせる。記事の名前を変えるときは、リンク元を探して直す(`src/help/links.test.ts` が、行き先の記事があることを確かめる)。
 - 「安全と規約」の一覧から、別のページ `/help/bot`(`src/site/help-bot-page.ts`)へのリンクを置く。Luma の配信を読む User-Agent が指すページで、読むもの、間隔、目的、問い合わせ先を書く。数は `src/feeds/limits.ts` の定数から出す([Luma の配信の実装設計](f33-luma-feeds.md))。
-- 規約とプライバシーポリシーは仮のページで、本文は変えていない。ヘルプに書いたことと、それらの本文の食い違いは、PR の「人の確認」に挙げた。
+- 規約とプライバシーポリシーは、このときは仮のページで、本文は変えていない(2026-11-27 に初版を出した)。ヘルプに書いたことと、それらの本文の食い違いは、PR の「人の確認」に挙げた。
