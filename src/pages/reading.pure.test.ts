@@ -2,13 +2,19 @@ import { describe, expect, it } from 'vitest'
 import { READING_SOURCE } from './reading'
 
 // The text the page script holds, run with plain values.
-const { pageIn, requestedIn, numberOf } = new Function(
-  `${READING_SOURCE}; return { numberOf, pageIn, requestedIn }`,
-)() as {
-  numberOf: (text: string) => number | null
-  pageIn: (search: string, hash: string) => number | null
-  requestedIn: (hash: string) => number | null
-}
+const { pageIn, requestedIn, numberOf, pageOfSlide, slideOfPage } =
+  new Function(
+    `${READING_SOURCE}; return { numberOf, pageIn, requestedIn, pageOfSlide, slideOfPage }`,
+  )() as {
+    numberOf: (text: string) => number | null
+    pageIn: (search: string, hash: string) => number | null
+    requestedIn: (hash: string) => number | null
+    pageOfSlide: (columns: number[], h: number, v: number) => number | null
+    slideOfPage: (
+      columns: number[],
+      page: number,
+    ) => { h: number; v: number } | null
+  }
 
 describe('pageIn: the page of a slide that gives no sign of its tool', () => {
   it.each([
@@ -83,4 +89,43 @@ describe('numberOf', () => {
       expect(numberOf(text)).toBeNull()
     },
   )
+})
+
+describe('pageOfSlide and slideOfPage: reveal.js slides in reading order', () => {
+  const five = [1, 1, 1, 1, 1]
+
+  it.each([0, 1, 2, 3, 4])(
+    'Given five columns of one slide, When column %i is on show, Then its page is one more, and it opens from that page',
+    (h) => {
+      expect(pageOfSlide(five, h, 0)).toBe(h + 1)
+      expect(slideOfPage(five, h + 1)).toEqual({ h, v: 0 })
+    },
+  )
+
+  it.each([
+    ['a column past the end', 5, 0],
+    ['a negative column', -1, 0],
+    ['a slide below a column of one', 2, 1],
+    ['a negative row', 2, -1],
+    ['a fraction', 1.5, 0],
+    ['no number', Number.NaN, 0],
+    ['undefined', undefined as unknown as number, 0],
+  ])('Given %s, When its page is asked, Then there is none', (_, h, v) => {
+    expect(pageOfSlide(five, h, v)).toBeNull()
+  })
+
+  it.each([
+    ['past the last page', 6, { h: 4, v: 0 }],
+    ['far past the last page', 9999, { h: 4, v: 0 }],
+  ])(
+    'Given a page %s, When it is opened, Then the last slide is the one',
+    (_, page, slide) => {
+      expect(slideOfPage(five, page)).toEqual(slide)
+    },
+  )
+
+  it('Given a deck with no slide, When a page is asked, Then there is none', () => {
+    expect(slideOfPage([], 1)).toBeNull()
+    expect(pageOfSlide([], 0, 0)).toBeNull()
+  })
 })

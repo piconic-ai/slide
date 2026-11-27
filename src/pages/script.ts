@@ -50,7 +50,13 @@ export const pageScript = (viewerOrigin: string) => `(() => {
   if (parent === window || parent !== top) return
   ${STORED_AT_PLACEHOLDER}
   ${READING_SOURCE}
-  const pageOf = () => pageIn(location.search, location.hash)
+  // What a slide tool shows, once the script has recognised the tool by its
+  // own API (see the readers below). Until then, and for slides of no known
+  // tool, the page is what the address says.
+  let tool = null
+  const pageOf = () => tool ? tool.pageOf() : pageIn(location.search, location.hash)
+  // The page the reader was sent to, as the address said when this ran.
+  const requested = requestedIn(location.hash)
   let told = 0
   const tell = () => {
     const page = pageOf()
@@ -83,6 +89,44 @@ export const pageScript = (viewerOrigin: string) => `(() => {
         .catch(() => {})
     }
   })
+  // reveal.js. Its API is global when the page loads it with a script tag,
+  // and it tells the page of its own events (they bubble to the document):
+  // 'ready' once it has laid the slides out, 'slidechanged' when a slide
+  // shows. It reads the address once, on start, as a number from 0 (#3 is
+  // the fourth slide), so the page asked for is opened when it is ready.
+  const revealOf = () => {
+    const deck = window.Reveal
+    const known = deck && typeof deck.isReady === 'function' && typeof deck.getIndices === 'function' && typeof deck.slide === 'function'
+    return known && deck.isReady() && document.querySelector('.reveal .slides') ? deck : null
+  }
+  const stacksOf = () => Array.from(document.querySelectorAll('.reveal .slides > section'), (column) => column.querySelectorAll(':scope > section').length)
+  const columnsOf = () => stacksOf().map((below) => Math.max(1, below))
+  const startReveal = () => {
+    const deck = tool ? null : revealOf()
+    if (!deck || stacksOf().some((below) => below > 0)) return
+    tool = {
+      pageOf: () => {
+        const at = deck.getIndices()
+        return pageOfSlide(columnsOf(), at.h, at.v)
+      },
+    }
+    const slide = requested === null ? null : slideOfPage(columnsOf(), requested)
+    if (slide) {
+      // Without the slides' move from one to another, which would show, and
+      // at the first step of the slide: going back to a slide, reveal.js
+      // shows all its fragments unless told which one.
+      const slides = document.querySelector('.reveal .slides')
+      slides.classList.add('no-transition')
+      deck.slide(slide.h, slide.v, -1)
+      void slides.offsetWidth
+      slides.classList.remove('no-transition')
+    }
+    tell()
+  }
+  document.addEventListener('ready', startReveal)
+  document.addEventListener('slidechanged', tell)
+  addEventListener('load', startReveal)
+  startReveal()
   addEventListener('hashchange', tell)
   addEventListener('popstate', tell)
   tell()

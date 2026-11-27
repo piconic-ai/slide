@@ -155,20 +155,27 @@ const RECORDED: {
       address: '/@owner/suraido/4',
     },
   },
-  // reveal.js reads the fragment it is opened with from 0 (#3 is the fourth
-  // page), and with its defaults does not write the address as pages turn.
+]
+
+/**
+ * reveal.js outputs, each as a slide of its own (the variants of
+ * scripts/fixtures/tools/revealjs). They differ in how the page initializes
+ * reveal.js: its defaults, which do not write the address; `hash: true`,
+ * which writes it from 0; `hashOneBasedIndex: true`, which counts from 1.
+ */
+const REVEAL = [
+  { slug: 'revealjs', dist: 'dist', acs: 'F03-AC187, F03-AC188' },
   {
-    slug: 'revealjs',
-    dir: 'revealjs',
-    apart: [],
-    seen: {
-      opened: ['delta'],
-      openedFrame: '/#3',
-      turned: ['echo'],
-      turnedFrame: '/#3',
-      address: '/@owner/revealjs/3',
-    },
+    slug: 'revealjs-hash',
+    dist: 'dist-hash',
+    acs: 'F03-AC187, F03-AC188, F03-AC189',
   },
+  {
+    slug: 'revealjs-one-based',
+    dist: 'dist-one-based',
+    acs: 'F03-AC187, F03-AC188, F03-AC189',
+  },
+  { slug: 'revealjs-fragments', dist: 'dist-fragments', acs: 'F03-AC190' },
 ]
 
 /** What a reader sees of slides of one of these tools, opened at page 3. */
@@ -188,8 +195,9 @@ const inventories = new Map<
 beforeAll(async () => {
   await applyMigrations(db)
   await signIn(env)
-  for (const [index, tool] of [...TOOLS, ...RECORDED].entries()) {
-    const built = await readBuilt(join(TOOLS_DIR, tool.dir, 'dist'))
+  for (const [index, tool] of [...TOOLS, ...RECORDED, ...REVEAL].entries()) {
+    const dir = 'dist' in tool ? `revealjs/${tool.dist}` : `${tool.dir}/dist`
+    const built = await readBuilt(join(TOOLS_DIR, dir))
     for (const path of 'apart' in tool ? tool.apart : []) built.delete(path)
     const id = await seedPublic(db, tool.slug, index + 1, tool.slug)
     inventories.set(tool.slug, await store(id, built))
@@ -233,7 +241,7 @@ async function withPage(use: (page: Page) => Promise<void>) {
   }
 }
 
-test.each([...TOOLS, ...RECORDED])(
+test.each([...TOOLS, ...RECORDED, ...REVEAL])(
   'F22-AC6: Given the $slug fixture, When it is read as an upload, Then it is within the limits of one version',
   ({ slug }) => {
     const inventory = inventories.get(slug)!
@@ -292,6 +300,91 @@ const frameAt = (page: Page) => {
   )
   return url.pathname + url.search + url.hash
 }
+
+/** Presses a key as the reader does: the frame holds the focus. */
+async function pressInDeck(page: Page, key: string) {
+  await page.locator('iframe#deck').focus()
+  await page
+    .frames()
+    .find((frame) => frame.url().includes('.content.example'))!
+    .evaluate(() => window.focus())
+  await page.keyboard.press(key)
+}
+
+const addressOf = (page: Page) => new URL(page.url()).pathname
+
+/** The slide on show in reveal.js, by the words in its text. */
+const revealShown = (deck: FrameLocator) =>
+  deck
+    .locator('.reveal .slides section.present')
+    .last()
+    .innerText()
+    // The theme sets capitals.
+    .then((text) => text.toLowerCase())
+
+test.each(REVEAL.filter(({ slug }) => slug !== 'revealjs-fragments'))(
+  '$acs: Given the real output of reveal.js ($slug), When the reader opens /@owner/$slug/3 and turns a page, Then page 3 shows, the address stays at 3, and it becomes /4 after the turn',
+  async ({ slug }) => {
+    await withPage(async (page) => {
+      await page.goto(`${TEST_ORIGIN}/@owner/${slug}/3`)
+      const deck = page.frameLocator('iframe#deck')
+      await expect
+        .poll(() => revealShown(deck), { timeout: 20000 })
+        .toContain('charlie')
+      // Settle: the slides are not moved on after they show page 3.
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+      expect(await revealShown(deck)).toContain('charlie')
+      expect(addressOf(page)).toBe(`/@owner/${slug}/3`)
+      await pressInDeck(page, 'ArrowRight')
+      await expect
+        .poll(() => revealShown(deck), { timeout: 20000 })
+        .toContain('delta')
+      await page.waitForURL((url) => url.pathname === `/@owner/${slug}/4`)
+      await pressInDeck(page, 'ArrowLeft')
+      await page.waitForURL((url) => url.pathname === `/@owner/${slug}/3`)
+    })
+  },
+  60000,
+)
+
+test('F03-AC190: Given the real output of reveal.js whose page 3 shows its lines one at a time, When the reader steps through them, Then the address stays at page 3 until the next page', async () => {
+  await withPage(async (page) => {
+    await page.goto(`${TEST_ORIGIN}/@owner/revealjs-fragments/3`)
+    const deck = page.frameLocator('iframe#deck')
+    await expect
+      .poll(() => revealShown(deck), { timeout: 20000 })
+      .toContain('charlie')
+    const told: number[] = []
+    await page.exposeFunction('told', (n: number) => told.push(n))
+    await page.evaluate(() =>
+      addEventListener('message', (event) => {
+        if (event.data?.type === 'slide:page')
+          (window as unknown as { told: (n: number) => void }).told(
+            event.data.page,
+          )
+      }),
+    )
+    for (const step of ['first-step', 'second-step']) {
+      await pressInDeck(page, 'ArrowRight')
+      await expect
+        .poll(() =>
+          deck.locator(`.fragment.visible:has-text("${step}")`).count(),
+        )
+        .toBe(1)
+      await new Promise((resolve) => setTimeout(resolve, 500))
+      expect(addressOf(page)).toBe('/@owner/revealjs-fragments/3')
+    }
+    expect(told).toEqual([])
+    await pressInDeck(page, 'ArrowRight')
+    await expect
+      .poll(() => revealShown(deck), { timeout: 20000 })
+      .toContain('delta')
+    await page.waitForURL(
+      (url) => url.pathname === '/@owner/revealjs-fragments/4',
+    )
+    expect(told).toEqual([4])
+  })
+}, 60000)
 
 const RECORD_NOTE =
   'A record of what happens now, not an expectation: the spec has not decided how these slides should behave (#694, open question 2)'
