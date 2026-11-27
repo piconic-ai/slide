@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { destinationOf, mayAnswerEviction } from './fetch-metadata'
+import { mayAnswerEviction } from './fetch-metadata'
 
 describe('mayAnswerEviction', () => {
   const own = ['same-origin', 'same-site']
@@ -26,39 +26,6 @@ describe('mayAnswerEviction', () => {
     'F37-AC7: Given Sec-Fetch-Dest %s and Sec-Fetch-Site %s, Then it answers: %s',
     (dest, site, sites, answered) => {
       expect(mayAnswerEviction({ dest, site }, sites)).toBe(answered)
-    },
-  )
-})
-
-describe('destinationOf', () => {
-  test.each([
-    // [dest, site, replayed, destination]
-    // The viewer's worker asking for a move to the page.
-    ['empty', 'same-origin', 'document', 'document'],
-    // A browser's own request is what it says it is, whatever else it carries.
-    ['document', 'none', undefined, 'document'],
-    ['document', 'same-origin', 'document', 'document'],
-    ['iframe', 'cross-site', 'document', 'iframe'],
-    ['image', 'same-origin', 'document', 'image'],
-    // A script's fetch, which names nothing.
-    ['empty', 'same-origin', undefined, 'empty'],
-    ['empty', 'same-origin', '', 'empty'],
-    // Only a document is named.
-    ['empty', 'same-origin', 'iframe', 'empty'],
-    ['empty', 'same-origin', 'Document', 'empty'],
-    ['empty', 'same-origin', 'document, document', 'empty'],
-    // Not from this origin: not the worker.
-    ['empty', 'same-site', 'document', 'empty'],
-    ['empty', 'cross-site', 'document', 'empty'],
-    ['empty', 'none', 'document', 'empty'],
-    ['empty', undefined, 'document', 'empty'],
-    // No metadata at all: nothing to go by, as before.
-    [undefined, undefined, undefined, undefined],
-    [undefined, 'same-origin', 'document', undefined],
-  ] as const)(
-    'F02-AC29: Given Sec-Fetch-Dest %s, Sec-Fetch-Site %s and a worker naming %s, Then the request is for: %s',
-    (dest, site, replayed, destination) => {
-      expect(destinationOf({ dest, site, replayed })).toBe(destination)
     },
   )
 })

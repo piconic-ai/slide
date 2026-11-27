@@ -148,12 +148,9 @@ viewer のページそのもの(作者の記事、引用、操作を含む)は�
 
 共有 URL(`/@handle/slug`、`/@handle/slug/<ページ>`)のナビゲーションだけを扱う。ほかは何もしない。
 
-サービスに取りに行く要求には、何のための読み込みだったかを添える。Service Worker が出し直した要求は、Chromium、Firefox、WebKit のどれでも `Sec-Fetch-Dest: empty` で届き、script の `fetch` と見分けられない(Firefox は `Sec-Fetch-Mode` も `same-origin` になる)。サービスは、作者だけが開ける版の viewer を、文書の読み込みにだけ出す([作者限定の閲覧](f02-publication.md#作者限定の閲覧))ので、添えないと、作者に読者と同じ応答(公開中の版、または 404)を返す(#683)。
+サービスに取りに行く要求は、ブラウザが渡したものをそのまま出す。ヘッダーを足すために作り直さない。作り直した要求は、`Referer` が Service Worker の URL になり、別のサイトから来た読者の参照元を運べない(参照元の記録が、すべて内部になる)。
 
-- ページ自身への移動(`request.destination` が `document`)のときだけ、`X-Slide-Replayed-Dest: document` を付ける(`replayOf`、`src/offline/viewer-worker.ts`)。枠の中の移動には付けず、そのまま出す。
-- サービスは、`Sec-Fetch-Dest: empty` かつ `Sec-Fetch-Site: same-origin` の要求に限り、このヘッダーの `document` を信じる(`destinationOf`、`src/offline/fetch-metadata.ts`)。ブラウザ自身が `Sec-Fetch-Dest` を付けた要求(`document`、`iframe`、`image` など)では、ヘッダーを見ない。
-- 別のサイトのページは、読者の cookie とともにこのヘッダーを送れない(安全なヘッダーの一覧に無く、事前の確認が要る。管理 origin は、それを許さない)。管理 origin で動く script は、サービス自身のものだけである。このヘッダーで変わるのは、作者本人に、作者の viewer を出すかどうかだけで、作者かどうかは、これまでどおり session で確かめる。
-- ヘッダーを付けない古い Service Worker は、更新が届くまで(最大 1 日)、作者に読者と同じ応答を返す。強制再読み込み(Service Worker を通らない)では、作者の viewer が出る。
+Service Worker が出し直した要求は、Chromium、Firefox、WebKit のどれでも `Sec-Fetch-Dest: empty` でサービスに届き、script の `fetch` と見分けられない(`Sec-Fetch-Mode` は、Chromium と WebKit が `navigate`、Firefox が `same-origin`)。そのため、サービスは、作者だけが開ける版の viewer を出すかを決めるとき、`empty` もページ自身の読み込みと数える([作者限定の閲覧](f02-publication.md#作者限定の閲覧)、#683)。数えないと、Service Worker が入ったブラウザの作者に、読者と同じ応答(公開中の版、または 404)を返す。判定はサービスの側だけにあるので、古い Service Worker のままのブラウザにも、反映した時点で効く。
 
 | 取りに行った結果 | することと、返すもの |
 | --- | --- |
