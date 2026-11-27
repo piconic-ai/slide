@@ -202,7 +202,7 @@ iOS Safari・Android Chrome の実機と、本番の Cloudflare 経由での表�
 
 ### ツールごとの読み替え
 
-reveal.js の読み替え(縦のスライドを含む)までを実装した(#709)。suraido.js と Slidev は未実装である。以降は、実装した部分と、実装の前に調べたことを分けて書く。
+reveal.js の読み替え(縦のスライドを含む。#709)と、Slidev の読み替え(#711。下の「Slidev」)を実装した。suraido.js は未実装である。以降は、実装した部分と、実装の前に調べたことを分けて書く。
 
 #### 実装したもの(reveal.js)
 
@@ -215,6 +215,13 @@ reveal.js の読み替え(縦のスライドを含む)までを実装した(#709
 - 縦の slide: `.slides > section` の列ごとに、中の `section` の数(なければ 1)を数え、読む順の通し番号をページ番号にする(`pageOfSlide`・`slideOfPage`。F03-AC199〜F03-AC201)。reveal.js 自身の `getSlidePastCount` は使わない。global の API に頼らず、DOM の構造と `getIndices()` の `h`・`v` だけで決まり、純粋な処理としてテストできるためである。1 列目が 1 枚、2 列目が縦に 3 枚、3 列目が 1 枚のスライドは、1・2・3・4・5 ページで、縦の列の下から右へ送ると 4 から 5 になる。縦の列が先頭にある出力、末尾にある出力(`[2, 1, 2]`)も、全部のキー操作のあとで、表示中の slide の番号とアドレスが合うことを確かめた。
 - `ETag`: 差し込む script は、これまでどおり `viewerOrigin` だけを持つ 1 つの文字列で、どのスライドにも同じである。判定は script の中で行うので、`ETag` の決め方は変わらない。script の文字列が変わるので、`ETag`(`scriptHashSource`)は変わり、前の script で配った byte を `304` にしない。
 - 読み替えない出力: global の `Reveal` がない出力(`import Reveal from './reveal.mjs'` で `new Reveal().initialize()` を呼ぶ ES module)は、読み替えない。起動を呼んだ instance に、差し込む script から届く手段がないためである。そのスライドは、これまでどおり `#3` を 1 始まりの番号として通知し、reveal.js は 4 枚目を開く(確かめた: `/@owner/<slug>/3` で 4 枚目が出て、めくってもアドレスバーは `/3` のまま)。F03-AC187〜F03-AC190 は、global の API で読み込むスライド(reveal.js の starter の形)で確かめた範囲である。
+
+#### 実装したもの(Slidev)
+
+- 判定: `<meta property="slidev:version">`。差し込む script は `<head>` の先頭で動き、その時点では meta がまだ読まれていないので、`MutationObserver` で、parser が meta を足した時点を待つ(`DOMContentLoaded` と、script が動いた時点でも試す)。Slidev 自身の module は、文書を読み終えたあとに動くので、その前に、アドレスを書き換えられる。
+- 開くとき: Slidev の router は path を読み、`/` を `/1` に送り、fragment を捨てる。そこで、渡されたページ(`#3`)があり、path が `/` のときだけ、`history.replaceState` で path を `/3` にする(network の要求は起きない)。`?` 以降は残す。
+- 表示中のページ: path の `/N`(1 始まり)。`/` は 1。`/presenter/3`、`/overview`、`/entry` などは何も伝えない。fragment が `#/` で始まるとき(`routerMode: hash`)も、何も伝えない(仕様の未決事項。これまでどおり読む)。
+- **確かめて、止まっていること(#711 の「確認」)**: Slidev は、めくると枠の path を `/4` に書き換える。版の origin の `/4` にファイルはないので、枠が `/4` のまま文書として読み込まれると 404 になる。実物(ローカルの Worker、公開した版)で viewer を開き、2 回めくったあと、viewer を読み込み直し、履歴を戻り、進めた結果: **Chromium では、履歴を戻る(`page.goBack()`)と、枠が `/4` を文書として読み込み、404(`Not found`)になる**(進めても `/5` で 404)。viewer の読み込み直しは、枠が `/#5` から開き直されるので、404 にならない。Firefox では、読み込み直し、戻る、進むのどれでも 404 にならない。WebKit は、手元の実行が終わらず、確かめられていない。仕様の「作らないこと」に関わる(どの path でも `index.html` を返すと、転送の再現になる)ので、対処は依頼者の判断を待つ。
 
 #### 実装の前に調べたこと
 
