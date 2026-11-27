@@ -4,7 +4,7 @@ import { defineArticle } from '../../article'
 export default defineArticle({
   order: 40,
   form: 'reference',
-  related: ['start/sign-in', 'start/code-not-arrived'],
+  related: ['start/sign-in', 'start/code-not-arrived', 'safety/data-we-keep'],
   ja: {
     title: 'メールアドレスを変える、受信箱を失ったとき',
     lead: () => html`メールアドレスを変える画面はありません。`,
@@ -16,7 +16,10 @@ export default defineArticle({
           >からご連絡ください。個別に対応します。
         </p>
         <p>
-          メールアドレスは、自分の「設定」の「アカウント」にだけ出ます。ほかの人には見えません。
+          メールアドレスは、自分の「設定」の「アカウント」にだけ出ます。ほかの利用者には見えません。表示する場面は、運営の画面に出る場面も含めて、<a
+            href="/help/safety/data-we-keep"
+            >預かっている情報と、その守り方</a
+          >の一覧にあります。
         </p>`,
   },
   en: {
@@ -29,7 +32,11 @@ export default defineArticle({
         </p>
         <p>
           Your email address is shown only on your own “Settings”, under
-          “Account”. Nobody else can see it.
+          “Account”. Other users cannot see it. The places where it is shown,
+          including those on the operator’s screens, are listed in
+          <a href="/help/safety/data-we-keep"
+            >what we keep, and how we protect it</a
+          >.
         </p>`,
   },
 })
