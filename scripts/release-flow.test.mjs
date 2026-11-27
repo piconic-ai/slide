@@ -38,6 +38,7 @@ test('REL-AC1: Given the checked-in Worker configuration, When it is read, Then 
   ])
   expect(config.r2_buckets).toEqual([
     { binding: 'UPLOADS', bucket_name: 'slide-uploads' },
+    { binding: 'UPLOADS_BACKUP', bucket_name: 'slide-uploads-backup' },
   ])
   expect(
     Object.fromEntries(

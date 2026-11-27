@@ -40,10 +40,17 @@ async function fire(
 const eventsOf = (logged: Awaited<ReturnType<typeof fire>>['events']) =>
   logged.map(({ line }) => line.event)
 
-/** The events a task has always written, without the line every task now adds. */
+/**
+ * The events a task has always written, without the line every task now adds.
+ * The backup's own summary is left out: wrangler.jsonc binds its bucket, and it
+ * writes that line only when a sweep runs, which depends on the clock and on the
+ * bucket's state, so that the same fire gives it or not. That it runs is the
+ * `cron_task` line of F39-AC17; its failure is the `backup_error` line below.
+ */
 const oldEventsOf = (logged: Awaited<ReturnType<typeof fire>>['events']) =>
   eventsOf(logged).filter(
-    (event) => event !== 'cron_task' && event !== 'alert_error',
+    (event) =>
+      event !== 'cron_task' && event !== 'alert_error' && event !== 'backup',
   )
 
 test('Given the hourly Cron Trigger, When it fires, Then every task is started and each logs the event it always has', async () => {
@@ -143,6 +150,7 @@ test('Given every store fails, When the Trigger fires, Then each task that needs
   // no D1, cannot be queued: that is logged by its kind and never stops a task.
   const failed = events.filter(({ line }) => line.outcome === 'failed')
   expect(failed.map(({ line }) => line.task).sort()).toEqual([
+    'backup',
     'deck_purge',
     'notification_sweep',
     'preview_sweep',
@@ -159,8 +167,10 @@ test('Given every store fails, When the Trigger fires, Then each task that needs
     'cron_failed',
     'cron_failed',
     'cron_failed',
+    'cron_failed',
   ])
   expect(Object.keys(byEvent).sort()).toEqual([
+    'backup_error',
     'deck_purge_error',
     'feeds_read',
     'notification_sweep_error',
@@ -180,6 +190,7 @@ test('Given every store fails, When the Trigger fires, Then each task that needs
       'name',
     ])
   for (const event of [
+    'backup_error',
     'notification_sweep_error',
     'preview_sweep_error',
     'signup_sweep_error',
