@@ -118,11 +118,21 @@ pnpm install --frozen-lockfile
 - そのレビューの本文と、行へのコメントのうち、自分が返信していないものが 1 つもない。直すと答えたものは、直してある。
 - `gh pr view <PR> --json mergeable,mergeStateStatus` が `MERGEABLE` と `CLEAN` を返す。`UNSTABLE` は、check がまだ実行中か、失敗していることを表す。Pullfrog のレビュー本文が付いていても、`pullfrog` の check が終わるまで待つ。
 - 差分を読み直し、issue の範囲に収まっている。
-- branch に、最新の `origin/main` を取り込んである。下のコマンドで `Already up to date.` と出ること。取り込みが起きたら、push して、手順 3 と 5 をやり直す。
+- branch が `origin/main` に追いついていなくても、次の 2 つを満たせば merge してよい。複数の agent が並行して `main` へ merge するので、そのたびに取り込み直して CI を待つと、いつまでも merge できない。`main` に merge しても本番は変わらず、merge の後に `main` の CI を見る(6 の 2)ためである。
+
+  - いまの `origin/main` を取り込んでも、衝突しない。`git merge-tree` が、終了コード 0 で tree の ID を 1 行だけ返す。
+  - この PR の `migrations/` に足したファイルの番号が、追いついていない間に `main` へ入った migration の番号と重ならない。番号が同じファイルが 2 つできると、どちらの変更が先かを、だれも決めていないことになる。2 つの一覧を比べ、重なりがなければ(どちらかが空でもよい)満たしている。
 
   ```sh
-  git fetch origin && git merge origin/main
+  git fetch origin
+  git merge-tree --write-tree HEAD origin/main
+  git diff --name-only --diff-filter=A origin/main...HEAD -- migrations   # この PR が足した migration
+  git diff --name-only --diff-filter=A HEAD...origin/main -- migrations   # 追いついていない間に main へ入った migration
   ```
+
+  この 2 つで分かるのは、文字の上で衝突しないことだけである。意味の上のぶつかりや、`migrations/` から作る図、ヘルプの一覧のような生成物の古さは、merge の後の `main` の CI でしか見つからない。待ったあとは `main` が進んでいることがあるので、`gh pr merge` の直前に、もう一度確かめる。
+
+  どちらかを満たさないときは、`git merge origin/main` で取り込み、衝突を直すか番号を付け直して、push し、手順 3 と 5 をやり直す。取り込んだあとの head が、レビュー済みの commit に `origin/main` を取り込んだだけの merge commit なら、上の `pullfrog` の扱いを使う。
 
 - 今回の PR の `migrations/` の差分を、すべて読んだ。どの SQL にも `DROP`、`DELETE`、表の作り直し(`CREATE TABLE ... _new` と `DROP TABLE` の組)、値が失われる変更がない。1 つでもあれば、PR の本文の先頭に、ファイルの名前と消えるものを書く。本番にある未適用の migration は、リリース PR を merge する前に、依頼者が見る(本番の D1 には触れない)。
 
