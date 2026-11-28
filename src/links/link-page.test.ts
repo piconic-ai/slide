@@ -3,7 +3,14 @@ import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test, vi } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
-import { blocks, decks, events, mutes, suspensions } from '../db/schema'
+import {
+  blocks,
+  decks,
+  events,
+  mutes,
+  relatedLinks,
+  suspensions,
+} from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   resetTables,
@@ -14,6 +21,7 @@ import {
   TEST_ORIGIN,
   testEnv,
 } from '../publication/test-support'
+import { linkPagePath } from './link-address'
 import { listLinks } from './store'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
@@ -34,7 +42,13 @@ beforeEach(async () => {
 })
 afterAll(() => platform.dispose())
 
-const add = (deck: string, url: string, title = '', cookie = owner) =>
+const add = (
+  deck: string,
+  url: string,
+  title = '',
+  cookie = owner,
+  kind = '',
+) =>
   server.fetch(
     new Request(`${TEST_ORIGIN}/my/slides/${deck}/links`, {
       method: 'POST',
@@ -43,7 +57,11 @@ const add = (deck: string, url: string, title = '', cookie = owner) =>
         Origin: TEST_ORIGIN,
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: new URLSearchParams({ url, title }).toString(),
+      body: new URLSearchParams({
+        url,
+        title,
+        ...(kind && { kind }),
+      }).toString(),
     }),
     env,
   )
@@ -501,3 +519,203 @@ test.each([
     expect(talkNames(await flat(page))).toEqual(['Talk'])
   },
 )
+
+const POST = 'https://example.com/post'
+const POST_PAGE = '/link/example.com/post'
+const MISSING = 'この URL の集まりは、まだありません'
+/** Two public slides, one of each author, newest `reply`. */
+const seedTwo = async () => {
+  await seedPublic(db, 'talk', 100, 'Owner talk')
+  await seedPublic(db, 'reply', 200, 'Bob talk', '2')
+}
+const removeLink = async (deck: string, cookie: string) =>
+  server.fetch(
+    new Request(
+      `${TEST_ORIGIN}/my/slides/${deck}/links/${(await listLinks(db, deck))[0]!.id}/delete`,
+      { method: 'POST', headers: { Cookie: cookie, Origin: TEST_ORIGIN } },
+    ),
+    env,
+  )
+
+test('F45-AC1: F45-AC2: F45-AC24: Given a link that is no event, When slides of one author, then of two, carry it and one leaves again, Then its page shows only with two authors, and otherwise answers as an address nobody added', async () => {
+  await seedTwo()
+  await seedPublic(db, 'more', 300, 'Owner more')
+  const nobody = await get(POST_PAGE)
+  await add('talk', POST)
+  await add('more', `${POST}/`)
+  const alone = await get(POST_PAGE)
+  expect([nobody.status, alone.status]).toEqual([404, 404])
+  const missing = await alone.text()
+  expect(missing).toBe(await nobody.text())
+  expect(missing).toContain(MISSING)
+  expect(missing).not.toContain('Owner')
+
+  await add('reply', POST, 'A post', bob)
+  const shown = await get(POST_PAGE)
+  expect(shown.status).toBe(200)
+  expect(shown.headers.get('x-robots-tag')).toBeNull()
+  const body = (await shown.text()).replace(/\s+/g, ' ')
+  expect(talkNames(body)).toEqual(['Owner more', 'Bob talk', 'Owner talk'])
+  expect(body).toContain('<span class="event-talks-count">3 本</span>')
+  expect(body).toContain('<h1>A post</h1>')
+  expect(sourceOf(body)).toBe(POST)
+  expect(body).toContain(
+    'data-link-check aria-haspopup="dialog" >example.com で見る</a',
+  )
+  expect(body).not.toContain('class="event-community')
+
+  await orm
+    .update(decks)
+    .set({ public_deployment_id: null, paused_at: 5 })
+    .where(eq(decks.id, 'reply'))
+  expect(await (await get(POST_PAGE)).text()).toBe(missing)
+})
+
+test('F45-AC10: F45-AC25: Given a link of two authors with no title, When the first saved link is removed, Then the heading is the site and the address, and the way out follows the oldest link left', async () => {
+  await seedTwo()
+  await seedPublic(db, 'third', 300, 'Third', '2')
+  await add('talk', `${POST}?a=1&utm_source=x`)
+  await add('reply', `https://www.example.com/post/?a=1`, '', bob)
+  await add('third', `${POST}?a=1#x`, '', bob)
+  const page = '/link/example.com/post?a=1'
+  const body = await flat(page)
+  expect(body).toContain('<h1>example.com https://example.com/post?a=1</h1>')
+  expect(sourceOf(body)).toBe(`${POST}?a=1`)
+  await removeLink('talk', owner)
+  expect((await get(page)).status).toBe(404)
+  await seedPublic(db, 'again', 400, 'Again')
+  await add('again', `${POST}?a=1`)
+  expect(sourceOf(await flat(page))).toBe('https://www.example.com/post/?a=1')
+})
+
+test.each([
+  [
+    'www., a final slash, a tracking query and a fragment (F45-AC23)',
+    ['https://www.example.com/post/?utm_source=x&fbclid=1#top'],
+    POST,
+    POST_PAGE,
+  ],
+  [
+    'the start time of a YouTube video (F45-AC5, F27-AC74)',
+    ['https://youtu.be/dQw4w9WgXcQ?t=30', 'https://youtu.be/dQw4w9WgXcQ?t=60'],
+    'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    '/link/youtube.com/watch?v=dQw4w9WgXcQ',
+  ],
+  [
+    'the start of a ニコニコ動画 video (F45-AC5, F27-AC77)',
+    ['https://nico.ms/sm9?from=30', 'https://nico.ms/sm9'],
+    'https://www.nicovideo.jp/watch/sm9?from=5',
+    '/link/nicovideo.jp/watch/sm9',
+  ],
+  [
+    'nothing, in Japanese with an IDN host',
+    ['https://例え.jp/日本語?q=あ'],
+    'https://xn--r8jz45g.jp/%E6%97%A5%E6%9C%AC%E8%AA%9E?q=%E3%81%82',
+    '/link/xn--r8jz45g.jp/%E6%97%A5%E6%9C%AC%E8%AA%9E?q=%E3%81%82',
+  ],
+  [
+    'nothing, at the longest address kept',
+    [`https://example.com/${'a'.repeat(1980)}`],
+    `https://example.com/${'a'.repeat(1980)}`,
+    `/link/example.com/${'a'.repeat(1980)}`,
+  ],
+])(
+  'F45-AC1: Given links of two authors that differ only in %s, When the page opens, Then both slides are on one page, a slide with two such links once',
+  async (_, mine, theirs, page) => {
+    await seedTwo()
+    for (const url of mine) expect((await add('talk', url)).status).toBe(303)
+    expect(await listLinks(db, 'talk')).toHaveLength(mine.length)
+    await add('reply', theirs, '', bob)
+    expect(linkPagePath(theirs)).toBe(page)
+    const body = await flat(page)
+    expect(talkNames(body)).toEqual(['Bob talk', 'Owner talk'])
+    expect(body).toContain('<span class="event-talks-count">2 本</span>')
+  },
+)
+
+test('F45-AC23: Given links of two authors that differ in a % form, in a query, or whose key was never kept, When their pages open, Then none is gathered', async () => {
+  await seedTwo()
+  await add('talk', 'https://example.com/%41')
+  await add('reply', 'https://example.com/A', '', bob)
+  await add('talk', 'https://example.com/q?a=1')
+  await add('reply', 'https://example.com/q?a=2', '', bob)
+  await add('talk', 'https://example.com/old')
+  await add('reply', 'https://example.com/old', '', bob)
+  await orm
+    .update(relatedLinks)
+    .set({ gather_key: null })
+    .where(eq(relatedLinks.url, 'https://example.com/old'))
+  for (const path of ['%41', 'A', 'q?a=1', 'q?a=2', 'q', 'old'])
+    expect((await get(`/link/example.com/${path}`)).status).toBe(404)
+})
+
+test('F45-AC14: F45-AC15: Given a link of two authors, When one is suspended, Then there is no page; When a reader blocked both, Then the page still answers 200 with no slide', async () => {
+  await seedTwo()
+  await add('talk', POST)
+  await add('reply', POST, '', bob)
+  const carol = await signIn(env, 'carol', { id: '3' })
+  await orm.insert(blocks).values(
+    ['722500', '2'].map((blocked) => ({
+      blocker_user_id: '3',
+      blocked_user_id: blocked,
+      created_at: 1,
+    })),
+  )
+  const blocked = await get(POST_PAGE, { Cookie: carol })
+  expect(blocked.status).toBe(200)
+  const none = (await blocked.text()).replace(/\s+/g, ' ')
+  expect(talkNames(none)).toEqual([])
+  expect(none).toContain('<span class="event-talks-count">0 本</span>')
+  expect(talkNames(await flat(POST_PAGE))).toHaveLength(2)
+
+  await orm.insert(suspensions).values({
+    user_id: '2',
+    reason: 'test',
+    suspended_at: 1,
+    suspended_by: 'operator',
+  })
+  const gone = await get(POST_PAGE, { Cookie: carol })
+  expect(gone.status).toBe(404)
+  expect(await gone.text()).toContain(MISSING)
+})
+
+test('F45-AC35: F27-AC90: Given one address made an event by one author and added as another kind by two more, When its pages open, Then the address without a query is the page of the event, and with a query the links are gathered whatever their kind', async () => {
+  await seedTwo()
+  await seedPublic(db, 'third', 300, 'Carol talk', '3')
+  const carol = await signIn(env, 'carol', { id: '3' })
+  const PEATIX = 'https://peatix.com/event/123'
+  await add('talk', 'https://www.peatix.com/event/123', '', owner, 'event')
+  await add('reply', PEATIX, '', bob, 'article')
+  await add('third', PEATIX, '', carol, 'other')
+  // The event is looked up first; the links of other kinds are not on it.
+  expect(talkNames(await flat('/link/peatix.com/event/123'))).toEqual([
+    'Owner talk',
+  ])
+  await add('reply', `${PEATIX}?day=2`, '', bob, 'video')
+  await add('third', `${PEATIX}/?day=2`, '', carol, 'other')
+  expect(talkNames(await flat('/link/peatix.com/event/123?day=2'))).toEqual([
+    'Carol talk',
+    'Bob talk',
+  ])
+  // Without the event, the same address gathers the links of the two.
+  await removeLink('talk', owner)
+  expect(talkNames(await flat('/link/peatix.com/event/123'))).toEqual([
+    'Carol talk',
+    'Bob talk',
+  ])
+})
+
+test('F45-AC3: Given connpass addresses kept as another kind, When their pages open, Then one slide is enough for an event-shaped link, and a number written with leading zeros is not found', async () => {
+  await seedTwo()
+  await add('talk', 'https://connpass.com/event/7/', '', owner, 'other')
+  await add('talk', 'https://connpass.com/event/008/', '', owner, 'other')
+  await add('reply', 'https://connpass.com/event/008/', '', bob, 'other')
+  expect(await orm.select().from(events).all()).toEqual([])
+  expect(talkNames(await flat('/link/connpass.com/event/7'))).toEqual([
+    'Owner talk',
+  ])
+  expect(linkPagePath('https://connpass.com/event/008/')).toBe(
+    '/link/connpass.com/event/8',
+  )
+  expect((await get('/link/connpass.com/event/8')).status).toBe(404)
+})

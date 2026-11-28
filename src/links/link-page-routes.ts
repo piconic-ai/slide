@@ -9,7 +9,6 @@ import { ERROR_PAGE_POLICY, errorPage } from '../site/error-pages'
 import { langOf } from '../site/lang'
 import { pageShell } from '../site/shell'
 import {
-  eventKeysOf,
   linkPagePath,
   linkTargetOf,
   parseLinkPath,
@@ -21,11 +20,7 @@ import {
   linkMissingTitle,
 } from './link-missing-page'
 import { linkPageBody, linkPageTitle } from './link-page'
-import {
-  findAliasedKey,
-  findEventIdsByKey,
-  readEventPage,
-} from './link-page-store'
+import { findAliasedKey, readLinkPage, type LinkPage } from './link-page-store'
 
 type C = Context<{ Bindings: Env }>
 
@@ -112,27 +107,22 @@ function show(c: C, target: LinkTarget, page: Shown) {
 }
 
 /**
- * The page of the event the address stands for, or null when there is no
- * event or it has no public talk. Of the events an address of another site
- * may be kept as, the first with a public talk.
+ * The page of the links to the address: of the event it stands for, or of
+ * the links gathered by its key (F45-AC35). Null when neither shows.
  */
-async function eventPage(c: C, target: LinkTarget) {
+async function linkPage(c: C, target: LinkTarget) {
   const viewer = (await currentOwner(c))?.userId ?? null
-  for (const id of await findEventIdsByKey(c.env.DB, eventKeysOf(target))) {
-    const read = await readEventPage(c.env.DB, id, viewer)
-    if (read) return shownEvent(c, target, read)
-  }
-  return null
+  const read = await readLinkPage(c.env.DB, target, viewer)
+  return read && shownPage(c, target, read)
 }
 
-async function shownEvent(
-  c: C,
-  target: LinkTarget,
-  read: NonNullable<Awaited<ReturnType<typeof readEventPage>>>,
-) {
+async function shownPage(c: C, target: LinkTarget, read: LinkPage) {
   const eventId = read.event.id
+  // For now only an event is in a community.
   const community =
-    (await listEventCommunities(c.env.DB, [eventId])).get(eventId) ?? null
+    eventId === null
+      ? null
+      : ((await listEventCommunities(c.env.DB, [eventId])).get(eventId) ?? null)
   const lang = langOf(c)
   const contentBase = contentBaseOf(c.env)
   return show(c, target, {
@@ -189,9 +179,9 @@ linkPageRoutes.get('/link', (c) => {
 })
 
 /**
- * The page of the links to one address. For now only an event has one; any
- * other address answers the page of F45-AC12. The order is F45-AC13's:
- * refuse, move, then the page.
+ * The page of the links to one address; an address nothing is gathered at
+ * answers the page of F45-AC12. The order is F45-AC13's: refuse, move, then
+ * the page.
  */
 linkPageRoutes.get('/link/*', async (c) => {
   const read = parseLinkPath(sentRestOf(c))
@@ -199,5 +189,5 @@ linkPageRoutes.get('/link/*', async (c) => {
   const target = linkTargetOf(read.url)
   const moved = await movedTo(c.env.DB, sentRestOf(c), target)
   if (moved !== null) return c.redirect(moved, 301)
-  return (await eventPage(c, target)) ?? missing(c, target)
+  return (await linkPage(c, target)) ?? missing(c, target)
 })
