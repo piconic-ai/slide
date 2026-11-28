@@ -52,9 +52,10 @@ const kindOf = (links: unknown, url: string) =>
   (links as Link[]).find((link) => link.url === url)?.kind
 const eventIdOf = async (key: string) =>
   (await db.select().from(events).where(eq(events.key, key)).get())?.id
-const eventPage = async (id: number | undefined) => {
+/** The page of links of an event, by what follows `/link/` (F45). */
+const linkPage = async (rest: string) => {
   const response = await server.fetch(
-    new Request(`${TEST_ORIGIN}/events/${id}`),
+    new Request(`${TEST_ORIGIN}/link/${rest}`),
     env,
   )
   return { status: response.status, body: await response.text() }
@@ -141,28 +142,35 @@ test('F23-AC42: Given the tool list, When add_related_link is read, Then its kin
   expect(schema.required).not.toContain('kind')
 })
 
-test('F23-AC43: Given a public slide, When add_related_link adds an event address to it, Then the slide is listed as a talk on the event page', async () => {
-  const deck = await slide(true)
-  const url = 'https://tokyo.connpass.com/event/4242/?utm_source=x'
-  const { isError, data } = await add(deck, { url, title: 'Tokyo #42' })
-  expect(isError).toBe(false)
-  expect(
-    kindOf(data.links, 'https://tokyo.connpass.com/event/4242/?utm_source=x'),
-  ).toBe('event')
-  const page = await eventPage(
-    await eventIdOf('https://connpass.com/event/4242'),
-  )
-  expect(page.status).toBe(200)
-  expect(page.body).toContain(`href="/@alice/${deck}"`)
-  expect(page.body).toContain('Tokyo #42')
-})
+test.each([
+  [
+    'an event address and no kind',
+    { url: 'https://tokyo.connpass.com/event/4242/?utm_source=x' },
+    'connpass.com/event/4242',
+  ],
+  [
+    'the kind event and an address of another site',
+    { kind: 'event', url: 'https://www.conf.example/2027/' },
+    'conf.example/2027',
+  ],
+])(
+  'F23-AC52: Given a public slide, When add_related_link adds %s to it, Then the slide is listed on the page of links of the event',
+  async (_name, link, rest) => {
+    const deck = await slide(true)
+    const { isError, data } = await add(deck, { ...link, title: 'Tokyo #42' })
+    expect(isError).toBe(false)
+    expect(kindOf(data.links, link.url)).toBe('event')
+    const page = await linkPage(rest)
+    expect(page.status).toBe(200)
+    expect(page.body).toContain(`href="/@alice/${deck}"`)
+    expect(page.body).toContain('Tokyo #42')
+  },
+)
 
-test('F23-AC43: Given a private slide, When add_related_link adds an event address to it, Then the event page does not list it', async () => {
+test('F23-AC52: Given a private slide, When add_related_link adds an event address to it, Then the page of links of the event does not list it', async () => {
   const deck = await slide()
   await add(deck, { url: 'https://connpass.com/event/4343/' })
-  const page = await eventPage(
-    await eventIdOf('https://connpass.com/event/4343'),
-  )
+  const page = await linkPage('connpass.com/event/4343')
   expect(page.status).toBe(404)
   expect(page.body).not.toContain(deck)
 })
@@ -188,12 +196,14 @@ test('F23-AC44: Given the tool list, When its names and descriptions are read, T
   ])
 })
 
-test('F23-AC45: Given the tool list, When add_related_link is read, Then its description says an event page’s address lists the slide as a talk of the event', async () => {
+test('F23-AC53: Given the tool list, When add_related_link is read, Then its description says an event’s address lists the slide on the page of links of that event', async () => {
   const tool = (await client.listTools()).tools.find(
     (one) => one.name === 'add_related_link',
   )
   const description = tool?.description ?? ''
   expect(description).toContain('video, article, event or other')
   expect(description).toContain('event pages on connpass, Doorkeeper and Luma')
-  expect(description).toContain('listed as a talk on that event’s page')
+  expect(description).toContain(
+    'listed on the page of links of that event (/link/ followed by the event’s address without https://)',
+  )
 })
