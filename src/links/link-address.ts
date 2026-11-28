@@ -14,14 +14,20 @@ export type LinkPath =
  *   (F45-AC31).
  * - `eventShaped`: whether it is an event of connpass, Doorkeeper or Luma.
  * - `eventKey`: the key to look an event up by first, or null when no event
- *   can have this address (F45-AC35): an event of another site is looked up
- *   only by an address without a query.
+ *   can have this address (F45-AC35). An event of connpass, Doorkeeper or
+ *   Luma is looked up without its query. An event of another site is looked
+ *   up by the address as it was written (its `www.` stays, and the compared
+ *   form of its site is not applied), and only when the address has no query.
+ * - `eventRest`: what follows `/link/` in the path of the page of that event,
+ *   or null when `eventKey` is. It is `rest` for connpass, Doorkeeper and
+ *   Luma, and the written host and path for an event of another site.
  * - `gatherKey`: the key to look the other links up by.
  */
 export type LinkTarget = Readonly<{
   rest: string
   eventShaped: boolean
   eventKey: string | null
+  eventRest: string | null
   gatherKey: string
 }>
 
@@ -79,14 +85,24 @@ const keyOf = (href: string) =>
   isEventAddress(href) ? (eventRefOf(href)?.key ?? href) : gatherKeyOf(href)
 
 /**
+ * The most steps the key of an address can need. A step that changes the key
+ * either drops one leading `www.` (four characters of an address no longer
+ * than MAX_LENGTH) or is one of the few that turn the compared form into the
+ * key of an event, so this bound is never reached; it only shows that the
+ * loop ends.
+ */
+const MAX_STEPS = MAX_LENGTH / 'www.'.length + 12
+
+/**
  * The key no further step changes. One step is not always enough: the
  * compared form of `a.b.connpass.com/event/07` is an event address whose key
  * drops the zero, and only one leading `www.` is dropped at a time. The steps
- * are bounded, so an address written to need more still ends.
+ * go on until the key stays as it is, so the canonical form read again is
+ * itself and one redirect is enough (F45-AC31).
  */
 function settledKeyOf(href: string): string {
   let key = keyOf(href)
-  for (let step = 0; step < 8; step += 1) {
+  for (let step = 0; step < MAX_STEPS; step += 1) {
     const next = keyOf(key)
     if (next === key) break
     key = next
@@ -94,32 +110,65 @@ function settledKeyOf(href: string): string {
   return key
 }
 
+const SCHEME_LENGTH = 'https://'.length
+
+/**
+ * The key of the event an address may be, and the `rest` of that event's
+ * page. `key` is the settled key and `written` the address before any rule
+ * compared it.
+ */
+function eventOf(
+  key: string,
+  written: string,
+): Pick<LinkTarget, 'eventKey' | 'eventRest'> {
+  // connpass, Doorkeeper and Luma: the settled key is the key of the event.
+  if (isEventAddress(key)) {
+    const eventKey = eventRefOf(key)?.key ?? null
+    return { eventKey, eventRest: eventKey?.slice(SCHEME_LENGTH) ?? null }
+  }
+  // Another site: the event has the host and path as written. A query the
+  // compared form keeps means no event has this address; one it drops (a
+  // tracking name) does not count.
+  const queried = new URL(written).search !== '' && new URL(key).search !== ''
+  const eventKey = queried ? null : (eventRefOf(written)?.key ?? null)
+  return { eventKey, eventRest: eventKey?.slice(SCHEME_LENGTH) ?? null }
+}
+
 /** The page of links an https address belongs to. */
 export function linkTargetOf(url: string): LinkTarget {
   const key = settledKeyOf(url)
-  const eventShaped = isEventAddress(key)
-  const queried = new URL(key).search !== ''
   return {
-    rest: key.slice('https://'.length),
-    eventShaped,
-    eventKey: eventShaped || !queried ? (eventRefOf(key)?.key ?? null) : null,
+    rest: key.slice(SCHEME_LENGTH),
+    eventShaped: isEventAddress(key),
+    ...eventOf(key, url),
     gatherKey: gatherKeyOf(key),
   }
 }
 
 /**
- * The keys an event of the address may be kept under, the likelier first
- * (F45-AC35). An event of connpass, Doorkeeper or Luma has one key. An event
- * of another site keeps the `www.` its address was written with, which the
- * path of the page drops, so both ways of writing the host are looked up.
- * None when the address has a query and so can be no event.
+ * The keys an event of the address may be kept under (F45-AC35): the one key
+ * of the address as written, or none when the address has a query and so can
+ * be no event. An event of another site is looked up with the `www.` it was
+ * written with and no other way: `www.example.com/conf` and
+ * `example.com/conf` are two events.
  */
-export function eventKeysOf(target: LinkTarget): readonly string[] {
-  if (target.eventKey === null) return []
-  if (target.eventShaped) return [target.eventKey]
-  return [target.eventKey, target.eventKey.replace('https://', 'https://www.')]
-}
+export const eventKeysOf = (target: LinkTarget): readonly string[] =>
+  target.eventKey === null ? [] : [target.eventKey]
 
-/** The one path of the page of links an https address belongs to. */
+/**
+ * The one path of the page of links an https address belongs to: the page
+ * links of any kind but "event" are gathered on.
+ */
 export const linkPagePath = (url: string): string =>
   `/link/${linkTargetOf(url).rest}`
+
+/**
+ * The path of the page of an event, from the event's own address
+ * (`events.url`). An event of connpass, Doorkeeper or Luma has the canonical
+ * path. An event of another site has its address as written, `www.` and all:
+ * two events that differ only by what the compared form drops keep two pages.
+ */
+export function eventPagePath(eventUrl: string): string {
+  const target = linkTargetOf(eventUrl)
+  return `/link/${target.eventRest ?? target.rest}`
+}

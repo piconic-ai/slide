@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { linkPagePath } from '../links/link-address'
+import { eventPagePath } from '../links/link-address'
 import { findShownEventUrl } from '../links/link-page-store'
 
 /** The number in /events/:id: digits only, as the service gave it. */
@@ -18,5 +18,5 @@ eventRoutes.get('/events/:id', async (c) => {
   const eventId = eventIdOf(c.req.param('id'))
   const url =
     eventId === null ? null : await findShownEventUrl(c.env.DB, eventId)
-  return url === null ? c.notFound() : c.redirect(linkPagePath(url), 301)
+  return url === null ? c.notFound() : c.redirect(eventPagePath(url), 301)
 })

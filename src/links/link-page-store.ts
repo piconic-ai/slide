@@ -275,7 +275,7 @@ const gatheredBy = (keys: readonly string[]) =>
  * way out follow the oldest link (F45-AC10, F45-AC25); the viewer's mutes
  * and blocks only leave slides out of the list (F45-AC15).
  */
-async function readGatheredPage(
+export async function readGatheredPage(
   database: D1Database,
   target: LinkTarget,
   viewer: string | null,
@@ -321,11 +321,10 @@ async function readGatheredPage(
 }
 
 /**
- * The page of links of an address (F45-AC35): of the event kept under its
- * key, the first with a public talk; with none, of the links gathered by
- * its key. Null when neither shows.
+ * The page of the event kept under the key of an address (F45-AC35), or
+ * null when there is none or it has no public talk.
  */
-export async function readLinkPage(
+export async function readEventPageOf(
   database: D1Database,
   target: LinkTarget,
   viewer: string | null,
@@ -334,7 +333,7 @@ export async function readLinkPage(
     const read = await readEventPage(database, id, viewer)
     if (read) return read
   }
-  return readGatheredPage(database, target, viewer)
+  return null
 }
 
 /**
