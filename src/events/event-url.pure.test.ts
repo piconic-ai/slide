@@ -349,7 +349,7 @@ describe('eventRefOf, slashes and zeros', () => {
     ).toBe(true)
   })
 
-  test('F45-AC25: Given connpass addresses of one number under two groups, When their events are read, Then both lead to the page without a group and keep their own hosts', () => {
+  test('F45-AC42: Given connpass addresses of one number under two groups, When their events are read, Then both lead to the page without a group and keep their own hosts', () => {
     const kanagawa = eventRefOf('https://kanagawapm.connpass.com/event/410635/')
     const evil = eventRefOf('https://evil.connpass.com/event/410635/')
     expect(kanagawa?.url).toBe('https://connpass.com/event/410635/')
@@ -419,7 +419,7 @@ describe('sourceUrlOf', () => {
     ['-bad.connpass.com', 'https://connpass.com/event/410635/'],
     ['evilconnpass.com', 'https://connpass.com/event/410635/'],
   ])(
-    'F45-AC25: Given a connpass event whose first link was written with the host %s, When its page is led to, Then it is %s',
+    'F45-AC42: Given a connpass event whose first link was written with the host %s, When its page is led to, Then it is %s',
     (host, url) => {
       expect(sourceUrlOf(connpass, host)).toBe(url)
     },
@@ -440,7 +440,7 @@ describe('sourceUrlOf', () => {
       'kanagawapm.connpass.com',
     ],
   ] as const)(
-    'F45-AC25: Given an event of %o, When its page is led to, Then it is the event’s own address, whatever its first link’s host',
+    'F45-AC42: Given an event of %o, When its page is led to, Then it is the event’s own address, whatever its first link’s host',
     (event, host) => {
       expect(sourceUrlOf(event, host)).toBe(event.url)
     },

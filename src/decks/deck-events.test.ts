@@ -87,7 +87,7 @@ test('F27-AC87: Given a link that is added without a kind, When its row is shown
   )
 })
 
-test('F27-AC88: F45-AC37: Given links of the slide, When kinds are saved to the route the page no longer links to, Then the new kinds are shown on the page, and an address shaped like an event stays an event', async () => {
+test('F27-AC90: F45-AC37: Given links of the slide, When kinds are saved to the route the page no longer links to, Then the new kinds are shown on the page, and an address shaped like an event stays an event', async () => {
   await post('/my/slides/talk/links', {
     url: 'https://example.com/a',
     title: 'A',
@@ -117,7 +117,7 @@ test('F27-AC88: F45-AC37: Given links of the slide, When kinds are saved to the 
   ).toEqual(['イベント', '動画', 'イベント'])
 })
 
-test('F27-AC88: Given a kind that is none of the four, When it is saved, Then nothing changes and the reason is shown', async () => {
+test('F27-AC90: Given a kind that is none of the four, When it is saved, Then nothing changes and the reason is shown', async () => {
   await post('/my/slides/talk/links', { url: 'https://example.com/a' })
   const [a] = await listLinks(db, 'talk')
   const response = await post('/my/slides/talk/links/kinds', {
@@ -129,7 +129,7 @@ test('F27-AC88: Given a kind that is none of the four, When it is saved, Then no
   expect(await kinds()).toEqual(['other'])
 })
 
-test("F27-AC88: Given another author's slide, When kinds are saved on it, Then it is not found and nothing changes", async () => {
+test("F27-AC90: Given another author's slide, When kinds are saved on it, Then it is not found and nothing changes", async () => {
   await post('/my/slides/talk/links', { url: 'https://luma.com/x1' })
   const [link] = await listLinks(db, 'talk')
   const response = await post(
@@ -274,7 +274,7 @@ test('F29-AC30: Given no related link with a page, When the slide page opens, Th
   )
 })
 
-test('F29-AC16: Given fetch watched, When event links are added, their kinds saved and the slide page opened, Then nothing is fetched', async () => {
+test('F45-AC19: Given fetch watched, When event links are added, their kinds saved and the slide page opened, Then nothing is fetched', async () => {
   const fetched = vi.spyOn(globalThis, 'fetch')
   try {
     await post('/my/slides/talk/links', {

@@ -1,6 +1,6 @@
 /**
  * The page that makes a community as a place a sign-in returns to
- * (F30-AC40): `/communities/new`, with the group's page an event page
+ * (F30-AC73): `/communities/new`, with the group's page an event page
  * carried along as `link`. Nothing is made on the way back; the form is only
  * shown again, filled in.
  */

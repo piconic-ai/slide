@@ -27,11 +27,11 @@
 | --- | --- |
 | `id` | リンクの鍵(UUID)。「外す」が指す |
 | `deck_id` | スライド。`decks` を参照する |
-| `kind` | `video`、`article`、`other`。CHECK で縛る。足すときに URL から決める(F27-AC34)。表の形は変えていない |
-| `url` | `https:` の URL を、URL として読んだ形(`URL.href`)。入れたとおりの URL として扱い、記録として残す。どのページにも出さない(F27-AC59)。migration 0051 より前の行は、入れたとおりの文字を持たないので、この値を入れたとおりの URL としても扱う |
+| `kind` | `video`、`article`、`other`。CHECK で縛る。足すときに URL から決める(F27-AC87)。表の形は変えていない |
+| `url` | `https:` の URL を、URL として読んだ形(`URL.href`)。入れたとおりの URL として扱い、記録として残す。どのページにも出さない(F27-AC89)。migration 0051 より前の行は、入れたとおりの文字を持たないので、この値を入れたとおりの URL としても扱う |
 | `normalized_url` | すでにあるかを比べる形(下の「正規化した形」)。migration 0051 で足した。NULL を許すのは、それより前の版の Worker が、この列を書かずに足せるようにするため |
 | `sanitized_url` | 整えた URL(下の「整えた URL」)。viewer の href と、サイト名に使う。migration 0052 で足した。NULL の行(それより前の版の Worker が足したもの)は、読むときに `url` から作る |
-| `gather_key`、`link_host` | リンクのページに集める鍵と、URL に書かれたホスト名。migration 0071 で足した。[リンクによる集約の実装設計](f45-link-gathering.md#データlink6-で実装済み)に書く |
+| `gather_key`、`link_host` | リンクのページに集める鍵と、URL に書かれたホスト名。migration 0071 で足した。[リンクによる集約の実装設計](f45-link-gathering.md#データ)に書く |
 | `title` | 題名。作者が入れた 1〜100 文字(CHECK)。入れなかったときは NULL(migration 0045 で NOT NULL を外した)。画面は NULL のとき、サイト名だけを出す |
 | `position` | 足すたびに最大値 + 1。外しても詰めず、再利用しない。並びは `position` の昇順 |
 | `created_at` | 足した時刻 |
@@ -55,7 +55,7 @@
 
 ## 種類
 
-足すとき、作者には選ばせず、URL のホスト名から決める(F27-AC34、AC35)。`parseLinkInput` が、`kind` が省かれたとき(無い、`null`、空)に `kindOfUrl` を呼ぶ。MCP の道具は `kind` を省いてよく、指定があればそれを使う(F27-AC36)。指定が 3 つのどれでもなければ断る(`kind`)。
+足すとき、作者には選ばせず、URL から決める(F27-AC86、F27-AC87)。`parseLinkInput` が、`kind` が省かれたとき(無い、`null`、空)に `kindOfUrl` を呼ぶ。MCP の道具は `kind` を省いてよく、指定があればそれを使う(F27-AC36)。指定が 3 つのどれでもなければ断る(`kind`)。
 
 - 一覧(`src/links/kind-hosts.ts`)は、動画と記事のホスト名だけ。一覧のホストと、その下のサブドメインに当たれば、その種類。当たらなければ「その他」。`speakerdeck.com` のように、一覧にないものは「その他」で足りるので、書かない。
 - 比べるのは `new URL(...).hostname`(小文字、国際化ドメイン名は punycode)。そのため、見た目が似た別のドメイン(キリル文字の `у` を使った `уoutube.com` など)は一覧と一致せず、「その他」になる。末尾の `notyoutube.com` や `youtube.com.example` も一致しない(`.` で区切って、ホスト名の終わりと比べる)。パスや問い合わせの文字列に一覧の名前があっても、見ない。

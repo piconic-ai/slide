@@ -27,7 +27,7 @@ export default defineArticle({
             互いのフォローが外れ、相手はあなたをフォローできなくなります。
           </li>
           <li>
-            相手のスライドが、あなたのトップ、おすすめ、コミュニティとイベントのページの一覧と数、フォローしているコミュニティの新着に出なくなります。
+            相手のスライドが、あなたのトップ、おすすめ、コミュニティとリンクのページの一覧と数、フォローしているコミュニティの新着に出なくなります。
           </li>
           <li>
             相手のスライドや記事にあなたのスライドへのリンクがあっても、あなたの画面には引用として出ず、お知らせも届かず、「引用された」の数にも入りません。リンクを書くこと自体は止められません。
@@ -74,8 +74,8 @@ export default defineArticle({
           </li>
           <li>
             Their slides no longer appear on your top page, in recommendations,
-            in the lists and counts of community and event pages, or among new
-            slides of the communities you follow.
+            in the lists and counts of community pages and pages of links, or
+            among new slides of the communities you follow.
           </li>
           <li>
             When their slides or articles link to yours, you do not see them as

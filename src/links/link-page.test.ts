@@ -181,7 +181,7 @@ test.each([
   },
 )
 
-test('F45-AC24: F45-AC9: Given an event with one talk, When the link is removed, Then its page of links is the page of no gathering and its number is not found', async () => {
+test('F45-AC41: F45-AC9: Given an event with one talk, When the link is removed, Then its page of links is the page of no gathering and its number is not found', async () => {
   await seedPublic(db, 'talk', 100, 'Talk')
   await add('talk', KANAGAWA)
   const id = await eventIdOf(KANAGAWA_KEY)
@@ -261,7 +261,7 @@ test.each([
     'https://kanagawapm.connpass.com/event/410635/',
   ],
 ])(
-  'F45-AC25: Given links to one connpass event whose first saved one names %s, When its page opens, Then it leads to the event under that first link’s group, or under none',
+  'F45-AC42: Given links to one connpass event whose first saved one names %s, When its page opens, Then it leads to the event under that first link’s group, or under none',
   async (_, links, source) => {
     await seedPublic(db, 'first', 100, 'First')
     await seedPublic(db, 'second', 200, 'Second', '2')
@@ -272,7 +272,7 @@ test.each([
   },
 )
 
-test('F45-AC25: Given the first saved link of a connpass event is on a draft, When the event page opens, Then it follows the oldest link on a public slide instead', async () => {
+test('F45-AC42: Given the first saved link of a connpass event is on a draft, When the event page opens, Then it follows the oldest link on a public slide instead', async () => {
   await seedDeck(db, 'draft')
   await seedDeployment(db, 'draft')
   await seedPublic(db, 'talk', 100, 'Talk')
@@ -282,7 +282,7 @@ test('F45-AC25: Given the first saved link of a connpass event is on a draft, Wh
   expect(sourceOf(await flat(`/events/${id}`))).toBe(KANAGAWA)
 })
 
-test('F45-AC25: Given three links to one connpass event, When the first saved one is removed and then the next, Then the page follows the oldest link left each time', async () => {
+test('F45-AC42: Given three links to one connpass event, When the first saved one is removed and then the next, Then the page follows the oldest link left each time', async () => {
   // One deck keeps one link to an event (F27-AC44), so each is on its own.
   await seedPublic(db, 'a', 100, 'A')
   await seedPublic(db, 'b', 200, 'B')
@@ -544,7 +544,7 @@ const removeLink = async (deck: string, cookie: string) =>
     env,
   )
 
-test('F45-AC1: F45-AC2: F45-AC24: Given a link that is no event, When slides of one author, then of two, carry it and one leaves again, Then its page shows only with two authors, and otherwise answers as an address nobody added', async () => {
+test('F45-AC1: F45-AC2: F45-AC41: Given a link that is no event, When slides of one author, then of two, carry it and one leaves again, Then its page shows only with two authors, and otherwise answers as an address nobody added', async () => {
   await seedTwo()
   await seedPublic(db, 'more', 300, 'Owner more')
   const nobody = await get(POST_PAGE)
@@ -578,7 +578,7 @@ test('F45-AC1: F45-AC2: F45-AC24: Given a link that is no event, When slides of 
   expect(await (await get(POST_PAGE)).text()).toBe(missing)
 })
 
-test('F45-AC10: F45-AC25: Given a link of two authors with no title, When the first saved link is removed, Then the heading is the site and the address, and the way out follows the oldest link left', async () => {
+test('F45-AC10: F45-AC42: Given a link of two authors with no title, When the first saved link is removed, Then the heading is the site and the address, and the way out follows the oldest link left', async () => {
   await seedTwo()
   await seedPublic(db, 'third', 300, 'Third', '2')
   await add('talk', `${POST}?a=1&utm_source=x`)

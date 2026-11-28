@@ -246,7 +246,7 @@ test.each([
     label: '@bob’s slides “<script>example</script>” are now in Kanagawa.pm',
   },
 ] as const)(
-  'F20-AC15: Given Alice has a community notice, When she reads her bell and opens the $lang list, Then the unread count is one and the line names the community and links to the slide',
+  'F20-AC20: Given Alice has a community notice, When she reads her bell and opens the $lang list, Then the unread count is one and the line names the community and links to the slide',
   async (t) => {
     await db.insert(communities).values({
       id: 91,

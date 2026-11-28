@@ -16,7 +16,7 @@ export default defineArticle({
       html`勉強会やカンファレンスのページ(コミュニティ)を、ログインしている人ならだれでも作れます。`,
     body: (n) =>
       html`<p>
-          紐づけ用リンクに合うイベントの発表が、自動でコミュニティのページに集まります。コミュニティは、人と同じ並びの
+          紐づけ用リンクに合う関連リンクを持つスライドが、自動でコミュニティのページに集まります。コミュニティは、人と同じ並びの
           <code>${SERVICE_NAME}/@ハンドル</code> の URL を持ちます。
         </p>
 
@@ -26,7 +26,7 @@ export default defineArticle({
               >コミュニティの管理</a
             >の「コミュニティを作る」から、<a href="/communities/new"
               >コミュニティを作る</a
-            >のページを開きます。イベントのページの「このグループのコミュニティはまだありません」の「作る」からも進めます。そのときは、紐づけ用リンクが入った状態で開きます。
+            >のページを開きます。イベントのリンクのページの「このグループのコミュニティはまだありません」の「作る」からも進めます。そのときは、紐づけ用リンクが入った状態で開きます。
           </li>
           <li>
             ハンドル、名前(${n.communityNameChars}
@@ -35,7 +35,7 @@ export default defineArticle({
             日たっていないハンドルは使えません。ハンドルはあとから変えられません。
           </li>
           <li>
-            作った人が管理者になり、コミュニティのページへ進みます。紐づけ用リンクに合う既存のイベントの発表が、すでに並んでいます。カバー画像とロゴは、5
+            作った人が管理者になり、コミュニティのページへ進みます。紐づけ用リンクに合う既存のスライドが、すでに並んでいます。カバー画像とロゴは、5
             色から選ばれた色の既定の見た目になります。
           </li>
         </ol>`,
@@ -47,7 +47,7 @@ export default defineArticle({
       community.`,
     body: (n) =>
       html`<p>
-          Talks given at events that match its links gather on the community’s
+          Slides whose related links match its links gather on the community’s
           page by themselves. A community has a URL of the form
           <code>${SERVICE_NAME}/@handle</code>, like a person.
         </p>
@@ -57,7 +57,8 @@ export default defineArticle({
             Open <a href="/communities/new">Create a community</a> from
             <a href="/my/communities">Your communities</a> in the account menu.
             You can also press “Create” under “This group has no community yet”
-            on an event’s page, which opens it with the link filled in.
+            on the page of an event’s link, which opens it with the link filled
+            in.
           </li>
           <li>
             Enter a handle, a name (up to ${n.communityNameChars} characters)
@@ -66,9 +67,9 @@ export default defineArticle({
             cannot be taken. The handle cannot be changed later.
           </li>
           <li>
-            You become its admin and go to the community’s page. Talks at
-            existing events that match the links are already there. The cover
-            and the logo take a default look in one of five colors.
+            You become its admin and go to the community’s page. Existing slides
+            that match the links are already there. The cover and the logo take
+            a default look in one of five colors.
           </li>
         </ol>`,
   },

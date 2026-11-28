@@ -17,7 +17,7 @@ const scope3 = readdirSync('migrations')
 
 // The one migration that drops a table: a CHECK constraint (the kinds a
 // notification may have) cannot be altered, so notifications is dropped and
-// made again for community_published (F20-AC15). The service has one user so
+// made again for community_published (F20-AC20). The service has one user so
 // far and the requester agreed that its notifications may go (2026-11-26).
 const REBUILDS = {
   '0060_community_notifications.sql': ['DROP TABLE'],

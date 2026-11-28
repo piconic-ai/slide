@@ -26,8 +26,11 @@ export default defineArticle({
         </ul>
         <ul>
           <li>
-            イベントのページの URL
-            のホスト名が、紐づけ用リンクのホスト名と同じなら、そのイベントの発表がコミュニティに入ります。コミュニティを作る前からあるイベントも入ります。
+            関連リンクの URL
+            のホスト名が、紐づけ用リンクのホスト名と同じなら、種類を問わず、そのリンクとスライドがコミュニティに入ります。コミュニティを作る前からあるリンクも入ります。<code
+              >www.</code
+            >
+            の有無は、別のホスト名です。
           </li>
           <li>
             Luma は、${SERVICE_NAME}
@@ -53,7 +56,7 @@ export default defineArticle({
             つのコミュニティにだけ入れられます。ほかのコミュニティが使っているリンクは、入れられません。
           </li>
           <li>
-            紐づけ用リンクを外すと、そのリンクで入っていたイベントが、コミュニティから外れます。スライドとイベントのページは残ります。
+            紐づけ用リンクを外すと、そのリンクで入っていたリンクが、コミュニティから外れます。スライドと関連リンクは残ります。
           </li>
           <li>グループの主催者かどうかは、${SERVICE_NAME} は確かめません。</li>
         </ul>`,
@@ -76,9 +79,10 @@ export default defineArticle({
         </ul>
         <ul>
           <li>
-            When the host name of an event’s URL is the host name of a link, the
-            talks at that event join the community, including events from before
-            the community was made.
+            When the host name of a related link’s URL is the host name of a
+            link, that related link and its slides join the community, whatever
+            its kind, including links from before the community was made. With
+            and without <code>www.</code> are different host names.
           </li>
           <li>
             For Luma, ${SERVICE_NAME} reads the calendar’s feed and adds the
@@ -102,8 +106,8 @@ export default defineArticle({
             cannot be added.
           </li>
           <li>
-            Removing a link takes out the events it brought in. The slides and
-            the event pages stay.
+            Removing a link takes out the related links it brought in. The
+            slides and their related links stay.
           </li>
           <li>${SERVICE_NAME} does not check that you organize the group.</li>
         </ul>`,

@@ -323,7 +323,7 @@ function siteRows(form: EditCommunityForm, lang: Lang) {
 }
 
 /**
- * A community's editing page (F30-AC25), for its admins only: its handle
+ * A community's editing page (F30-AC69), for its admins only: its handle
  * (shown, not changed), name, links, description, color, logo, cover and other
  * links, then "save" and "cancel"; and, below,
  * the parts the admins and deletion add.

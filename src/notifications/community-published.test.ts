@@ -129,7 +129,7 @@ const post = (path: string, fields: Record<string, string>) =>
     env,
   )
 
-test('F20-AC15: Given followers of a community and a draft linked to its event, When the author publishes it first, Then each follower is told once, naming the community and the slide, and the author is not', async () => {
+test('F20-AC20: Given followers of a community and a draft linked to its event, When the author publishes it first, Then each follower is told once, naming the community and the slide, and the author is not', async () => {
   await followAs(BOB)
   await followAs(CAROL)
   // The community's maker follows it (F31-AC17) and is the author here.
@@ -162,7 +162,7 @@ test('F20-AC15: Given followers of a community and a draft linked to its event, 
   expect(await countUnread(database, OWNER_ID)).toBe(0)
 })
 
-test('F20-AC15: Given a draft not linked to any event, When it is published, Then no follower is told', async () => {
+test('F20-AC20: Given a draft not linked to any event, When it is published, Then no follower is told', async () => {
   await followAs(BOB)
   const first = await draft('talk', null)
   await change({ kind: 'publish', deploymentId: first }, 0)
@@ -243,7 +243,7 @@ test('F20-AC17: Given someone stopped the notice for people they follow, When th
   expect(await recipients()).toEqual([BOB])
 })
 
-test('F20-AC16: Given a public slide, When the author adds an event link by the form, Then the follower is told and the slide opens from the notice', async () => {
+test('F20-AC21: Given a public slide, When the author adds an event link by the form, Then the follower is told and the slide opens from the notice', async () => {
   await followAs(BOB)
   await change({ kind: 'publish', deploymentId: await draft('talk', null) }, 0)
   expect(await told()).toEqual([])
@@ -252,7 +252,7 @@ test('F20-AC16: Given a public slide, When the author adds an event link by the 
   expect(await recipients()).toEqual([BOB])
 })
 
-test('F20-AC16: Given a public slide, When an event link is added through the MCP service, Then the follower is told', async () => {
+test('F20-AC21: Given a public slide, When an event link is added through the MCP service, Then the follower is told', async () => {
   await followAs(BOB)
   await change({ kind: 'publish', deploymentId: await draft('talk', null) }, 0)
   await addRelatedLink({ env, ownerUserId: OWNER_ID }, 'talk', {
@@ -262,7 +262,7 @@ test('F20-AC16: Given a public slide, When an event link is added through the MC
   expect(await recipients()).toEqual([BOB])
 })
 
-test('F20-AC16: Given a public slide, When a link of another kind is added, or a link’s kind becomes event, Then only the event one tells', async () => {
+test('F20-AC21: Given a public slide, When a link of another kind is added, or a link’s kind becomes event, Then only the event one tells', async () => {
   await followAs(BOB)
   await change({ kind: 'publish', deploymentId: await draft('talk', null) }, 0)
   await post('/my/slides/talk/links', { url: 'https://example.com/a' })
@@ -277,7 +277,7 @@ test('F20-AC16: Given a public slide, When a link of another kind is added, or a
   expect(await recipients()).toEqual([BOB])
 })
 
-test('F20-AC16: Given a public slide already in a community, When a later follower exists and an unrelated event link is added by the form, a kind change or the MCP service, Then the later follower is not told', async () => {
+test('F20-AC21: Given a public slide already in a community, When a later follower exists and an unrelated event link is added by the form, a kind change or the MCP service, Then the later follower is not told', async () => {
   await change({ kind: 'publish', deploymentId: await draft() }, 0)
   await followAs(BOB)
   expect(await told()).toEqual([])
@@ -298,7 +298,7 @@ test('F20-AC16: Given a public slide already in a community, When a later follow
   expect(await told()).toEqual([])
 })
 
-test('F20-AC16: Given a draft, and a slide paused before it was ever public, When an event link is added, Then nobody is told', async () => {
+test('F20-AC21: Given a draft, and a slide paused before it was ever public, When an event link is added, Then nobody is told', async () => {
   await followAs(BOB)
   await draft('talk', null)
   await addRelatedLink({ env, ownerUserId: OWNER_ID }, 'talk', {
@@ -333,7 +333,7 @@ test('F20-AC18: Given a slide that is public with an event link, When a communit
   expect(await told()).toEqual([])
 })
 
-test('F20-AC15: Given followers who muted or blocked the author (either way) or stopped the notice, When the slide is published, Then only the one without any of these is told', async () => {
+test('F20-AC20: Given followers who muted or blocked the author (either way) or stopped the notice, When the slide is published, Then only the one without any of these is told', async () => {
   const ERIN = '505'
   const FINN = '606'
   await db.insert(accounts).values([
@@ -370,7 +370,7 @@ test('F20-AC10: Given a notice, When the slide is hidden, or the author is block
   expect(await countUnread(database, BOB)).toBe(0)
 })
 
-test('F20-AC15: Given a notice, When the community is deleted, Then the notice goes and the others’ stay', async () => {
+test('F20-AC20: Given a notice, When the community is deleted, Then the notice goes and the others’ stay', async () => {
   await followAs(BOB)
   await change({ kind: 'publish', deploymentId: await draft() }, 0)
   await db.insert(notifications).values({
@@ -394,7 +394,7 @@ test('F20-AC15: Given a notice, When the community is deleted, Then the notice g
   ).toEqual(['other'])
 })
 
-test('F20-AC15: Given a follower with a notice, When they leave the service, Then it goes', async () => {
+test('F20-AC20: Given a follower with a notice, When they leave the service, Then it goes', async () => {
   await followAs(BOB)
   await followAs(CAROL)
   await change({ kind: 'publish', deploymentId: await draft() }, 0)
@@ -408,7 +408,7 @@ test('F31-AC19: Given the community, When someone follows it or lets go, Then no
   expect(await db.select().from(notifications)).toEqual([])
 })
 
-test('F20-AC15: Given the notifier fails, When the author first publishes, Then publication succeeds and the failure is logged', async () => {
+test('F20-AC20: Given the notifier fails, When the author first publishes, Then publication succeeds and the failure is logged', async () => {
   await followAs(BOB)
   await db.run(
     sql.raw(`CREATE TRIGGER refuse_community BEFORE INSERT ON notifications
@@ -444,7 +444,7 @@ test('F20-AC15: Given the notifier fails, When the author first publishes, Then 
   }
 })
 
-test('F20-AC16: Given the join of followers to events, When the query plan is read, Then the host index serves the event lookup', async () => {
+test('F20-AC21: Given the join of followers to events, When the query plan is read, Then the host index serves the event lookup', async () => {
   const plan = await db.all<{ detail: string }>(sql`EXPLAIN QUERY PLAN
     SELECT 1 FROM related_link_events WHERE host = 'kanagawapm.connpass.com'`)
   expect(plan.map((row) => row.detail).join('\n')).toContain(
@@ -477,7 +477,7 @@ test('F20-AC21: Given a slide first published at T, When an event link is added 
   expect(await recipients()).toEqual([BOB])
 })
 
-test('F20-AC16: Given a slide first published a month ago, When an event link is added through the form, Then nobody is told', async () => {
+test('F20-AC21: Given a slide first published a month ago, When an event link is added through the form, Then nobody is told', async () => {
   await followAs(BOB)
   await change(
     { kind: 'publish', deploymentId: await draft('talk', null) },

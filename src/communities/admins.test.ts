@@ -242,7 +242,7 @@ describe('admins', () => {
     ['not an admin', () => bob],
     ['signed out', () => ''],
   ])(
-    'F30-AC26: Given someone %s, When they send the admin and deletion forms, Then each is refused and nothing changes',
+    'F30-AC70: Given someone %s, When they send the admin and deletion forms, Then each is refused and nothing changes',
     async (_who, cookieOf) => {
       const cookie = cookieOf()
       expect(
@@ -354,7 +354,7 @@ describe('deleting', () => {
     ).toBe('available')
     expect(await orm.select().from(relatedLinks)).toHaveLength(2)
     // An event keeps its page with one slide (F45-AC3); the other link's
-    // page is the one of an address nobody gathered (F45-AC12).
+    // page is the one of an address nobody gathered (F45-AC40).
     expect((await open('/link/connpass.com/event/410635', '')).status).toBe(200)
     const gone = await open('/link/example.com/post', '')
     expect(gone.status).toBe(404)

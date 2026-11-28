@@ -55,7 +55,7 @@ export const communityIdOf = (text: string | undefined) =>
 
 /**
  * The community a request may change, and who asks: only a signed-in admin
- * of it (F30-AC26). Anyone else, and a community that is not there, get
+ * of it (F30-AC70). Anyone else, and a community that is not there, get
  * null alike, so nobody learns who runs what.
  */
 export async function adminRequest<E extends AppEnv>(
@@ -128,7 +128,7 @@ const backToEdit = (community: Community, notice: EditNotice | AdminNotice) =>
   `${profilePath(community.handle)}/edit${notice ? `?notice=${notice}` : ''}`
 
 /**
- * Saves what an admin changed (F30-AC25, F30-AC45): the name, the
+ * Saves what an admin changed (F30-AC69, F30-AC45): the name, the
  * description, the color, the other links and the links. A link another community holds is not taken,
  * and nothing is saved.
  */
@@ -335,7 +335,7 @@ communityEditForms.post(
 )
 
 /**
- * Deletes the community (F30-AC32, F30-AC33) once its handle is typed: the
+ * Deletes the community (F30-AC32, F30-AC71) once its handle is typed: the
  * page enables "delete" only then, and the service checks it again.
  */
 communityEditForms.post('/communities/:id/delete', csrf(), async (c) => {

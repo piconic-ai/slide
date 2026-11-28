@@ -205,7 +205,7 @@ const ofEvent = (eventId: number) => eq(relatedLinkEvents.event_id, eventId)
  * deck once, however many of its links name the event. With them, the hosts
  * the links of its public talks were written with (the groups, on connpass).
  * Its first title and where it leads (`source`) follow the oldest of those
- * links (F45-AC10, F45-AC25).
+ * links (F45-AC10, F45-AC42).
  * Null when there is no such event or it has no public talk: that is the
  * same for everyone. The viewer's mutes and blocks only leave talks out of
  * the list, down to none (F45-AC15).
@@ -348,7 +348,7 @@ const gatheredBy = (keys: readonly string[]) =>
  * Null unless the page shows (`pageShown`): an address only one author's
  * slides carry answers as one nobody added (F45-AC2), unless a community
  * holds its host (F45-AC4). The heading and the
- * way out follow the oldest link (F45-AC10, F45-AC25); the viewer's mutes
+ * way out follow the oldest link (F45-AC10, F45-AC42); the viewer's mutes
  * and blocks only leave slides out of the list (F45-AC15).
  */
 export async function readGatheredPage(

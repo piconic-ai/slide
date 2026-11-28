@@ -37,7 +37,7 @@ export const NEW_COMMUNITY_PATH = '/communities/new'
 export type LinkPageView = Readonly<{
   /** What the heading is made of: an event, or a link that is none. */
   event: NamedEvent
-  /** Where the page leads readers: the address's own page (F45-AC25). */
+  /** Where the page leads readers: the address's own page (F45-AC42). */
   source: string
   talks: readonly EventTalk[]
   /** The hosts the links of the talks were written with. */

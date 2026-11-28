@@ -25,7 +25,7 @@ export const linkMissingStyle = html`<style>
 </style>`
 
 /**
- * The page of an address no slides are gathered at (F45-AC12): the same for
+ * The page of an address no slides are gathered at (F45-AC40): the same for
  * an address no one wrote and for one a single author wrote. The address is
  * shown as text and never as a link (F45-AC29): anyone can write any address
  * after `/link/`, and the service does not lead readers there.

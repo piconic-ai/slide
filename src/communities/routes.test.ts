@@ -384,6 +384,21 @@ describe("a community's page", () => {
     )
   })
 
+  test('F30-AC68: F45-AC38: Given a link with more slides than its row shows, When "n more" is followed from the links tab, Then the page it leads to lists every slide of the row and the ones the row left out', async () => {
+    await seedEvents()
+    const body = await flat(await open('/@kanagawapm'))
+    const one = body.slice(body.indexOf('Kanagawa.pm #1'))
+    const href =
+      /<li class="carousel-more"> ?<a href="([^"]+)" ?>ほか (\d+) 本/.exec(one)
+    expect(href).not.toBeNull()
+    const [, path, left] = href!
+    const shown = one
+      .slice(0, one.indexOf('carousel-more'))
+      .match(/class="deck-card"/g)?.length
+    const page = await flat(await open(path!))
+    expect(page.match(/class="deck-card"/g)).toHaveLength(shown! + Number(left))
+  })
+
   test('F30-AC68: F45-AC4: F45-AC17: F32-AC22: Given links that are no event in a community, When the links tab opens, Then each is listed like an event, one author alone too, its heading leads to a page headed by the community, and a link left with no slide by a block is not listed', async () => {
     await seedEvents()
     await seedCommunity(db, {

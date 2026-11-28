@@ -5,13 +5,17 @@ import { SERVICE_NAME } from '../../../site/service'
 export default defineArticle({
   order: 50,
   form: 'howto',
-  related: ['community/remove-event-talk', 'community/create-community'],
+  related: [
+    'community/link-gathering',
+    'community/remove-event-talk',
+    'community/create-community',
+  ],
   ja: {
     title: 'スライドをイベントの発表として並べる',
     lead: () =>
       html`スライドの関連リンクに、勉強会やカンファレンスのイベントのページの
-      URL
-      を入れると、そのスライドがイベントの発表として、イベントのページに並びます。`,
+      URL を入れると、そのスライドがイベントの発表として、その URL
+      のリンクのページに並びます。`,
     body: () =>
       html`<p>主催者がイベントを登録する必要はありません。</p>
         <h2>並べかた</h2>
@@ -38,16 +42,19 @@ export default defineArticle({
                 >、<code>https://lu.ma/文字列</code>、<code>https://luma.com/event/evt-…</code>(コミュニティのカレンダーにあるイベントなら、どちらの形でも同じイベントに並びます)
               </li>
             </ul>
-            上の形ではない、ほかのサービス(Peatix、TECH PLAY
-            など)のイベントは、いまのところ並びません。
+            上の形ではない、ほかのサービス(Peatix、TECH PLAY など)の URL
+            は、種類が「その他」になり、<a href="/help/community/link-gathering"
+              >同じ URL を入れた作者が 2 人以上になると並びます</a
+            >。
           </li>
           <li>
             リンクの行の下に、どこに並ぶか(「(コミュニティ名)
             のページに並びます。」「リンクのページに並びます。」)が出ます。どこにも並ばない行には、出ません。
           </li>
           <li>
-            スライドが一般公開されると、そのイベントのページに並びます。同じイベントの
-            URL
+            スライドが一般公開されると、そのイベントの URL
+            のリンクのページに並びます。作者が 1
+            人でも、ページは出ます。同じイベントの URL
             を入れたほかの作者のスライドも、同じページに並びます。スライドが並ぶページは、スライドの編集の画面の「このスライドが並ぶページ」の枠で確かめられます。
           </li>
         </ol>
@@ -65,14 +72,14 @@ export default defineArticle({
           </li>
           <li>1 本のスライドは、いくつのイベントにも入れます。</li>
           <li>
-            イベントのページに並ぶのは、一般公開中のスライドだけで、一般公開の新しい順です。
+            リンクのページに並ぶのは、一般公開中のスライドだけで、一般公開の新しい順です。
           </li>
           <li>
             照らすのは関連リンクだけです。スライドの本文や記事の中のリンクでは、イベントに入りません。
           </li>
           <li>
-            ${SERVICE_NAME}
-            は、イベントのページを取りに行きません。イベントの日時と場所は出しません。
+            ${SERVICE_NAME} は、connpass
+            などのイベントのページを取りに行きません。イベントの日時と場所は出しません。
           </li>
         </ul>`,
   },
@@ -80,8 +87,8 @@ export default defineArticle({
     title: 'List your slides as talks at an event',
     lead: () =>
       html`Put the URL of the page of a meetup or a conference event into the
-      related links of your slides, and the slides are listed as a talk on the
-      event’s page.`,
+      related links of your slides, and the slides are listed as a talk on that
+      URL’s page of links.`,
     body: (n) =>
       html`<p>The organizers do not need to register the event.</p>
         <h2>How to list slides</h2>
@@ -108,8 +115,11 @@ export default defineArticle({
                 community’s calendar, either form lists it as the same event)
               </li>
             </ul>
-            An event on another service (Peatix, TECH PLAY and so on) is not
-            listed for now.
+            A URL on another service (Peatix, TECH PLAY and so on) gets the kind
+            Other, and
+            <a href="/help/community/link-gathering"
+              >is listed once two or more authors have entered the same URL</a
+            >.
           </li>
           <li>
             Under the row of the link, one sentence says where it is listed
@@ -117,10 +127,10 @@ export default defineArticle({
             link.”). A row listed nowhere has none.
           </li>
           <li>
-            When the slides are public, they are listed on the event’s page,
-            together with other authors’ slides that link to the same event. The
-            “Pages this slide appears on” area on the edit page shows the pages
-            the slides are on.
+            When the slides are public, they are listed on the page of links of
+            the event’s URL, even with one author, together with other authors’
+            slides that link to the same event. The “Pages this slide appears
+            on” area on the edit page shows the pages the slides are on.
           </li>
         </ol>
         <h2>The rules</h2>
@@ -135,7 +145,7 @@ export default defineArticle({
           </li>
           <li>One slide can be in any number of events.</li>
           <li>
-            An event’s page lists only public slides, the most recently made
+            The page of links lists only public slides, the most recently made
             public first.
           </li>
           <li>
@@ -143,8 +153,8 @@ export default defineArticle({
             article does not put them in an event.
           </li>
           <li>
-            ${SERVICE_NAME} does not fetch the event’s page, and shows no date
-            or place for it.
+            ${SERVICE_NAME} does not fetch the event’s page on connpass and the
+            others, and shows no date or place for it.
           </li>
         </ul>`,
   },

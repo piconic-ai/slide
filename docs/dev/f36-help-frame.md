@@ -192,7 +192,7 @@ URL も内容も変えない。`src/site/help-bot-page.ts` はそのままで、
 | ブログへの埋め込み(`embed`) | `sharing/embed-in-blog`(ブログにスライドを埋め込む) |
 | AI エージェントから置く(`agent`) | `agent/connect`(AI エージェントをつなぐ)、`agent/capabilities`(AI エージェントにできること、できないことを知る)、`agent/revoke`(AI エージェントの接続を取り消す) |
 | フォロー(`follow`) | `community/follow-people`(人をフォローする)、`community/unfollow`(フォローをやめる) |
-| イベントの発表(`events`) | `community/list-event-talks`(スライドをイベントの発表として並べる)、`community/event-names`(イベント名を直す)、`community/remove-event-talk`(スライドをイベントのページから外す) |
+| イベントの発表(`events`) | `community/list-event-talks`(スライドをイベントの発表として並べる)、`community/remove-event-talk`(スライドをイベントのリンクのページから外す)。`community/event-names`(イベント名を直す)は、名前を直す経路と一緒に消した(F45-AC20) |
 | コミュニティ(`communities`) | `community/create-community`(コミュニティを作る)、`community/link-rules`(紐づけ用リンクを決める)、`community/community-admins`(コミュニティを管理する)、`community/follow-community`(コミュニティをフォローする)、`community/delete-community`(コミュニティを削除する)、`community/ask-us`(ハンドルの変更などを運営に頼む) |
 | ブロック(`block`) | `safety/block-user`(人をブロックする)、`safety/block-vs-mute`(ブロックとミュートの違いを知る) |
 | 安全について(`safety`) | `safety/external-access`(知らない人のスライドを安全に開く) |
@@ -235,7 +235,7 @@ H1 の枠に、このスコープで増えた機能の記事を足した。URL �
 - 「禁止されていること」の日本語の一覧は、利用規約の「禁止事項」の号を、そのまま描く(言葉を合わせるため)。英語の一覧は訳で、号の数が変わるとテストが失敗する。
 - `safety/terms` と `safety/privacy` は、文面が下書きのあいだだけ、下書きであることを書く(`legalIsDraft`)。施行日が入ると、その 1 段落が消える。
 - 記事に数字を足すときは、`helpNumbers()` に足す(書き出しの 1 つの zip の上限、1 ページの本数、取り出す URL の期限、1 回に返すファイルの数を足した)。
-- 記事を足したら、`src/help/moved-content.pure.test.ts` の `ADDED_ARTICLES` に足す。
+- 記事を足したら、`src/help/moved-content.pure.test.ts` の `ADDED_ARTICLES` に足す。`community/link-gathering`(同じリンクを添えたスライドを集めて見る。F45-AC22)は、こうして足した。
 
 ### 画面から記事へのリンク(作業 H2)
 

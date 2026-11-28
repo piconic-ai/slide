@@ -165,6 +165,73 @@ describe('the article on connecting an AI agent', () => {
   })
 })
 
+describe('the article on slides gathered by a related link', () => {
+  test.each([
+    [
+      'ja',
+      [
+        '2 人以上の作者',
+        '1 本でもあれば',
+        'slide.community/link/',
+        '「このリンクを添えたスライド」',
+        '「このスライドが並ぶページ」',
+        '「リンク」のタブ',
+        '「この URL の集まりは、まだありません」',
+        '「外す」を押します',
+        'リンク先を取りに行きません',
+        '最初に保存された題名',
+        '見出しを後から直す画面は、ありません',
+      ],
+    ],
+    [
+      'en',
+      [
+        'two or more authors',
+        'even one public slide',
+        'slide.community/link/',
+        '“Slides with this link”',
+        '“Pages this slide appears on”',
+        '“Links” tab',
+        '“Nothing is gathered at this URL yet”',
+        'press “Remove” on the link',
+        'does not fetch the linked page',
+        'the title saved first',
+        'no screen to change the heading later',
+      ],
+    ],
+  ] as const)(
+    'F45-AC22: Given the article on link gathering in %s, When it is read, Then it says when slides gather, how to open the page under /link/, how to take slides off, and where the heading comes from',
+    async (lang, phrases) => {
+      const { lead, body, bodyHtml } = await render(
+        'community/link-gathering',
+        lang,
+      )
+      for (const phrase of phrases) expect(`${lead}\n${body}`).toContain(phrase)
+      expect(bodyHtml).toContain('href="/contact"')
+    },
+  )
+
+  test('F45-AC22: Given the articles on related links and on event talks, When they are read in each language, Then each leads to the article on link gathering', async () => {
+    for (const key of ['articles/related-links', 'community/list-event-talks'])
+      for (const lang of LANGS)
+        expect((await render(key, lang)).bodyHtml).toContain(
+          'href="/help/community/link-gathering"',
+        )
+  })
+
+  test('F45-AC22, F30-AC72: Given every article in each language, When it is read, Then none speaks of the service’s event pages, its tab of events, or fixing an event’s name', async () => {
+    const GONE =
+      /イベントのページに並|発表したイベント|イベントのタブ|イベント名の修正|イベント名を直す|listed on the event’s page|Events tab|event’s name/u
+    for (const entry of HELP_CATALOG)
+      for (const lang of LANGS) {
+        const { lead, body } = await render(entry.key, lang)
+        expect(`${entry.article[lang].title}\n${lead}\n${body}`).not.toMatch(
+          GONE,
+        )
+      }
+  })
+})
+
 describe('the wording of the articles that was read through', () => {
   test.each([
     [1, '1 day'],

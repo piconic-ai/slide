@@ -1,6 +1,6 @@
 # コミュニティの実装設計
 
-[コミュニティをつくる](../features/f30-communities.md) の F30-AC9〜F30-AC41 と、[イベントの発表として並ぶ](../features/f29-event-talks.md) の F29-AC22 を作るための設計。ハンドルの表と取り方は [人とコミュニティが分け合うハンドルの実装設計](f30-handles.md)、イベントの表と URL の鍵は [イベントの発表の実装設計](f29-event-talks.md) にある。
+[コミュニティをつくる](../features/f30-communities.md) の設計。ハンドルの表と取り方は [人とコミュニティが分け合うハンドルの実装設計](f30-handles.md)、イベントの表と URL の鍵は [イベントの発表の実装設計](f29-event-talks.md)、コミュニティに入るリンクの条件、「リンク」のタブ、リンクのページは [リンクによる集約の実装設計](f45-link-gathering.md) にある。
 
 ## 表
 
@@ -17,7 +17,7 @@ migration は 0056(`migrations/0056_communities.sql`)。足すだけで、既存
 - `color` は作るときに 5 色(`red`、`orange`、`yellow`、`green`、`navy`)から乱数で選ぶ(D-45、F30-AC22)。変える経路は編集のフォームだけで、`readEditForm` が 5 色のどれかに解析し、`updateCommunity` がほかの値と同じ更新で書く(F30-AC45)。列の `CHECK` も 5 色に限る。
 - `sites` は「ほかのリンク」(D-37)の JSON の配列で、3 つまで(CHECK)。読むときに zod で解析する。
 - `logo_at`、`cover_at` は、アップロードした画像を置いた時刻(ミリ秒)。画像の URL の版にする。NULL なら頭文字と既定の模様。
-- イベントとコミュニティの対応は、表に書き写さない。読むときに、紐づけ用リンクのホスト名とイベントのリンクのホスト名(`related_link_events.host`)を突き合わせる(下の「照らし合わせ」)。紐づけ用リンクを足しても外しても、イベントが後から作られても、対応を作り直す処理が要らない(D-35)。照らし合わせのために、`related_link_events.host` に索引を足す。
+- リンクとコミュニティの対応は、表に書き写さない。読むときに、紐づけ用リンクのホスト名と、関連リンクに書かれたホスト名(イベントのリンクは `related_link_events.host`、ほかのリンクは `related_links.link_host`)を突き合わせる(下の「照らし合わせ」)。紐づけ用リンクを足しても外しても、イベントが後から作られても、対応を作り直す処理が要らない(D-35)。照らし合わせのために、`related_link_events.host` に索引を足す。
 
 ## 紐づけ用リンクの判定
 
@@ -31,7 +31,7 @@ migration は 0056(`migrations/0056_communities.sql`)。足すだけで、既存
 | 自前のサイト | `https://<ホスト名>/` | 同じ | `<ホスト名>` |
 
 - `http` も受け取り、`https` にそろえる。ホスト名は小文字にし、末尾の `.` を外す。クエリとフラグメントは捨てる。
-- パスはトップ(`/`)だけ。イベントのページやグループの下のページは `not_top` で断る。
+- パスはトップ(`/`)だけ。イベントの URL やグループの下のページは `not_top` で断る。
 - ユーザー名、パスワード、ポートのある URL、ホスト名の形でないもの(`localhost` など、`.` のないもの)は `invalid` で断る。
 - `luma.com`、`www.luma.com`、`lu.ma` のページと、形の違う `api.luma.com` の URL は `luma_calendar` で断る(カレンダーの iCal の URL を入れてもらう)。カレンダーの番号の形(`LUMA_CALENDAR_ID`)、パス(`LUMA_FEED_PATH`)、そろえた綴りの組み立て(`lumaFeedUrl`)は、配信の取得の側(`src/feeds/luma-url.ts`)と同じものを使う。
 - connpass と Doorkeeper のグループは、イベントの URL の判定と同じ `groupOf`(`src/events/event-url.ts`)で読む。
@@ -55,21 +55,21 @@ connpass と Doorkeeper のサブドメインのうち、サービスが自分�
 
 ## 照らし合わせ
 
-`src/communities/store.ts` の `inCommunity(communityId)` が、コミュニティのイベントを `events.id` の条件として返す(D-33、F30-AC14〜F30-AC16)。
+コミュニティに入るのは、紐づけ用リンクに合う関連リンクで、種類を問わない(D-33、F30-AC65、F30-AC16)。条件は `src/communities/store.ts` にあり、リンクの id の条件 `linkInCommunity(communityId, linkId)` と、スライドの id の条件 `deckInCommunity(communityId, deckId)` で使う。イベントだけの条件 `inCommunity(communityId)`(`events.id` の条件)も残り、イベントのリンクの判定と、viewer の「(コミュニティ名) のほかのイベントの発表」が使う。イベントでないリンクは、`related_links.link_host` が紐づけ用リンクの `host` と同じなら入る(`www.` の有無は別のホスト名)。細部は [リンクによる集約の実装設計](f45-link-gathering.md)の「コミュニティへの所属」に書いた。イベントのリンクは、次のとおりである。
 
 - connpass、Doorkeeper、自前のサイト: イベントのリンクのうち 1 本でも、書かれたホスト名(`related_link_events.host`)が紐づけ用リンクの `host` と一致すれば入る。connpass のイベントは、グループの違うリンクが混ざることがある(B の設計)。それぞれのグループのコミュニティに入る。
 - グループ名の無い `https://connpass.com/event/<番号>/` のリンクは、ホスト名が `connpass.com` で、これを持つコミュニティは無い(だれでも使うサイトとして断る)。どのコミュニティにも入らない。
 - Luma: 配信に並ぶイベントの鍵(`community_feed_events.event_key`)が `events.key` と一致すれば入る。作業 L は、`listFeedLinks` でカレンダーの一覧を読み、`addFeedEvents(db, { linkId, keys, now })` で鍵を入れる。鍵は `eventRefOf(url).key`。スライドがまだ無いイベントの鍵も入れてよい(後から関連リンクが保存されたときに入る)。配信から消えた鍵は外さない(D-68)。
-- 紐づけ用リンクを外すと(`replaceCommunityLinks`)、そのリンクの行と、Luma ならその配信の鍵が消え、そのリンクで入っていたイベントが外れる(F30-AC15)。
+- 紐づけ用リンクを外すと(`replaceCommunityLinks`)、そのリンクの行と、Luma ならその配信の鍵が消え、そのリンクで入っていたリンクが外れる(F30-AC66)。
 
-1 つのイベントが 2 つ以上のコミュニティに入ることがある(グループの違うリンクが混ざった connpass のイベント)。イベントのページのカバー画像と、イベントの行のコミュニティには、紐づけ用リンクがいちばん先に足されたコミュニティを出す。
+1 つのイベントが 2 つ以上のコミュニティに入ることがある(グループの違うリンクが混ざった connpass のイベント)。リンクのページの頭と、viewer のイベントの行のコミュニティには、紐づけ用リンクがいちばん先に足されたコミュニティを出す(`listEventCommunities`、`findHostCommunity`。`src/communities/event-communities-store.ts`)。
 
 ## 管理者の判定
 
-- 変更の経路(編集、画像、管理者、削除、イベント名)は、どれも最初に `community_admins` で、ログイン中の人が管理者かを確かめる。ログインしていない人と、管理者でない人は、同じく 404 にする(コミュニティの有無と、管理者かどうかを外から区別させない)。`/@ハンドル/edit` も同じ。
+- 変更の経路(編集、画像、管理者、削除)は、どれも最初に `community_admins` で、ログイン中の人が管理者かを確かめる。ログインしていない人と、管理者でない人は、同じく 404 にする(コミュニティの有無と、管理者かどうかを外から区別させない)。`/@ハンドル/edit` も同じ。
 - 管理者を外す処理は、1 つの文で「外したあとに 1 人以上残る」ことを条件にする。2 人が同時に互いを外しても、最後の 1 人は残る(F30-AC28)。
 - 編集のページの管理者の一覧(`adminsPanel`、`src/communities/admin-page.ts`)は、一覧に 1 人しかいないとき、その人の「管理者から外れる」を `disabled` で描き、理由の行を `aria-describedby` でつなぐ(F30-AC52)。一覧は、ハンドルのある管理者だけを数えるので、外す処理の数え方と合う。押せない状態は案内で、拒否はサーバーの条件が受け持つ。
-- イベント名を直せるのは、そのイベントが入っているコミュニティのどれかの管理者(F29-AC22)。作業 B の `mayRenameEvent` に、そのイベントのコミュニティの管理者の集合を渡す。
+- 管理者が直せるのは、名前、説明、色、ロゴ、カバー画像、ほかのリンク、紐づけ用リンクである(F30-AC69、F30-AC70)。イベント名(リンクのページの見出し)を直す経路は、2026-11-27 に消した(F45-AC20)。
 
 ## コミュニティの管理
 
@@ -92,16 +92,16 @@ connpass と Doorkeeper のサブドメインのうち、サービスが自分�
 ## 色と既定の見た目
 
 - 5 色の値は `src/site/design-tokens.ts` の `--community-*`(作業 B が足した)。色の名前は `src/site/cover-pattern.ts` の `COMMUNITY_COLORS`。
-- 既定のカバー画像は `coverPattern({ color, seed: id, label })`(D-46、F30-AC23)。アップロードした画像と既定の模様のどちらを描くかは、`communityCoverOf`(`src/communities/community.ts`)が選び、`coverOf`(`src/site/cover-pattern.ts`)が描く。コミュニティのページと、そのコミュニティのイベントのページは、同じこの 2 つを使う。アップロードした画像には `referrerpolicy="no-referrer"` が付く。
+- 既定のカバー画像は `coverPattern({ color, seed: id, label })`(D-46、F30-AC23)。アップロードした画像と既定の模様のどちらを描くかは、`communityCoverOf`(`src/communities/community.ts`)が選び、`coverOf`(`src/site/cover-pattern.ts`)が描く。コミュニティのページと、そのコミュニティに入ったリンクのページ(`src/links/link-page.ts`)は、同じこの 2 つを使う。アップロードした画像には `referrerpolicy="no-referrer"` が付く。
 - ロゴは、`logoOf`(`src/communities/logo.ts`)が、アップロードしたロゴの URL か頭文字かを選び、`communityLogo` で描く。コミュニティのページ、プロフィールのコミュニティのタブ、viewer のイベントの行は、どれも `logoOf` を使う。
 - ロゴの頭文字は、名前の最初の 1 文字(書記素)を大文字にして、色の「中」の地に出す。文字の色は、トークンの値から白と墨それぞれの対比を計算し、高い方を選ぶ(D-48、F30-AC24)。赤、緑、紺は白、橙、黄は墨になる。
 - 編集のページで色の見本を選ぶと、`public/share.js` の `previewCommunityColor` が、`data-color-shown` を付けたロゴとカバーの見本の中で、style に `--community-<色>` を持つ部品の色の名前だけを選んだ色に差し替える。頭文字の文字の色は、radio の `data-tone`(`letterTone` の結果)にする(F30-AC51)。アップロードした画像にはその部品が無いので変わらない。保存はしない。
 
 ## 削除
 
-管理者が、ハンドルを入れて削除する(D-39、F30-AC32、F30-AC33)。入力がハンドルと一致しないときは、サービスが断る。
+管理者が、ハンドルを入れて削除する(D-39、F30-AC32、F30-AC71)。入力がハンドルと一致しないときは、サービスが断る。
 
-1 つの batch で、`releaseHandleSteps`(ハンドルを 90 日の保留へ、F30-AC8)、配信の鍵、紐づけ用リンク、管理者、コミュニティの行を消す。R2 のロゴとカバー画像は、batch の後に消す。スライド、関連リンク、イベントは触らない。コミュニティのフォローの行も、同じ batch で消す([コミュニティのフォローの実装設計](f31-community-follow.md))。
+1 つの batch で、`releaseHandleSteps`(ハンドルを 90 日の保留へ、F30-AC8)、配信の鍵、紐づけ用リンク、管理者、コミュニティの行を消す。R2 のロゴとカバー画像は、batch の後に消す。スライド、関連リンク、イベントは触らない。紐づけ用リンクが無くなるので、コミュニティに入ったことだけで出ていたリンクのページは、「まだありません」のページになる(F30-AC71)。コミュニティのフォローの行も、同じ batch で消す([コミュニティのフォローの実装設計](f31-community-follow.md))。
 
 ## 運営の画面
 

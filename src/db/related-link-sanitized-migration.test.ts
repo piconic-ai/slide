@@ -90,7 +90,7 @@ const hrefs = [
   ),
 ]
 
-test('F27-AC59: Given links kept before the sanitized address existed, When the migration is applied, Then every one gets the address sanitizedUrlOf gives its url, and keeps its url and compared form', async () => {
+test('F27-AC89: Given links kept before the sanitized address existed, When the migration is applied, Then every one gets the address sanitizedUrlOf gives its url, and keeps its url and compared form', async () => {
   await applyMigrations(database, { until: BEFORE })
   await seedDeck(database, 'talk')
   for (let start = 0; start < hrefs.length; start += 20)
