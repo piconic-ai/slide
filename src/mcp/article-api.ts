@@ -144,11 +144,13 @@ export async function addRelatedLink(
   const parsed = parseLinkInput({ ...input, title: input.title ?? '' })
   if (!parsed.ok)
     return refusalResult(`link_${parsed.reason}`, LINK_MESSAGES[parsed.reason])
+  const linkId = crypto.randomUUID()
   const result = await addLink(env.DB, {
     deckId: deck.id,
     ownerUserId,
     link: parsed.link,
     now: now(),
+    linkId,
   })
   if (result === 'missing') return toolError('unknown_slide')
   if (result === 'added')
@@ -160,14 +162,14 @@ export async function addRelatedLink(
     )
   // The calendars are read by the next Cron Trigger; a tool call has no
   // waitUntil to read them after its answer.
-  if (result === 'added' && parsed.link.kind === 'event') {
+  if (result === 'added')
     await notifyCommunityPublishedQuietly(env.DB, {
       deckId: deck.id,
       now: now(),
-      eventKey: parsed.link.event.key,
+      linkId,
     })
+  if (result === 'added' && parsed.link.kind === 'event')
     await readCalendarsForEventSoon(env, null, parsed.link.event)
-  }
   if (result === 'full')
     return refusalResult(
       'links_full',

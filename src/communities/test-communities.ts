@@ -64,6 +64,7 @@ export async function seedTalkLink(
     owner?: string
     title?: string
     kind?: LinkKind
+    linkId?: string
   }>,
 ) {
   const parsed = parseLinkInput({
@@ -77,6 +78,7 @@ export async function seedTalkLink(
     ownerUserId: input.owner ?? '722500',
     link: parsed.link,
     now: 100,
+    linkId: input.linkId,
   })
   if (result !== 'added') throw new Error(`not added: ${result}`)
 }

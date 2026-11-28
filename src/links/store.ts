@@ -154,11 +154,13 @@ export async function addLink(
     ownerUserId: string
     link: LinkInput
     now: number
+    /** The id the link is kept under, for a caller that reads it back. */
+    linkId?: string
   }>,
 ): Promise<AddResult> {
   const { deckId, ownerUserId, link, now } = input
   const db = drizzle(database)
-  const linkId = crypto.randomUUID()
+  const linkId = input.linkId ?? crypto.randomUUID()
   const normalized = normalizedUrlOf(link.url)
   const insert = database
     .prepare(

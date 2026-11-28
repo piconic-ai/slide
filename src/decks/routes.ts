@@ -246,23 +246,26 @@ deckForms.post('/:deck/links', csrf(), requireOwner, async (c) => {
     title: form.title,
   })
   if (!parsed.ok) return back(parsed.reason)
+  const linkId = crypto.randomUUID()
   const result = await addLink(c.env.DB, {
     deckId: deck.id,
     ownerUserId,
     link: parsed.link,
     now: now(),
+    linkId,
   })
-  if (result === 'added')
+  if (result === 'added') {
     recordFrom(c, { name: 'related_link_added', deckId: deck.id })
-  if (result === 'added' && parsed.link.kind === 'event') {
-    // A slide that is public may now be in a community (F20-AC16).
+    // A slide that is public may now be in a community, whatever the kind
+    // of the link (F20-AC21).
     await notifyCommunityPublishedQuietly(c.env.DB, {
       deckId: deck.id,
       now: now(),
-      eventKey: parsed.link.event.key,
+      linkId,
     })
-    await readCalendarsForEventSoon(c.env, waitUntilOf(c), parsed.link.event)
   }
+  if (result === 'added' && parsed.link.kind === 'event')
+    await readCalendarsForEventSoon(c.env, waitUntilOf(c), parsed.link.event)
   if (result === 'missing')
     return renderPage(
       c,
@@ -304,11 +307,13 @@ deckForms.post('/:deck/links/kinds', csrf(), requireOwner, async (c) => {
       kinding,
       now: now(),
     })
+    // Only a link that becomes an event may bring the slide into a community
+    // it was not in: any other kind is matched by its host, as it was before.
     if (changed === 'changed' && kinding.kind === 'event') {
       await notifyCommunityPublishedQuietly(c.env.DB, {
         deckId: deck.id,
         now: now(),
-        eventKey: kinding.event.key,
+        linkId: change.id,
       })
       await readCalendarsForEventSoon(c.env, waitUntilOf(c), kinding.event)
     }
