@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { eventNameOf, serviceNameOf, sourceLinkTextOf } from './event-name'
+import { eventNameOf, serviceNameOf, sourceLinkTextOf } from './link-heading'
 
 describe('eventNameOf', () => {
   test.each([

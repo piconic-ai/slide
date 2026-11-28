@@ -7,10 +7,10 @@ import { coverUrl } from '../share/cover'
 import { profilePath, sharePath } from '../share/path'
 import { colorOfNumber, coverOf, type Cover } from '../site/cover-pattern'
 import { messages, type Lang } from '../site/i18n'
-import type { EventCommunity } from './deck-event'
-import { eventNameOf, sourceLinkTextOf } from './event-name'
-import { groupPageOfHosts } from './event-url'
-import type { EventTalk, StoredEvent } from '../links/link-page-store'
+import type { EventCommunity } from '../events/deck-event'
+import { eventNameOf, sourceLinkTextOf } from './link-heading'
+import { groupPageOfHosts } from '../events/event-url'
+import type { EventTalk, StoredEvent } from './link-page-store'
 
 const text = messages({
   ja: {

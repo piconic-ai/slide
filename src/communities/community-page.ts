@@ -1,5 +1,5 @@
 import { html } from 'hono/html'
-import { eventNameOf } from '../events/event-name'
+import { eventNameOf } from '../links/link-heading'
 import { linkPagePath } from '../links/link-address'
 import { websiteLabel } from '../profile/profile-lines'
 import { coverUrl } from '../share/cover'

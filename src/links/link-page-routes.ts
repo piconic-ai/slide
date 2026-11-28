@@ -3,11 +3,7 @@ import { currentOwner } from '../auth/owner-middleware'
 import { communityCoverOf, communityHref } from '../communities/community'
 import { listEventCommunities } from '../communities/event-communities-store'
 import { homePagePolicy, PAGE_POLICY } from '../decks/pages'
-import {
-  defaultEventCover,
-  eventPageBody,
-  eventPageTitle,
-} from '../events/event-page'
+import { defaultEventCover, eventPageBody, eventPageTitle } from './link-page'
 import { recordFrom } from '../metrics/record-routes'
 import { contentBaseOf } from '../preview/config'
 import { ERROR_PAGE_POLICY, errorPage } from '../site/error-pages'

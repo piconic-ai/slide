@@ -1,6 +1,6 @@
 import { html } from 'hono/html'
 import type { HtmlEscapedString } from 'hono/utils/html'
-import { eventNameOf } from '../events/event-name'
+import { eventNameOf } from '../links/link-heading'
 import { profilePath } from '../share/path'
 import { messages, type Lang } from '../site/i18n'
 import { SERVICE_NAME } from '../site/service'

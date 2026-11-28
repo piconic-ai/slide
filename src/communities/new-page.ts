@@ -1,5 +1,5 @@
 import { html } from 'hono/html'
-import { NEW_COMMUNITY_PATH } from '../events/event-page'
+import { NEW_COMMUNITY_PATH } from '../links/link-page'
 import { handleRefusalText, type HandleProblem } from '../handles/refusals'
 import { helpArticleLink } from '../help/links'
 import { messages, type Lang } from '../site/i18n'

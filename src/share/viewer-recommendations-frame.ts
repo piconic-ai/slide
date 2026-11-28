@@ -1,7 +1,7 @@
 import { html } from 'hono/html'
 import { citationCardGrid, type CitationCard } from '../citations/cards'
 import { communityHref } from '../communities/community'
-import { eventNameOf } from '../events/event-name'
+import { eventNameOf } from '../links/link-heading'
 import { messages, type Lang } from '../site/i18n'
 import { eventHref } from './viewer-events-frame'
 import type { ViewerTalks } from './viewer-talks'

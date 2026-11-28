@@ -1,6 +1,6 @@
 import { html } from 'hono/html'
 import type { DeckEvent } from '../events/deck-event'
-import { eventNameOf } from '../events/event-name'
+import { eventNameOf } from '../links/link-heading'
 import { linkPagePath } from '../links/link-address'
 import { messages, type Lang } from '../site/i18n'
 

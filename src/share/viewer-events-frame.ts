@@ -4,7 +4,7 @@ import {
   type EventCommunityView,
 } from '../communities/community'
 import { logoOf } from '../communities/logo'
-import { eventNameOf, type NamedEvent } from '../events/event-name'
+import { eventNameOf, type NamedEvent } from '../links/link-heading'
 import { linkPagePath } from '../links/link-address'
 import { messages, type Lang } from '../site/i18n'
 

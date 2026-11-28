@@ -1,5 +1,5 @@
 import type { Lang } from '../site/i18n'
-import type { EventService } from './event-url'
+import type { EventService } from '../events/event-url'
 
 /** The parts of an event its name and its way out are made of. */
 export type NamedEvent = Readonly<{
