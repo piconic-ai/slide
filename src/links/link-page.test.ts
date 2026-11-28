@@ -715,19 +715,26 @@ test('F45-AC35: F27-AC90: Given one address made an event by one author and adde
   ])
 })
 
-test('F45-AC3: Given connpass addresses kept as another kind, When their pages open, Then one slide is enough for an event-shaped link, and a number written with leading zeros is not found', async () => {
+test('F45-AC37: Given connpass addresses added with another kind, with a query and with leading zeros, When their pages open, Then they are gathered by the key of their event, one slide being enough', async () => {
   await seedTwo()
-  await add('talk', 'https://connpass.com/event/7/', '', owner, 'other')
+  await add('talk', 'https://connpass.com/event/7/?foo=1', '', owner, 'other')
   await add('talk', 'https://connpass.com/event/008/', '', owner, 'other')
-  await add('reply', 'https://connpass.com/event/008/', '', bob, 'other')
-  expect(await orm.select().from(events).all()).toEqual([])
+  await add('reply', 'https://g.connpass.com/event/8/', '', bob, 'article')
+  expect(
+    (await orm.select().from(events).all()).map((event) => event.key),
+  ).toEqual(['https://connpass.com/event/7', 'https://connpass.com/event/8'])
   expect(talkNames(await flat('/link/connpass.com/event/7'))).toEqual([
     'Owner talk',
   ])
+  const written = await get('/link/connpass.com/event/7/?foo=1')
+  expect(written.headers.get('location')).toBe('/link/connpass.com/event/7')
   expect(linkPagePath('https://connpass.com/event/008/')).toBe(
     '/link/connpass.com/event/8',
   )
-  expect((await get('/link/connpass.com/event/8')).status).toBe(404)
+  expect(talkNames(await flat('/link/connpass.com/event/8'))).toEqual([
+    'Bob talk',
+    'Owner talk',
+  ])
 })
 
 /** A public deck of the owner with one link, made an event as the tool does. */
