@@ -66,3 +66,29 @@ export const sourceOf = (gathered: Gathered): string =>
   gathered.kind === 'event'
     ? sourceUrlOf(gathered.event, gathered.firstLinkHost)
     : gathered.firstLinkUrl
+
+/** What decides whether the page of links of an address shows. */
+export type PageFacts = Readonly<{
+  /** The slides anyone may open that carry the link, each once. */
+  publicDecks: number
+  /** The authors of those slides. */
+  authors: number
+  /** `event`: the link is kept as an event (its shape, or the kind chosen). */
+  kind: 'event' | 'link'
+  /** Whether the address is an event of connpass, Doorkeeper or Luma. */
+  eventShaped: boolean
+  inCommunity: boolean
+}>
+
+/**
+ * Whether the page shows: with a public slide, an event and a link in a
+ * community always do (F45-AC3, F45-AC4); any other link needs slides of two
+ * authors, so one person's address is no list of that person's slides
+ * (F45-AC1, F45-AC2).
+ */
+export const pageShown = (facts: PageFacts): boolean =>
+  facts.publicDecks >= 1 &&
+  (facts.kind === 'event' ||
+    facts.eventShaped ||
+    facts.inCommunity ||
+    facts.authors >= 2)

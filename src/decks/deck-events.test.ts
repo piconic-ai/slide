@@ -87,29 +87,34 @@ test('F27-AC87: Given a link that is added without a kind, When its row is shown
   )
 })
 
-test('F27-AC88: Given links of the slide, When kinds are saved to the route the page no longer links to, Then the new kinds are shown on the page', async () => {
+test('F27-AC88: F45-AC37: Given links of the slide, When kinds are saved to the route the page no longer links to, Then the new kinds are shown on the page, and an address shaped like an event stays an event', async () => {
   await post('/my/slides/talk/links', {
     url: 'https://example.com/a',
     title: 'A',
   })
   await post('/my/slides/talk/links', {
+    url: 'https://example.com/b',
+    title: 'B',
+  })
+  await post('/my/slides/talk/links', {
     url: 'https://luma.com/x1',
     title: 'Night',
   })
-  const [a, night] = await listLinks(db, 'talk')
+  const [a, b, night] = await listLinks(db, 'talk')
   const response = await post('/my/slides/talk/links/kinds', {
     [`kind-${a!.id}`]: 'event',
+    [`kind-${b!.id}`]: 'video',
     [`kind-${night!.id}`]: 'video',
   })
   expect(response.status).toBe(303)
   expect(response.headers.get('Location')).toBe('/my/slides/talk#links')
-  expect(await kinds()).toEqual(['event', 'video'])
+  expect(await kinds()).toEqual(['event', 'video', 'event'])
   const links = frame(await page(), 'links')
   expect(
     [...links.matchAll(/class="link-row-kind"[\s\S]*?<\/span/g)].map(
       ([row]) => /イベント|動画/.exec(row)?.[0],
     ),
-  ).toEqual(['イベント', '動画'])
+  ).toEqual(['イベント', '動画', 'イベント'])
 })
 
 test('F27-AC88: Given a kind that is none of the four, When it is saved, Then nothing changes and the reason is shown', async () => {

@@ -26,3 +26,24 @@ test.each(['podcast', '', ['video', 'article'], 1])(
     expect(kindChanges(links, { 'kind-a': chosen })).toEqual({ ok: false })
   },
 )
+
+test('F45-AC37: Given an address shaped like an event, When another kind is chosen for it, Then nothing changes; kept without its event, any choice makes it an event', () => {
+  const kept = [
+    { id: 'b', url: 'https://luma.com/x1', kind: 'event' },
+    { id: 'c', url: 'https://connpass.com/event/7/?foo=1', kind: 'other' },
+    { id: 'd', url: 'https://example.com/conf', kind: 'event' },
+  ] as const
+  expect(
+    kindChanges(kept, {
+      'kind-b': 'video',
+      'kind-c': 'other',
+      'kind-d': 'other',
+    }),
+  ).toEqual({
+    ok: true,
+    changes: [
+      { id: 'c', url: 'https://connpass.com/event/7/?foo=1', kind: 'event' },
+      { id: 'd', url: 'https://example.com/conf', kind: 'other' },
+    ],
+  })
+})

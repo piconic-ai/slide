@@ -112,12 +112,15 @@ test('F23-AC42: Given add_related_link with the kind event and an address of no 
   expect(await eventIdOf('https://conf.example/2026')).toBeDefined()
 })
 
-test('F23-AC42: Given add_related_link with a kind other than event and an event address, When it is called, Then the kind given is used and the link is not an event', async () => {
-  const url = 'https://connpass.com/event/11/'
-  const { data } = await add(await slide(), { kind: 'article', url })
-  expect(kindOf(data.links, url)).toBe('article')
-  expect(await ties(url)).toEqual([])
-})
+test.each(['video', 'article', 'other'])(
+  'F45-AC37: Given add_related_link with the kind %s and an event address, When it is called, Then the link is still an event, tied to its event',
+  async (kind) => {
+    const url = `https://connpass.com/event/11/?from=${kind}`
+    const { data } = await add(await slide(), { kind, url })
+    expect(kindOf(data.links, url)).toBe('event')
+    expect(await ties(url)).toHaveLength(1)
+  },
+)
 
 test('F23-AC42: Given add_related_link with a kind that is not one of the kinds, When it is called, Then it is refused and nothing is added', async () => {
   const deck = await slide()

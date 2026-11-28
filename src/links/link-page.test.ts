@@ -3,7 +3,15 @@ import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test, vi } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
-import { blocks, decks, events, mutes, suspensions } from '../db/schema'
+import {
+  blocks,
+  decks,
+  events,
+  mutes,
+  relatedLinks,
+  suspensions,
+} from '../db/schema'
+import { seedTalkLink } from '../communities/test-communities'
 import { applyMigrations } from '../db/test-migrations'
 import {
   OWNER_ID,
@@ -16,6 +24,7 @@ import {
   testEnv,
 } from '../publication/test-support'
 import { eventRefOf } from '../events/event-url'
+import { linkPagePath } from './link-address'
 import { listLinks, setLinkKind } from './store'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
@@ -36,7 +45,13 @@ beforeEach(async () => {
 })
 afterAll(() => platform.dispose())
 
-const add = (deck: string, url: string, title = '', cookie = owner) =>
+const add = (
+  deck: string,
+  url: string,
+  title = '',
+  cookie = owner,
+  kind = '',
+) =>
   server.fetch(
     new Request(`${TEST_ORIGIN}/my/slides/${deck}/links`, {
       method: 'POST',
@@ -45,7 +60,11 @@ const add = (deck: string, url: string, title = '', cookie = owner) =>
         Origin: TEST_ORIGIN,
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: new URLSearchParams({ url, title }).toString(),
+      body: new URLSearchParams({
+        url,
+        title,
+        ...(kind && { kind }),
+      }).toString(),
     }),
     env,
   )
@@ -504,6 +523,242 @@ test.each([
   },
 )
 
+const POST = 'https://example.com/post'
+const POST_PAGE = '/link/example.com/post'
+const MISSING = 'この URL の集まりは、まだありません'
+/** Two public slides, one of each author, newest `reply`. */
+const seedTwo = async () => {
+  await seedPublic(db, 'talk', 100, 'Owner talk')
+  await seedPublic(db, 'reply', 200, 'Bob talk', '2')
+}
+const removeLink = async (deck: string, cookie: string) =>
+  server.fetch(
+    new Request(
+      `${TEST_ORIGIN}/my/slides/${deck}/links/${(await listLinks(db, deck))[0]!.id}/delete`,
+      { method: 'POST', headers: { Cookie: cookie, Origin: TEST_ORIGIN } },
+    ),
+    env,
+  )
+
+test('F45-AC1: F45-AC2: F45-AC24: Given a link that is no event, When slides of one author, then of two, carry it and one leaves again, Then its page shows only with two authors, and otherwise answers as an address nobody added', async () => {
+  await seedTwo()
+  await seedPublic(db, 'more', 300, 'Owner more')
+  const nobody = await get(POST_PAGE)
+  await add('talk', POST)
+  await add('more', `${POST}/`)
+  const alone = await get(POST_PAGE)
+  expect([nobody.status, alone.status]).toEqual([404, 404])
+  const missing = await alone.text()
+  expect(missing).toBe(await nobody.text())
+  expect(missing).toContain(MISSING)
+  expect(missing).not.toContain('Owner')
+
+  await add('reply', POST, 'A post', bob)
+  const shown = await get(POST_PAGE)
+  expect(shown.status).toBe(200)
+  expect(shown.headers.get('x-robots-tag')).toBeNull()
+  const body = (await shown.text()).replace(/\s+/g, ' ')
+  expect(talkNames(body)).toEqual(['Owner more', 'Bob talk', 'Owner talk'])
+  expect(body).toContain('<span class="event-talks-count">3 本</span>')
+  expect(body).toContain('<h1>A post</h1>')
+  expect(sourceOf(body)).toBe(POST)
+  expect(body).toContain(
+    'data-link-check aria-haspopup="dialog" >example.com で見る</a',
+  )
+  expect(body).not.toContain('class="event-community')
+
+  await orm
+    .update(decks)
+    .set({ public_deployment_id: null, paused_at: 5 })
+    .where(eq(decks.id, 'reply'))
+  expect(await (await get(POST_PAGE)).text()).toBe(missing)
+})
+
+test('F45-AC10: F45-AC25: Given a link of two authors with no title, When the first saved link is removed, Then the heading is the site and the address, and the way out follows the oldest link left', async () => {
+  await seedTwo()
+  await seedPublic(db, 'third', 300, 'Third', '2')
+  await add('talk', `${POST}?a=1&utm_source=x`)
+  await add('reply', `https://www.example.com/post/?a=1`, '', bob)
+  await add('third', `${POST}?a=1#x`, '', bob)
+  const page = '/link/example.com/post?a=1'
+  const body = await flat(page)
+  expect(body).toContain('<h1>example.com https://example.com/post?a=1</h1>')
+  expect(sourceOf(body)).toBe(`${POST}?a=1`)
+  await removeLink('talk', owner)
+  expect((await get(page)).status).toBe(404)
+  await seedPublic(db, 'again', 400, 'Again')
+  await add('again', `${POST}?a=1`)
+  expect(sourceOf(await flat(page))).toBe('https://www.example.com/post/?a=1')
+})
+
+test.each([
+  [
+    'www., a final slash, a tracking query and a fragment (F45-AC23)',
+    ['https://www.example.com/post/?utm_source=x&fbclid=1#top'],
+    POST,
+    POST_PAGE,
+  ],
+  [
+    'the start time of a YouTube video (F45-AC5, F27-AC74)',
+    ['https://youtu.be/dQw4w9WgXcQ?t=30', 'https://youtu.be/dQw4w9WgXcQ?t=60'],
+    'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    '/link/youtube.com/watch?v=dQw4w9WgXcQ',
+  ],
+  [
+    'the start of a ニコニコ動画 video (F45-AC5, F27-AC77)',
+    ['https://nico.ms/sm9?from=30', 'https://nico.ms/sm9'],
+    'https://www.nicovideo.jp/watch/sm9?from=5',
+    '/link/nicovideo.jp/watch/sm9',
+  ],
+  [
+    'nothing, in Japanese with an IDN host',
+    ['https://例え.jp/日本語?q=あ'],
+    'https://xn--r8jz45g.jp/%E6%97%A5%E6%9C%AC%E8%AA%9E?q=%E3%81%82',
+    '/link/xn--r8jz45g.jp/%E6%97%A5%E6%9C%AC%E8%AA%9E?q=%E3%81%82',
+  ],
+  [
+    'nothing, at the longest address kept',
+    [`https://example.com/${'a'.repeat(1980)}`],
+    `https://example.com/${'a'.repeat(1980)}`,
+    `/link/example.com/${'a'.repeat(1980)}`,
+  ],
+])(
+  'F45-AC1: Given links of two authors that differ only in %s, When the page opens, Then both slides are on one page, a slide with two such links once',
+  async (_, mine, theirs, page) => {
+    await seedTwo()
+    for (const url of mine) expect((await add('talk', url)).status).toBe(303)
+    expect(await listLinks(db, 'talk')).toHaveLength(mine.length)
+    await add('reply', theirs, '', bob)
+    expect(linkPagePath(theirs)).toBe(page)
+    const body = await flat(page)
+    expect(talkNames(body)).toEqual(['Bob talk', 'Owner talk'])
+    expect(body).toContain('<span class="event-talks-count">2 本</span>')
+  },
+)
+
+test('F45-AC23: Given links of two authors that differ in a % form, in a query, or whose key was never kept, When their pages open, Then none is gathered', async () => {
+  await seedTwo()
+  await add('talk', 'https://example.com/%41')
+  await add('reply', 'https://example.com/A', '', bob)
+  await add('talk', 'https://example.com/q?a=1')
+  await add('reply', 'https://example.com/q?a=2', '', bob)
+  await add('talk', 'https://example.com/old')
+  await add('reply', 'https://example.com/old', '', bob)
+  await orm
+    .update(relatedLinks)
+    .set({ gather_key: null })
+    .where(eq(relatedLinks.url, 'https://example.com/old'))
+  for (const path of ['%41', 'A', 'q?a=1', 'q?a=2', 'q', 'old'])
+    expect((await get(`/link/example.com/${path}`)).status).toBe(404)
+})
+
+test('F45-AC14: F45-AC15: Given a link of two authors, When one is suspended, Then there is no page; When a reader blocked both, Then the page still answers 200 with no slide', async () => {
+  await seedTwo()
+  await add('talk', POST)
+  await add('reply', POST, '', bob)
+  const carol = await signIn(env, 'carol', { id: '3' })
+  await orm.insert(blocks).values(
+    ['722500', '2'].map((blocked) => ({
+      blocker_user_id: '3',
+      blocked_user_id: blocked,
+      created_at: 1,
+    })),
+  )
+  const blocked = await get(POST_PAGE, { Cookie: carol })
+  expect(blocked.status).toBe(200)
+  const none = (await blocked.text()).replace(/\s+/g, ' ')
+  expect(talkNames(none)).toEqual([])
+  expect(none).toContain('<span class="event-talks-count">0 本</span>')
+  expect(talkNames(await flat(POST_PAGE))).toHaveLength(2)
+
+  await orm.insert(suspensions).values({
+    user_id: '2',
+    reason: 'test',
+    suspended_at: 1,
+    suspended_by: 'operator',
+  })
+  const gone = await get(POST_PAGE, { Cookie: carol })
+  expect(gone.status).toBe(404)
+  expect(await gone.text()).toContain(MISSING)
+})
+
+test('F45-AC35: F45-AC38: F27-AC90: Given one address made an event by one author and added as another kind by two more, When its pages open, Then the page of the event lists all three, and with a query the links are gathered whatever their kind', async () => {
+  await seedTwo()
+  await seedPublic(db, 'third', 300, 'Carol talk', '3')
+  const carol = await signIn(env, 'carol', { id: '3' })
+  const PEATIX = 'https://peatix.com/event/123'
+  await add('talk', 'https://www.peatix.com/event/123', '', owner, 'event')
+  await add('reply', PEATIX, '', bob, 'article')
+  await add('third', PEATIX, '', carol, 'other')
+  // The event is looked up as written, www. and all; the slides that carry
+  // the same address under another kind are listed with it.
+  expect(talkNames(await flat('/link/www.peatix.com/event/123'))).toEqual([
+    'Carol talk',
+    'Bob talk',
+    'Owner talk',
+  ])
+  // No event was written without www.: there the other links are gathered.
+  expect(talkNames(await flat('/link/peatix.com/event/123'))).toEqual([
+    'Carol talk',
+    'Bob talk',
+  ])
+  await add('reply', `${PEATIX}?day=2`, '', bob, 'video')
+  await add('third', `${PEATIX}/?day=2`, '', carol, 'other')
+  expect(talkNames(await flat('/link/peatix.com/event/123?day=2'))).toEqual([
+    'Carol talk',
+    'Bob talk',
+  ])
+  // Without the event, its path moves to the one of the links of the two.
+  await removeLink('talk', owner)
+  const moved = await get('/link/www.peatix.com/event/123')
+  expect(moved.status).toBe(301)
+  expect(moved.headers.get('location')).toBe('/link/peatix.com/event/123')
+  expect(talkNames(await flat('/link/peatix.com/event/123'))).toEqual([
+    'Carol talk',
+    'Bob talk',
+  ])
+})
+
+test('F45-AC37: Given connpass addresses added with another kind, with a query and with leading zeros, When their pages open, Then they are gathered by the key of their event, one slide being enough', async () => {
+  await seedTwo()
+  await add('talk', 'https://connpass.com/event/7/?foo=1', '', owner, 'other')
+  await add('talk', 'https://connpass.com/event/008/', '', owner, 'other')
+  await add('reply', 'https://g.connpass.com/event/8/', '', bob, 'article')
+  expect(
+    (await orm.select().from(events).all()).map((event) => event.key),
+  ).toEqual(['https://connpass.com/event/7', 'https://connpass.com/event/8'])
+  expect(talkNames(await flat('/link/connpass.com/event/7'))).toEqual([
+    'Owner talk',
+  ])
+  const written = await get('/link/connpass.com/event/7/?foo=1')
+  expect(written.headers.get('location')).toBe('/link/connpass.com/event/7')
+  expect(linkPagePath('https://connpass.com/event/008/')).toBe(
+    '/link/connpass.com/event/8',
+  )
+  expect(talkNames(await flat('/link/connpass.com/event/8'))).toEqual([
+    'Bob talk',
+    'Owner talk',
+  ])
+})
+
+test('F45-AC38: Given a connpass address kept as another kind without its event, as a row from before the rule, When the page of the event opens, Then the slide is listed with the talks of the event', async () => {
+  await seedTwo()
+  await add('talk', 'https://connpass.com/event/7/', '', owner)
+  await add('reply', 'https://g.connpass.com/event/7', '', bob)
+  const [old] = await listLinks(db, 'reply')
+  await setLinkKind(db, {
+    deckId: 'reply',
+    ownerUserId: '2',
+    linkId: old!.id,
+    kinding: { kind: 'other' },
+    now: 1,
+  })
+  expect(talkNames(await flat('/link/connpass.com/event/7'))).toEqual([
+    'Bob talk',
+    'Owner talk',
+  ])
+})
+
 /** A public deck of the owner with one link, made an event as the tool does. */
 async function seedEventOfAnotherSite(deck: string, name: string, url: string) {
   await seedPublic(db, deck, 100, name)
@@ -553,3 +808,73 @@ test.each([
     expect(talkNames(await flat(page))).toEqual(['Talk'])
   },
 )
+
+test('F45-AC38: Given an event whose public links were written with 101 different queries, When its page of links opens, Then it opens and lists the 101 slides, as the keys do not go to D1 one by one', async () => {
+  for (let n = 0; n <= 100; n += 1) {
+    await seedPublic(db, `many${n}`, 100 + n, `Many ${n}`)
+    await seedTalkLink(db, {
+      deckId: `many${n}`,
+      url: `https://connpass.com/event/9/?foo=${n}`,
+    })
+  }
+  const response = await get('/link/connpass.com/event/9')
+  expect(response.status).toBe(200)
+  expect(talkNames((await response.text()).replace(/\s+/g, ' '))).toHaveLength(
+    101,
+  )
+})
+
+test('F45-AC38: Given one address added as an event on one public slide and under other kinds on seven more, When its page of links opens, Then all eight are listed newest first and counted once each', async () => {
+  const url = 'https://peatix.com/event/123'
+  await seedEventOfAnotherSite('event', 'As event', url)
+  for (const n of [1, 2, 3, 4, 5, 6, 7]) {
+    const mine = n % 2 === 1
+    await seedPublic(
+      db,
+      `more${n}`,
+      100 + n,
+      `More ${n}`,
+      mine ? OWNER_ID : '2',
+    )
+    // Written differently each time: one gathered key all the same.
+    await add(`more${n}`, `${url}/?utm_source=${n}`, '', mine ? owner : bob)
+  }
+  // A draft with the address is the author's own.
+  await seedDeck(db, 'draft')
+  await seedDeployment(db, 'draft')
+  await add('draft', url)
+  const response = await get('/link/peatix.com/event/123')
+  expect(response.status).toBe(200)
+  const body = (await response.text()).replace(/\s+/g, ' ')
+  expect(talkNames(body)).toEqual([
+    'More 7',
+    'More 6',
+    'More 5',
+    'More 4',
+    'More 3',
+    'More 2',
+    'More 1',
+    'As event',
+  ])
+  expect(body).toContain('<span class="event-talks-count">8 本</span>')
+  // Blocking an author leaves only that author's slides out.
+  await orm
+    .insert(blocks)
+    .values({ blocker_user_id: '2', blocked_user_id: OWNER_ID, created_at: 1 })
+  expect(
+    talkNames(await flat('/link/peatix.com/event/123', { Cookie: bob })),
+  ).toEqual(['More 6', 'More 4', 'More 2'])
+})
+
+test('F45-AC38: Given one slide with the address as an event and, written with a query, under another kind, When the page opens, Then the slide is listed once', async () => {
+  await seedEventOfAnotherSite('both', 'Both', 'https://peatix.com/event/123')
+  await add('both', 'https://youtube.com/watch?v=abc')
+  await seedPublic(db, 'video', 200, 'Video', '2')
+  await add('video', 'https://youtube.com/watch?v=abc&t=5', '', bob)
+  // The video is no event: its page gathers both slides, the event's only one.
+  expect(talkNames(await flat('/link/youtube.com/watch?v=abc'))).toEqual([
+    'Video',
+    'Both',
+  ])
+  expect(talkNames(await flat('/link/peatix.com/event/123'))).toEqual(['Both'])
+})

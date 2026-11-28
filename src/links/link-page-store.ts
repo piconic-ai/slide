@@ -1,8 +1,17 @@
 /**
- * What the page of links of an address reads from D1 (F45). For now only
- * the event an address stands for; the other links come with their columns.
+ * What the page of links of an address reads from D1 (F45): the event the
+ * address stands for, or the links gathered by its key.
  */
-import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  sql,
+} from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { alias } from 'drizzle-orm/sqlite-core'
 import { z } from 'zod'
@@ -20,7 +29,8 @@ import { deckSlugSchema, type DeckSlug } from '../decks/deck-id'
 import { notMutedBy } from '../mutes/store'
 import { notHidden, notHiddenOf } from '../publication/takedown-store'
 import { handleSchema, type Handle } from '../share/handle'
-import { sourceOf, type NamedEvent } from './link-heading'
+import { eventKeysOf, linkTargetOf, type LinkTarget } from './link-address'
+import { pageShown, sourceOf, type NamedEvent } from './link-heading'
 
 /**
  * The events kept under the keys, in the order of the keys. The keys are
@@ -101,6 +111,20 @@ const talkSchema = z.object({
 // added has the time its public version became ready.
 const publishedAt = sql<number>`coalesce(${decks.first_published_at}, ${deployments.ready_at})`
 
+/** The deck of a related link, when readers may open it from a list. */
+const openDeck = (viewer: string | null) =>
+  and(
+    eq(decks.id, relatedLinks.deck_id),
+    notHidden,
+    notMutedBy(viewer),
+    notBlockedBy(viewer),
+  )
+const readyVersion = and(
+  eq(deployments.id, decks.public_deployment_id),
+  eq(deployments.deck_id, decks.id),
+  eq(deployments.state, 'ready'),
+)
+
 /**
  * The decks readers may open from a list, as on the top page: a public
  * version that is ready, not taken down, by an author with a handle
@@ -120,27 +144,29 @@ const publicTalks = (db: ReturnType<typeof drizzle>, viewer: string | null) =>
       coverPath: deployments.cover_path,
       linkHost: relatedLinkEvents.host,
       linkTitle: relatedLinks.title,
+      gatherKey: relatedLinks.gather_key,
     })
     .from(relatedLinkEvents)
     .innerJoin(relatedLinks, eq(relatedLinks.id, relatedLinkEvents.link_id))
-    .innerJoin(
-      decks,
-      and(
-        eq(decks.id, relatedLinks.deck_id),
-        notHidden,
-        notMutedBy(viewer),
-        notBlockedBy(viewer),
-      ),
-    )
+    .innerJoin(decks, openDeck(viewer))
     .innerJoin(accounts, eq(accounts.user_id, decks.owner_user_id))
-    .innerJoin(
-      deployments,
-      and(
-        eq(deployments.id, decks.public_deployment_id),
-        eq(deployments.deck_id, decks.id),
-        eq(deployments.state, 'ready'),
-      ),
-    )
+    .innerJoin(deployments, readyVersion)
+
+/** The order of a list of slides: the most recently published first. */
+const newestFirst = (
+  a: Readonly<{ publishedAt: number; slug: string }>,
+  b: Readonly<{ publishedAt: number; slug: string }>,
+) => b.publishedAt - a.publishedAt || (a.slug < b.slug ? -1 : 1)
+
+/** What the page of the links to one address is made of. */
+export type LinkPage = Readonly<{
+  /** What the heading is made of; `id` is null for a link that is no event. */
+  event: NamedEvent & Readonly<{ id: number | null }>
+  /** Where the page leads readers. */
+  source: string
+  talks: readonly EventTalk[]
+  linkHosts: ReadonlySet<string>
+}>
 
 const ofEvent = (eventId: number) => eq(relatedLinkEvents.event_id, eventId)
 
@@ -153,19 +179,16 @@ const ofEvent = (eventId: number) => eq(relatedLinkEvents.event_id, eventId)
  * Null when there is no such event or it has no public talk: that is the
  * same for everyone. The viewer's mutes and blocks only leave talks out of
  * the list, down to none (F45-AC15).
+ * The public slides that carry the same address under another kind are
+ * listed with them, each slide once (F45-AC38): the links that are no event
+ * and have the gathered key of a link to the event on a public slide.
  */
 export async function readEventPage(
   database: D1Database,
   eventId: number,
   /** Who is looking. Null for a reader not signed in. */
   viewer: string | null = null,
-): Promise<{
-  event: StoredEvent
-  /** Where the page leads readers. */
-  source: string
-  talks: readonly EventTalk[]
-  linkHosts: ReadonlySet<string>
-} | null> {
+): Promise<LinkPage | null> {
   const db = drizzle(database)
   const [event, links, rows] = await Promise.all([
     db
@@ -196,8 +219,31 @@ export async function readEventPage(
       .all(),
   ])
   if (!event || links.length === 0) return null
-  // A deck with two links to the event comes twice; it is listed once.
-  const decksOnce = [...new Map(rows.map((row) => [row.deckId, row])).values()]
+  // The keys of the event's public links come from a subquery, not as bound
+  // values: an event whose links were written with many queries has more keys
+  // than D1 binds in one statement.
+  const eventKeys = publicTalks(db, null).where(ofEvent(eventId)).as('keys')
+  const others = !links.some((link) => link.gatherKey !== null)
+    ? []
+    : await gatheredLinks(db, viewer)
+        .where(
+          and(
+            inArray(
+              relatedLinks.gather_key,
+              db
+                .select({ key: eventKeys.gatherKey })
+                .from(eventKeys)
+                .where(isNotNull(eventKeys.gatherKey)),
+            ),
+            isNull(relatedLinkEvents.link_id),
+          ),
+        )
+        .all()
+  // A deck with two links to the event, or with one of each kind, comes
+  // twice; it is listed once.
+  const decksOnce = [
+    ...new Map([...rows, ...others].map((row) => [row.deckId, row])).values(),
+  ]
   const firstTitle =
     links.find((link) => link.linkTitle !== null)?.linkTitle ?? null
   return {
@@ -207,7 +253,7 @@ export async function readEventPage(
       event,
       firstLinkHost: links[0]?.linkHost ?? null,
     }),
-    talks: talkSchema.array().parse(decksOnce),
+    talks: talkSchema.array().parse(decksOnce).sort(newestFirst),
     linkHosts: new Set(links.map((row) => row.linkHost)),
   }
 }
@@ -232,13 +278,118 @@ export async function findShownEventUrl(
   return event && talk ? event.url : null
 }
 
-/** A related link of a deck whose page of links shows, and the event it is of. */
-export type ShownLink = Readonly<{ linkId: string; eventId: number }>
+/**
+ * The related links that are no event, on the decks readers may open, with
+ * the deck of each. A link kept as an event is gathered as that event, and
+ * one without a key (added before the key was kept) with no other.
+ */
+const gatheredLinks = (db: ReturnType<typeof drizzle>, viewer: string | null) =>
+  db
+    .select({
+      deckId: decks.id,
+      author: decks.owner_user_id,
+      handle: accounts.handle,
+      slug: decks.slug,
+      title: deployments.title,
+      publishedAt: publishedAt.as('published_at'),
+      deploymentId: deployments.id,
+      coverPath: deployments.cover_path,
+      linkTitle: relatedLinks.title,
+      href: relatedLinks.sanitized_url,
+    })
+    .from(relatedLinks)
+    .leftJoin(relatedLinkEvents, eq(relatedLinkEvents.link_id, relatedLinks.id))
+    .innerJoin(decks, openDeck(viewer))
+    .innerJoin(accounts, eq(accounts.user_id, decks.owner_user_id))
+    .innerJoin(deployments, readyVersion)
+
+const gatheredBy = (keys: readonly string[]) =>
+  and(
+    inArray(relatedLinks.gather_key, [...keys]),
+    isNull(relatedLinkEvents.link_id),
+  )
+
+/**
+ * The page of the links gathered by the key of an address that is no event:
+ * the public slides with such a link, the most recently published first.
+ * Null unless the page shows (`pageShown`): an address only one author's
+ * slides carry answers as one nobody added (F45-AC2). The heading and the
+ * way out follow the oldest link (F45-AC10, F45-AC25); the viewer's mutes
+ * and blocks only leave slides out of the list (F45-AC15).
+ */
+export async function readGatheredPage(
+  database: D1Database,
+  target: LinkTarget,
+  viewer: string | null,
+): Promise<LinkPage | null> {
+  const db = drizzle(database)
+  const key = target.gatherKey
+  const [links, rows] = await Promise.all([
+    gatheredLinks(db, null)
+      .where(gatheredBy([key]))
+      .orderBy(asc(relatedLinks.created_at), sql`${relatedLinks}.rowid`)
+      .all(),
+    gatheredLinks(db, viewer)
+      .where(gatheredBy([key]))
+      .orderBy(desc(publishedAt), asc(decks.slug))
+      .all(),
+  ])
+  const facts = {
+    publicDecks: new Set(links.map((link) => link.deckId)).size,
+    authors: new Set(links.map((link) => link.author)).size,
+    kind: 'link',
+    eventShaped: target.eventShaped,
+    // Links of every kind go into communities with their own change.
+    inCommunity: false,
+  } as const
+  if (!pageShown(facts)) return null
+  const decksOnce = [...new Map(rows.map((row) => [row.deckId, row])).values()]
+  return {
+    event: {
+      id: null,
+      service: 'web',
+      ref: '',
+      host: new URL(key).host,
+      url: key,
+      name: null,
+      firstTitle:
+        links.find((link) => link.linkTitle !== null)?.linkTitle ?? null,
+    },
+    source: sourceOf({ kind: 'link', firstLinkUrl: links[0]?.href ?? key }),
+    talks: talkSchema.array().parse(decksOnce),
+    // Only an event's group is offered a community (F45-AC27).
+    linkHosts: new Set(),
+  }
+}
+
+/**
+ * The page of the event kept under the key of an address (F45-AC35), or
+ * null when there is none or it has no public talk.
+ */
+export async function readEventPageOf(
+  database: D1Database,
+  target: LinkTarget,
+  viewer: string | null,
+): Promise<LinkPage | null> {
+  for (const id of await findEventIdsByKey(database, eventKeysOf(target))) {
+    const read = await readEventPage(database, id, viewer)
+    if (read) return read
+  }
+  return null
+}
+
+/**
+ * A related link of a deck whose page of links shows, and the event it is
+ * of; null for a link that is no event.
+ */
+export type ShownLink = Readonly<{ linkId: string; eventId: number | null }>
 
 /**
  * The related links of a deck whose page of links shows, whoever is looking
- * (F29-AC29, F29-AC30): for now the links to an event with a public talk,
- * this deck's or another's. The other links come with their columns.
+ * (F29-AC29, F29-AC30, F45-AC18): the links to an event with a public talk,
+ * this deck's or another's, and the other links whose key gathers enough
+ * public slides (`pageShown`). Two queries besides the deck's own links,
+ * however many links it has.
  */
 export async function listShownLinks(
   database: D1Database,
@@ -246,23 +397,66 @@ export async function listShownLinks(
 ): Promise<readonly ShownLink[]> {
   const db = drizzle(database)
   const own = await db
-    .select({ linkId: relatedLinks.id, eventId: relatedLinkEvents.event_id })
+    .select({
+      linkId: relatedLinks.id,
+      eventId: relatedLinkEvents.event_id,
+      key: relatedLinks.gather_key,
+    })
     .from(relatedLinks)
-    .innerJoin(
-      relatedLinkEvents,
-      eq(relatedLinkEvents.link_id, relatedLinks.id),
-    )
+    .leftJoin(relatedLinkEvents, eq(relatedLinkEvents.link_id, relatedLinks.id))
     .where(eq(relatedLinks.deck_id, deckId))
     .all()
-  if (own.length === 0) return []
-  const shown = await publicTalks(db, null)
-    .where(
-      inArray(relatedLinkEvents.event_id, [
-        ...new Set(own.map((link) => link.eventId)),
-      ]),
+  const eventIds = own.map((link) => link.eventId).filter((id) => id !== null)
+  // A key the path of a page does not lead back to has no page to show.
+  const targets = new Map(
+    own
+      .filter((link) => link.eventId === null && link.key !== null)
+      .map((link) => [link.key ?? '', linkTargetOf(link.key ?? '')] as const)
+      .filter(([key, target]) => target.gatherKey === key),
+  )
+  const [talks, gathered] = await Promise.all([
+    eventIds.length === 0
+      ? []
+      : publicTalks(db, null)
+          .where(inArray(relatedLinkEvents.event_id, [...new Set(eventIds)]))
+          .groupBy(relatedLinkEvents.event_id)
+          .all(),
+    targets.size === 0
+      ? []
+      : db
+          .select({
+            key: relatedLinks.gather_key,
+            publicDecks: sql<number>`count(DISTINCT ${decks.id})`,
+            authors: sql<number>`count(DISTINCT ${decks.owner_user_id})`,
+          })
+          .from(relatedLinks)
+          .leftJoin(
+            relatedLinkEvents,
+            eq(relatedLinkEvents.link_id, relatedLinks.id),
+          )
+          .innerJoin(decks, openDeck(null))
+          .innerJoin(accounts, eq(accounts.user_id, decks.owner_user_id))
+          .innerJoin(deployments, readyVersion)
+          .where(gatheredBy([...targets.keys()]))
+          .groupBy(relatedLinks.gather_key)
+          .all(),
+  ])
+  const events = new Set(talks.map((row) => row.eventId))
+  const keys = new Set(
+    gathered
+      .filter((row) =>
+        pageShown({
+          ...row,
+          kind: 'link',
+          eventShaped: targets.get(row.key ?? '')?.eventShaped ?? false,
+          inCommunity: false,
+        }),
+      )
+      .map((row) => row.key),
+  )
+  return own
+    .filter((link) =>
+      link.eventId === null ? keys.has(link.key) : events.has(link.eventId),
     )
-    .groupBy(relatedLinkEvents.event_id)
-    .all()
-  const events = new Set(shown.map((row) => row.eventId))
-  return own.filter((link) => events.has(link.eventId))
+    .map(({ linkId, eventId }) => ({ linkId, eventId }))
 }

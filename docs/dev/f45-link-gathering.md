@@ -104,21 +104,24 @@ SQL は `src/links/url-rules.ts` の規則を写したものである。`gathere
 `GET /link/*`(`src/links/link-page-routes.ts`)は、次の順で答える(F45-AC13 の順)。
 
 1. `new URL(c.req.url)` の `pathname` と `search` から、`/link/` の後ろを取り、`parseLinkPath` で読む。断られたものは、共通の 404 のページ(`errorPage`)で答える。入れられた文字列は、本文にも href にも出さない。フッターの言語の切り替えは `/link?lang=…` を指す。
-2. 届いた書き方が正規の形と違えば、`/link/<正規の形>` へ 301(F45-AC31)。
-3. イベントの形の URL で、`luma_event_aliases` に対応があれば、名前の URL の `/link/…` へ 301(F45-AC26)。
-4. `eventKeysOf` の鍵でイベントを引き、一般公開中のスライドがあれば、イベントのページを 200 で出す(`readEventPage`、`eventPageBody`)。`Link`(hreflang)は付けない。`?lang=` がページを指さないためである。
-5. どれにも当たらなければ、「まだありません」のページを 404 で出す(F45-AC12)。URL は `<p>` の文字で出し、リンクにしない(F45-AC29)。イベントでないリンクは、link7 まで、すべてここになる。
+2. ほかのサイトの URL(イベントの形でないもの)は、転送の前に、書かれた URL の鍵(`eventKey`)でイベントを引く。一般公開中のスライドのあるイベントが見つかれば、届いた書き方が `eventRest` と違うときは `/link/<eventRest>` へ 301 し、同じならイベントのページを 200 で出す。見つからないとき(イベントが無い、一般公開中のスライドが無い)は、次へ進む。だれも入れていない URL と応答が同じになる。
+3. 届いた書き方が正規の形と違えば、`/link/<正規の形>` へ 301(F45-AC31)。
+4. イベントの形の URL で、`luma_event_aliases` に対応があれば、名前の URL の `/link/…` へ 301(F45-AC26)。
+5. イベントの形の URL は、`eventKeysOf` の鍵でイベントを引き、一般公開中のスライドがあれば、イベントのページを 200 で出す(`readEventPageOf`、`linkPageBody`)。`Link`(hreflang)は付けない。`?lang=` がページを指さないためである。
+6. 集める鍵で、イベントでないリンクのページを引く(`readGatheredPage`。link7)。
+7. どれにも当たらなければ、「まだありません」のページを 404 で出す(F45-AC12)。URL は `<p>` の文字で出し、リンクにしない(F45-AC29)。
 
+- イベントのページのフッターの言語の切り替えは、`/link?to=/link/<eventRest>` を指す。`GET /link` は、`to` が `eventRest` の書き方ならそこへ、ほかは正規の形へ戻す。
 - 404 は、どちらも `screen_error` として数える(F40-AC14。`screen` は `/link/*`、`/link`)。
 - 検索: `isIndexablePath` は `/link/` で始まる path を載せてよいとする(F45-AC36)。`noindexPrivate` は 200 と 304 だけを通すので、404 と 301 には `X-Robots-Tag: noindex, nofollow` が付く。
 - 予約語: `link` を `ROUTE_HANDLES` に足した(F30-AC74)。`events` は、経路が残るので、残している。
 
 ## `/events/:id` の転送と、ページを出す条件(link3 で実装済み)
 
-`GET /events/:id`(`src/events/routes.ts`)は、番号からイベントを引き(`findShownEventUrl`)、一般公開中のスライドが 1 本でもあれば、`linkPagePath(events.url)` へ 301 で転送する(F45-AC9)。数字でない番号、無い番号、一般公開中のスライドの無いイベントは、共通の 404。見る人を当てないので、だれが開いても同じ応答になる。クエリ(`?lang=` を含む)は、転送先に持ち越さない。
+`GET /events/:id`(`src/events/routes.ts`)は、番号からイベントを引き(`findShownEventUrl`)、一般公開中のスライドが 1 本でもあれば、`eventPagePath(events.url)` へ 301 で転送する(F45-AC9)。数字でない番号、無い番号、一般公開中のスライドの無いイベントは、共通の 404。見る人を当てないので、だれが開いても同じ応答になる。クエリ(`?lang=` を含む)は、転送先に持ち越さない。
 
-- `events.url` は、`eventRefOf` が作る `https://` の URL である。`linkPagePath` が正規の形にそろえるので、転送は 1 回で終わる。Luma の番号のイベントで、名前との対応があるものだけ、`/link/…` の側でもう 1 回転送される(F45-AC26)。
-- ほかのサイトのイベントで、`www.` 有りと無しの両方がイベントになっているとき、`www.` 有りのイベントの番号は、`www.` の無い path へ転送され、無いほうに一般公開中のスライドがあれば、そちらのページが出る(上の「計画との違い」と同じ扱い)。
+- `events.url` は、`eventRefOf` が作る `https://` の URL である。`eventPagePath` は、connpass、Doorkeeper、Luma では正規の形、ほかのサイトでは書かれたとおりの鍵(`www.` を残す)の path を作るので、転送は 1 回で終わる。Luma の番号のイベントで、名前との対応があるものだけ、`/link/…` の側でもう 1 回転送される(F45-AC26)。
+- ほかのサイトのイベントで、`www.` 有りと無しの両方がイベントになっているとき、それぞれの番号は、それぞれのページ(`/link/www.example.com/conf`、`/link/example.com/conf`)へ転送され、自分のスライドが並ぶ(#741 の指摘を受けて直した)。
 
 `readEventPage`(`src/links/link-page-store.ts`)は、問い合わせを 2 つに分ける。
 
@@ -131,7 +134,7 @@ SQL は `src/links/url-rules.ts` の規則を写したものである。`gathere
 - 「一般公開中」は、どちらも `publicTalks` の条件である: 公開の版が `ready`、運営が非表示にしておらず、作者が停止中でない(`notHidden`)、作者の `accounts` の行がある(F45-AC14)。
 - `listListedEvents`(イベントの一覧)は、テストだけが使っていたので消した。F45 に、イベントの一覧は無い。
 
-アプリの中のイベントへのリンクは、`linkPagePath(event.url)` で作る。`DeckEvent`、`ViewerEvent`、`CommunityEvent` に `url`(`events.url`)を足した。
+アプリの中のイベントへのリンクは、`eventPagePath(event.url)` で作る。`DeckEvent`、`ViewerEvent`、`CommunityEvent` に `url`(`events.url`)を足した。
 
 | 場所 | ファイル |
 | --- | --- |
@@ -165,6 +168,28 @@ SQL は `src/links/url-rules.ts` の規則を写したものである。`gathere
 | ヘルプの記事「イベント名を直す」(`community/event-names`)と、ほかの記事の中の「イベント名の修正」 | `src/help/articles/community/` |
 
 `events.named_by`、`events.named_at` の列は残る(書く経路は無い)。
+
+## レビューを受けて決めた規則(2026-11-28。link7 で実装済み)
+
+Pullfrog のレビューの指摘(#738、#741、#745、#746、#751、#752)を受けて、仕様の「決めたこと」に 3 つの規則を足した(F45-AC37、F45-AC38。依頼者の確認待ち)。
+
+### イベントの形の URL は、種類にかかわらずイベント(F45-AC37)
+
+`kindedOf(kind, url)`(`src/links/link.ts`)は、URL が connpass、Doorkeeper、Luma のイベントの形なら、求められた種類にかかわらず、種類「イベント」とそのイベント(`EventRef`)を返す。関連リンクを足す入口(画面のフォーム、`add_related_link`)と、種類を選び直す経路(`POST /my/slides/:deck/links/kinds`)は、どれも `kindedOf` を通るので、イベントの形の URL は、必ず `related_link_events` の行(イベントの鍵)を持つ。`kindChanges`(`src/links/kind-changes.ts`)は、イベントの形の URL に別の種類が選ばれても、変更に数えない(結びつきと、その保存時刻を変えない)。
+
+- 理由: 種類「その他」の connpass の URL を集める鍵(`gather_key`。クエリを残す)で集めると、`https://connpass.com/event/7/?foo=1` の保存した鍵と、`/link/…` が引く鍵(クエリを除いたイベントの鍵)が食い違い、404 になった。先頭が 0 の番号(`event/007`)も同じである。Luma の配信との照合(`community_feed_events`)は `related_link_events` のあるリンクを起点にするので、種類「その他」の Luma の URL は、コミュニティに入らなかった。
+- 保存の形: `related_links.kind` は 3 種類(`video`、`article`、`other`)で、種類「イベント」は `other` と `related_link_events` の行で表す。イベントの形の URL に「動画」「記事」「その他」を選んでも、保存と表示は「イベント」になる。
+- ほかのサイトの URL は、これまでどおり、種類「イベント」を選んだときだけイベントで、種類を変えると外れる(F29-AC11)。
+- `setLinkKind`、`addLink`(`src/links/store.ts`)は、渡された種類のとおりに書く。規則は、入口の `kindedOf` が守る。
+- すでにある行: 規則の前に、イベントの形の URL を「イベント」以外の種類で保存した行は、`related_link_events` の行を持たない。migration は足していない(本番にそのような行があるかは、確かめていない。種類を選ぶ入口は、道具と、画面に出していない経路だけである)。その行は、種類を選び直すと(どの種類を選んでも)イベントに結びつく。結びつくまでは、下の F45-AC38 の読み方で、`gather_key` が同じイベントのリンク(クエリも先頭の 0 も無い書き方)があるときだけ、そのイベントのページに並ぶ。
+
+### イベントのページに、同じ URL のほかの種類のリンクも並べる(F45-AC38)
+
+`readEventPage` は、イベントに結びついたリンクのスライドに加えて、イベントでないリンク(`related_link_events` の行が無い)のうち、`gather_key` が、そのイベントの一般公開中のスライドのリンクのどれかと同じものを、同じ一覧に並べる。同じスライドは 1 本にまとめ、公開の新しい順に並べ直す。ブロック、ミュート、公開中の条件は、イベントのリンクと同じである(F45-AC14、F45-AC15)。
+
+- ページを出すかどうか、見出し、元のページへのリンクは、これまでどおり、イベントに結びついたリンクだけで決める。下書きのスライドのイベントのリンクは、鍵の出どころに数えない。
+- ほかのサイトの同じ URL を、1 人が道具で「イベント」に、別の人が「記事」などで足すと、`/link/…` はイベントを先に引く。これまでは、後者のスライドがどのページにも並ばなかった(#746、#752)。
+- `www.` の有無だけが違う 2 つのイベントがあるとき、イベントでないリンク(集める鍵は `www.` を除く)は、両方のページに並ぶ。
 
 ## 画面の言葉(link5 で実装済み)
 

@@ -9,7 +9,6 @@ import { ERROR_PAGE_POLICY, errorPage } from '../site/error-pages'
 import { langOf } from '../site/lang'
 import { pageShell } from '../site/shell'
 import {
-  eventKeysOf,
   linkPagePath,
   linkTargetOf,
   parseLinkPath,
@@ -23,8 +22,9 @@ import {
 import { linkPageBody, linkPageTitle } from './link-page'
 import {
   findAliasedKey,
-  findEventIdsByKey,
-  readEventPage,
+  readEventPageOf,
+  readGatheredPage,
+  type LinkPage,
 } from './link-page-store'
 
 type C = Context<{ Bindings: Env }>
@@ -118,30 +118,32 @@ function show(c: C, target: LinkTarget, page: Shown) {
  */
 async function eventPage(c: C, sent: string, target: LinkTarget) {
   const viewer = (await currentOwner(c))?.userId ?? null
-  for (const id of await findEventIdsByKey(c.env.DB, eventKeysOf(target))) {
-    const read = await readEventPage(c.env.DB, id, viewer)
-    if (!read) continue
-    return target.eventRest !== null && sent !== target.eventRest
-      ? c.redirect(PREFIX + target.eventRest, 301)
-      : // The language switch comes back to the path of the event, not to
-        // the canonical path of the other links.
-        shownEvent(
-          c,
-          { ...target, rest: target.eventRest ?? target.rest },
-          read,
-        )
-  }
-  return null
+  const read = await readEventPageOf(c.env.DB, target, viewer)
+  if (!read) return null
+  return target.eventRest !== null && sent !== target.eventRest
+    ? c.redirect(PREFIX + target.eventRest, 301)
+    : // The language switch comes back to the path of the event, not to the
+      // canonical path of the other links.
+      shownPage(c, { ...target, rest: target.eventRest ?? target.rest }, read)
 }
 
-async function shownEvent(
-  c: C,
-  target: LinkTarget,
-  read: NonNullable<Awaited<ReturnType<typeof readEventPage>>>,
-) {
+/**
+ * The page of the links gathered by the key of the address, or null when
+ * too few slides carry it for a page (F45-AC2).
+ */
+async function gatheredPage(c: C, target: LinkTarget) {
+  const viewer = (await currentOwner(c))?.userId ?? null
+  const read = await readGatheredPage(c.env.DB, target, viewer)
+  return read && shownPage(c, target, read)
+}
+
+async function shownPage(c: C, target: LinkTarget, read: LinkPage) {
   const eventId = read.event.id
+  // For now only an event is in a community.
   const community =
-    (await listEventCommunities(c.env.DB, [eventId])).get(eventId) ?? null
+    eventId === null
+      ? null
+      : ((await listEventCommunities(c.env.DB, [eventId])).get(eventId) ?? null)
   const lang = langOf(c)
   const contentBase = contentBaseOf(c.env)
   return show(c, target, {
@@ -202,9 +204,10 @@ linkPageRoutes.get('/link', (c) => {
 })
 
 /**
- * The page of the links to one address. For now only an event has one; any
- * other address answers the page of F45-AC12. The order is F45-AC13's:
- * refuse, move, then the page. An event of another site is looked up by the
+ * The page of the links to one address; an address nothing is gathered at
+ * answers the page of F45-AC12. The order is F45-AC13's: refuse, move, then
+ * the page: of the event the address stands for, or of the links gathered
+ * by its key (F45-AC35). An event of another site is looked up by the
  * address as written before the move to the canonical path, which would
  * compare away what tells it from another event (its `www.`, the form its
  * site's rule rewrites).
@@ -218,6 +221,6 @@ linkPageRoutes.get('/link/*', async (c) => {
   if (written !== null) return written
   const moved = await movedTo(c.env.DB, sent, target)
   if (moved !== null) return c.redirect(moved, 301)
-  const page = target.eventShaped ? await eventPage(c, sent, target) : null
-  return page ?? missing(c, target)
+  const event = target.eventShaped ? await eventPage(c, sent, target) : null
+  return event ?? (await gatheredPage(c, target)) ?? missing(c, target)
 })

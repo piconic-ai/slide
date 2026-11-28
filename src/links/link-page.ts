@@ -10,8 +10,8 @@ import { linkCheckPrompt, linkCheckTrigger } from '../share/link-check'
 import { profilePath, sharePath } from '../share/path'
 import { coverOf, type Cover } from '../site/cover-pattern'
 import { messages, type Lang } from '../site/i18n'
-import { headingOf, sourceLinkTextOf } from './link-heading'
-import type { EventTalk, StoredEvent } from './link-page-store'
+import { headingOf, sourceLinkTextOf, type NamedEvent } from './link-heading'
+import type { EventTalk } from './link-page-store'
 
 const text = messages({
   ja: {
@@ -35,7 +35,8 @@ export const NEW_COMMUNITY_PATH = '/communities/new'
 
 /** What the page of the links to one address shows. */
 export type LinkPageView = Readonly<{
-  event: StoredEvent
+  /** What the heading is made of: an event, or a link that is none. */
+  event: NamedEvent
   /** Where the page leads readers: the address's own page (F45-AC25). */
   source: string
   talks: readonly EventTalk[]
@@ -81,7 +82,7 @@ const communityPrompt = (view: LinkPageView, lang: Lang) => {
 }
 
 /** The title of the page: its heading. */
-export const linkPageTitle = (event: StoredEvent) => headingOf(event)
+export const linkPageTitle = (event: NamedEvent) => headingOf(event)
 
 /**
  * The cover, logo and name of the community the link is in, the name
