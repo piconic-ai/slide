@@ -2,7 +2,7 @@ import { and, desc, eq, isNull, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { z } from 'zod'
 import { notBlocking, notBlockedBy } from '../blocks/store'
-import { inCommunity } from '../communities/store'
+import { deckInCommunity } from '../communities/store'
 import {
   accounts,
   communities,
@@ -14,8 +14,6 @@ import {
   mutes,
   profilePictures,
   profiles,
-  relatedLinkEvents,
-  relatedLinks,
   suspensions,
 } from '../db/schema'
 import { deckSlugSchema } from '../decks/deck-id'
@@ -59,10 +57,7 @@ const communityOfSlide = (viewer: string) => sql`
     JOIN ${communities} ON ${communities.id} = ${communityFollows.community_id}
     JOIN ${handles} ON ${handles.owner_kind} = 'community'
       AND ${handles.owner_id} = CAST(${communities.id} AS TEXT)
-    JOIN ${relatedLinkEvents}
-      ON ${inCommunity(communityFollows.community_id, relatedLinkEvents.event_id)}
-    JOIN ${relatedLinks} ON ${relatedLinks.id} = ${relatedLinkEvents.link_id}
-    JOIN ${decks} ON ${decks.id} = ${relatedLinks.deck_id}
+    JOIN ${decks} ON ${deckInCommunity(communityFollows.community_id)}
     WHERE ${communityFollows.user_id} = ${viewer}
   ) WHERE pick = 1`
 

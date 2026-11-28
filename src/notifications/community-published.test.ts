@@ -452,7 +452,7 @@ test('F20-AC16: Given the join of followers to events, When the query plan is re
   )
 })
 
-test('F20-AC16: Given a slide first published at T, When an event link is added at exactly T plus 7 days, Then the follower is told; one second later, Then not', async () => {
+test('F20-AC21: Given a slide first published at T, When an event link is added at exactly T plus 7 days, Then the follower is told; one second later, Then not', async () => {
   const T = 1_000_000
   await followAs(BOB)
   await change(
@@ -460,20 +460,19 @@ test('F20-AC16: Given a slide first published at T, When an event link is added 
     0,
     T,
   )
-  await seedTalkLink(database, { deckId: 'talk', url: EVENT })
-  const [event] = await db.all<{ key: string }>(sql`SELECT key FROM events`)
-  const eventKey = event!.key
+  const linkId = 'added-link'
+  await seedTalkLink(database, { deckId: 'talk', url: EVENT, linkId })
   expect(noticeWindowStart(T + 7 * DAY)).toBe(T)
   await notifyCommunityPublished(database, {
     deckId: 'talk',
     now: T + 7 * DAY + 1,
-    eventKey,
+    linkId,
   })
   expect(await told()).toEqual([])
   await notifyCommunityPublished(database, {
     deckId: 'talk',
     now: T + 7 * DAY,
-    eventKey,
+    linkId,
   })
   expect(await recipients()).toEqual([BOB])
 })
@@ -487,4 +486,125 @@ test('F20-AC16: Given a slide first published a month ago, When an event link is
   )
   await post('/my/slides/talk/links', { url: EVENT })
   expect(await told()).toEqual([])
+})
+
+const SITE = 62
+const POST = 'https://example.com/post'
+/** A community of a site of its own, which Dave made and so follows. */
+const seedSite = () =>
+  seedCommunity(database, {
+    id: SITE,
+    handle: 'example',
+    name: 'Example',
+    links: ['https://example.com/'],
+    creator: DAVE,
+  })
+
+test('F20-AC20: F20-AC18: Given a draft with a link that is no event on a community’s host, When the author first publishes it, Then the followers are told once, naming the community, and the author is not', async () => {
+  await seedSite()
+  await followAs(BOB, SITE)
+  await followAs(OWNER_ID, SITE)
+  const first = await draft('talk', null)
+  await seedTalkLink(database, { deckId: 'talk', url: POST, kind: 'article' })
+  await change({ kind: 'publish', deploymentId: first }, 0)
+  expect(await told()).toEqual(
+    [BOB, DAVE].map((to) => ({
+      to,
+      kind: 'community_published',
+      community: SITE,
+      deck: 'talk',
+    })),
+  )
+  const [notice] = await listNotifications(database, BOB, 10)
+  expect(notice).toMatchObject({
+    community: { handle: 'example', name: 'Example' },
+    deck: { handle: 'owner', slug: 'talk' },
+  })
+})
+
+test('F20-AC21: Given a public slide, When a link of any kind on a community’s host is added by the form or the MCP service, Then the followers are told; a link on `www.` of that host tells nobody', async () => {
+  await seedSite()
+  await change({ kind: 'publish', deploymentId: await draft('talk', null) }, 0)
+  await post('/my/slides/talk/links', {
+    url: 'https://www.example.com/post',
+    kind: 'article',
+  })
+  expect(await told()).toEqual([])
+  await post('/my/slides/talk/links', { url: `${POST}?p=1`, kind: 'video' })
+  expect(await recipients()).toEqual([DAVE])
+  await db.run(sql`DELETE FROM notifications`)
+  await addRelatedLink({ env, ownerUserId: OWNER_ID }, 'talk', {
+    kind: 'other',
+    url: 'https://example.com/other',
+  })
+  expect(await recipients()).toEqual([DAVE])
+})
+
+test('F20-AC21: Given a slide first published at T, When a link that is no event is added at exactly T plus 7 days, Then the follower is told; one second later, Then not', async () => {
+  const T = 1_000_000
+  await seedSite()
+  await change(
+    { kind: 'publish', deploymentId: await draft('talk', null) },
+    0,
+    T,
+  )
+  const linkId = 'added-link'
+  await seedTalkLink(database, {
+    deckId: 'talk',
+    url: POST,
+    kind: 'other',
+    linkId,
+  })
+  const tell = (now: number) =>
+    notifyCommunityPublished(database, { deckId: 'talk', now, linkId })
+  await tell(T + 7 * DAY + 1)
+  expect(await told()).toEqual([])
+  // A link of another slide, or one that is not there, brings nobody.
+  await notifyCommunityPublished(database, {
+    deckId: 'talk',
+    now: T,
+    linkId: 'no-such-link',
+  })
+  expect(await told()).toEqual([])
+  await tell(T + 7 * DAY)
+  expect(await recipients()).toEqual([DAVE])
+})
+
+test('F20-AC21: Given a draft, and a slide that is paused, When a link that is no event on a community’s host is added, Then nobody is told', async () => {
+  await seedSite()
+  await draft('talk', null)
+  await post('/my/slides/talk/links', { url: POST, kind: 'article' })
+  expect(await told()).toEqual([])
+  const first = await seedDeployment(database, 'talk')
+  await change({ kind: 'publish', deploymentId: first }, 0)
+  await change({ kind: 'pause' }, 1, 200)
+  await db.run(sql`DELETE FROM notifications`)
+  await post('/my/slides/talk/links', {
+    url: 'https://example.com/next',
+    kind: 'article',
+  })
+  expect(await told()).toEqual([])
+})
+
+test('F20-AC17: F20-AC18: Given a public slide in a community by its event, When a link that is no event brings it into another, Then each follower has one notice, of the community they followed first, and a later follower of the first community none', async () => {
+  await seedSite()
+  await followAs(BOB, COMMUNITY, 5)
+  await followAs(BOB, SITE, 9)
+  await change({ kind: 'publish', deploymentId: await draft() }, 0)
+  expect(await told()).toMatchObject([{ to: BOB, community: COMMUNITY }])
+  await followAs(CAROL, COMMUNITY, 20)
+  await post('/my/slides/talk/links', { url: POST, kind: 'article' })
+  // Bob keeps the one notice; Carol follows only the community the slide
+  // was in already, which this link did not bring it into.
+  expect(await told()).toMatchObject([
+    { to: BOB, community: COMMUNITY },
+    { to: DAVE, community: SITE },
+  ])
+  // Saving the kind again tells nobody new either.
+  await followAs(CAROL, SITE, 30)
+  const [plain] = await db.all<{ id: string }>(
+    sql`SELECT id FROM related_links WHERE deck_id = 'talk' AND url = ${POST}`,
+  )
+  await post('/my/slides/talk/links/kinds', { [`kind-${plain!.id}`]: 'video' })
+  expect(await recipients()).toEqual([BOB, DAVE])
 })

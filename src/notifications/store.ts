@@ -18,18 +18,16 @@ import {
   communityFollows,
   decks,
   deployments,
-  events,
   follows,
   handles,
   mutes,
-  relatedLinkEvents,
   relatedLinks,
   notificationOptOuts,
   notifications,
   suspensions,
 } from '../db/schema'
 import { notBlocking } from '../blocks/store'
-import { inCommunity } from '../communities/store'
+import { deckInCommunity, linkInCommunity } from '../communities/store'
 import { noticeWindowStart, retentionCutoffs } from './limits'
 import { notHidden } from '../publication/takedown-store'
 import {
@@ -98,9 +96,10 @@ export async function notifyFolloweePublished(
 
 /**
  * Tells the people who follow a community that a public slide is in it
- * (F20-AC15), once each however many of their communities it is in: the
+ * (F20-AC20), once each however many of their communities it is in: the
  * community shown is the one they followed first, as in the follow feed.
- * "In" is read when this runs (inCommunity, D-35). The author is never
+ * "In" is by a related link of any kind, read when this runs
+ * (deckInCommunity, D-35). The author is never
  * told of their own slide, and the same slide is not told twice to someone
  * who already has the notice from the person they follow (the unique index
  * notifications_deck_once). Neither a follower the author blocked nor an
@@ -112,17 +111,18 @@ export async function notifyCommunityPublished(
   {
     deckId,
     now,
-    eventKey,
+    linkId,
   }: Readonly<{
     deckId: string
     now: number
     /**
-     * When a link was just added or changed, only the communities that this
-     * event puts the slide into count; the slide's other events do not. It
-     * also counts only while the slide is within COMMUNITY_NOTICE_WINDOW_SECONDS
-     * of its first publication.
+     * When a related link was just added or changed, of whatever kind
+     * (F20-AC21): only the communities that this link puts the slide into
+     * count; the slide's other links do not. It also counts only while the
+     * slide is within COMMUNITY_NOTICE_WINDOW_SECONDS of its first
+     * publication.
      */
-    eventKey?: string
+    linkId?: string
   }>,
 ) {
   await drizzle(database).run(sql`
@@ -135,18 +135,17 @@ export async function notifyCommunityPublished(
           ORDER BY ${communityFollows.created_at}, ${communities.id}) AS pick
       FROM ${communityFollows}
       JOIN ${communities} ON ${communities.id} = ${communityFollows.community_id}
-      JOIN ${relatedLinkEvents}
-        ON ${inCommunity(communityFollows.community_id, relatedLinkEvents.event_id)}
-      JOIN ${relatedLinks} ON ${relatedLinks.id} = ${relatedLinkEvents.link_id}
-      JOIN ${decks} ON ${decks.id} = ${relatedLinks.deck_id}
+      JOIN ${decks} ON ${deckInCommunity(communityFollows.community_id)}
       JOIN ${deployments} ON ${deployments.id} = ${decks.public_deployment_id}
         AND ${deployments.deck_id} = ${decks.id}
         AND ${deployments.state} = 'ready'
       WHERE ${decks.id} = ${deckId}
         AND ${
-          eventKey === undefined
+          linkId === undefined
             ? sql`1`
-            : sql`${relatedLinkEvents.event_id} = (SELECT ${events.id} FROM ${events} WHERE ${events.key} = ${eventKey})
+            : sql`${linkInCommunity(communityFollows.community_id, sql`${linkId}`)}
+              AND EXISTS (SELECT 1 FROM ${relatedLinks}
+                WHERE ${relatedLinks.id} = ${linkId} AND ${relatedLinks.deck_id} = ${decks.id})
               AND coalesce(${decks.first_published_at}, ${deployments.ready_at}) >= ${noticeWindowStart(now)}`
         }
         AND ${isNull(decks.deleted_at)}
@@ -167,7 +166,7 @@ export async function notifyCommunityPublished(
  */
 export async function notifyCommunityPublishedQuietly(
   database: D1Database,
-  input: Readonly<{ deckId: string; now: number; eventKey?: string }>,
+  input: Readonly<{ deckId: string; now: number; linkId?: string }>,
 ) {
   try {
     await notifyCommunityPublished(database, input)

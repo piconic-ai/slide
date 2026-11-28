@@ -72,9 +72,45 @@ export async function listEventCommunities(
     const kept = first.get(match.eventId)
     if (!kept || match.linkId < kept.linkId) first.set(match.eventId, match)
   }
-  const communityIds = [
+  const byId = await readViews(database, [
     ...new Set([...first.values()].map((m) => m.communityId)),
-  ]
+  ])
+  return new Map(
+    [...first.entries()].flatMap(([eventId, { communityId }]) => {
+      const community = byId.get(communityId)
+      return community ? [[eventId, community] as const] : []
+    }),
+  )
+}
+
+/**
+ * The community a link that is no event is shown with (F45-AC17): of those
+ * holding one of the hosts the link was written with on public slides, the
+ * one whose link was added first. Null when none holds any (F30-AC65).
+ */
+export async function findHostCommunity(
+  database: D1Database,
+  hosts: readonly string[],
+): Promise<EventCommunityView | null> {
+  if (hosts.length === 0) return null
+  const first = await drizzle(database)
+    .select({ communityId: communityLinks.community_id })
+    .from(communityLinks)
+    .where(inArray(communityLinks.host, hosts.slice(0, MAX_EVENTS_ASKED)))
+    .orderBy(communityLinks.id)
+    .get()
+  if (!first) return null
+  return (
+    (await readViews(database, [first.communityId])).get(first.communityId) ??
+    null
+  )
+}
+
+/** The communities of the numbers as they are shown, those that stand. */
+async function readViews(
+  database: D1Database,
+  communityIds: readonly number[],
+): Promise<ReadonlyMap<number, EventCommunityView>> {
   if (communityIds.length === 0) return new Map()
   const rows = await drizzle(database)
     .select({
@@ -93,18 +129,12 @@ export async function listEventCommunities(
         eq(handles.owner_id, sql`CAST(${communities.id} AS TEXT)`),
       ),
     )
-    .where(inArray(communities.id, communityIds))
+    .where(inArray(communities.id, [...communityIds]))
     .all()
-  const byId = new Map(
+  return new Map(
     viewRow
       .array()
       .parse(rows)
       .map((row) => [row.id, row]),
-  )
-  return new Map(
-    [...first.entries()].flatMap(([eventId, { communityId }]) => {
-      const community = byId.get(communityId)
-      return community ? [[eventId, community] as const] : []
-    }),
   )
 }

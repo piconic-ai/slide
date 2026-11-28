@@ -5,6 +5,7 @@ import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
 import {
   blocks,
+  communityLinks,
   decks,
   events,
   mutes,
@@ -14,8 +15,11 @@ import {
 import { seedTalkLink } from '../communities/test-communities'
 import { applyMigrations } from '../db/test-migrations'
 import {
+  resetCommunities,
+  seedCommunity,
+} from '../communities/test-communities'
+import {
   OWNER_ID,
-  resetTables,
   seedDeck,
   seedDeployment,
   seedPublic,
@@ -39,7 +43,7 @@ let owner = ''
 let bob = ''
 beforeAll(() => applyMigrations(db))
 beforeEach(async () => {
-  await resetTables(db)
+  await resetCommunities(db)
   owner = await signIn(env)
   bob = await signIn(env, 'bob', { id: '2' })
 })
@@ -877,4 +881,47 @@ test('F45-AC38: Given one slide with the address as an event and, written with a
     'Both',
   ])
   expect(talkNames(await flat('/link/peatix.com/event/123'))).toEqual(['Both'])
+})
+
+test('F45-AC4: F45-AC17: Given a link that is no event on one author’s slide, When a community holds the host it was written with, Then its page shows with the community at its head, the slide’s own pages lead to it, and without the community it is gone again', async () => {
+  await seedPublic(db, 'talk', 100, 'Owner talk')
+  await seedPublic(db, 'www', 200, 'Owner www')
+  await add('talk', POST, 'A post', owner, 'article')
+  await add('www', 'https://www.example.com/else', '', owner, 'article')
+  expect((await get(POST_PAGE)).status).toBe(404)
+  const manage = () => flat('/my/slides/talk', { Cookie: owner })
+  expect(await manage()).not.toContain('リンクのページに並びます。')
+
+  await seedCommunity(db, {
+    id: 77,
+    handle: 'example',
+    name: 'Example',
+    links: ['https://example.com/'],
+  })
+  const shown = await get(POST_PAGE)
+  expect(shown.status).toBe(200)
+  const body = (await shown.text()).replace(/\s+/g, ' ')
+  expect(talkNames(body)).toEqual(['Owner talk'])
+  expect(body).toMatch(
+    /<p class="event-community">.*?<a href="\/@example">Example<\/a>/,
+  )
+  expect(body).toContain('aria-label="Example のカバー画像"')
+  expect(body).not.toContain('このグループのコミュニティはまだありません')
+  expect(await manage()).toContain('リンクのページに並びます。')
+  expect(await flat('/@owner/talk')).toContain(
+    `<a class="related-link-page" href="${POST_PAGE}"`,
+  )
+  // `www.` is another host: its link is in no community (F30-AC65).
+  expect((await get('/link/example.com/else')).status).toBe(404)
+  expect(await flat('/@owner/www')).not.toContain(
+    '<a class="related-link-page"',
+  )
+
+  // A draft's link on the host shows no page.
+  await seedDeck(db, 'draft')
+  await add('draft', 'https://example.com/draft', '', owner, 'article')
+  expect((await get('/link/example.com/draft')).status).toBe(404)
+
+  await orm.delete(communityLinks)
+  expect((await get(POST_PAGE)).status).toBe(404)
 })

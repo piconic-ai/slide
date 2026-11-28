@@ -184,3 +184,30 @@ test('F31-AC5 (deleted): Given the list page that was dropped for the tab, When 
   expect((await open('/communities/following', bob)).status).toBe(404)
   expect((await open('/communities/following')).status).toBe(404)
 })
+
+test('F31-AC3: F30-AC65: Given a slide in a followed community by a link that is no event, When the top page and the timeline ask, Then it comes under the community, and a slide with the `www.` host does not', async () => {
+  await seedCommunity(db, {
+    id: 80,
+    handle: 'example',
+    name: 'Example',
+    links: ['https://example.com/'],
+    creator: BOB,
+  })
+  for (const [slug, url] of [
+    ['post', 'https://example.com/post'],
+    ['www', 'https://www.example.com/post'],
+  ] as const) {
+    await seedPublic(db, slug, 500, slug)
+    await seedTalkLink(db, { deckId: slug, url, kind: 'article' })
+  }
+  const card = { href: '/@owner/post' }
+  expect((await home())?.talks).toMatchObject([
+    { ...card, community: { name: 'Example', href: '/@example' } },
+  ])
+  const timeline = await open('/api/home/following-slides', bob)
+  expect(await timeline.json()).toMatchObject([card])
+  // The profile's tab of communities shows it as a recent slide (F31-AC8).
+  const tab = await (await open('/@bob/communities')).text()
+  expect(tab).toContain('/@owner/post')
+  expect(tab).not.toContain('/@owner/www')
+})

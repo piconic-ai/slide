@@ -8,7 +8,7 @@ import {
   notifications,
 } from '../db/schema'
 import { addLink } from '../links/store'
-import { parseLinkInput } from '../links/link'
+import { parseLinkInput, type LinkKind } from '../links/link'
 import { resetTables } from '../publication/test-support'
 import type { Handle } from '../share/handle'
 import { checkCommunityLinks } from './link-rules'
@@ -55,7 +55,7 @@ export async function seedCommunity(
     throw new Error(`not created: ${JSON.stringify(result)}`)
 }
 
-/** Adds a related link of the kind "event" to a deck. */
+/** Adds a related link to a deck, of the kind "event" unless another is given. */
 export async function seedTalkLink(
   db: D1Database,
   input: Readonly<{
@@ -63,10 +63,12 @@ export async function seedTalkLink(
     url: string
     owner?: string
     title?: string
+    kind?: LinkKind
+    linkId?: string
   }>,
 ) {
   const parsed = parseLinkInput({
-    kind: 'event',
+    kind: input.kind ?? 'event',
     url: input.url,
     title: input.title ?? '',
   })
@@ -76,6 +78,7 @@ export async function seedTalkLink(
     ownerUserId: input.owner ?? '722500',
     link: parsed.link,
     now: 100,
+    linkId: input.linkId,
   })
   if (result !== 'added') throw new Error(`not added: ${result}`)
 }
