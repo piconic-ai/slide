@@ -12,6 +12,7 @@ import {
   relatedLinks,
   suspensions,
 } from '../db/schema'
+import { seedTalkLink } from '../communities/test-communities'
 import { applyMigrations } from '../db/test-migrations'
 import {
   resetCommunities,
@@ -811,6 +812,21 @@ test.each([
     expect(talkNames(await flat(page))).toEqual(['Talk'])
   },
 )
+
+test('F45-AC38: Given an event whose public links were written with 101 different queries, When its page of links opens, Then it opens and lists the 101 slides, as the keys do not go to D1 one by one', async () => {
+  for (let n = 0; n <= 100; n += 1) {
+    await seedPublic(db, `many${n}`, 100 + n, `Many ${n}`)
+    await seedTalkLink(db, {
+      deckId: `many${n}`,
+      url: `https://connpass.com/event/9/?foo=${n}`,
+    })
+  }
+  const response = await get('/link/connpass.com/event/9')
+  expect(response.status).toBe(200)
+  expect(talkNames((await response.text()).replace(/\s+/g, ' '))).toHaveLength(
+    101,
+  )
+})
 
 test('F45-AC38: Given one address added as an event on one public slide and under other kinds on seven more, When its page of links opens, Then all eight are listed newest first and counted once each', async () => {
   const url = 'https://peatix.com/event/123'
