@@ -62,11 +62,7 @@ export const MOVED_FROM = {
   embed: ['sharing/embed-in-blog'],
   agent: ['agent/connect', 'agent/capabilities', 'agent/revoke'],
   follow: ['community/follow-people', 'community/unfollow'],
-  events: [
-    'community/list-event-talks',
-    'community/event-names',
-    'community/remove-event-talk',
-  ],
+  events: ['community/list-event-talks', 'community/remove-event-talk'],
   communities: [
     'community/create-community',
     'community/link-rules',
@@ -453,9 +449,6 @@ describe('what the help said before, now in its articles', () => {
         'https://luma.com/文字列',
         '一般公開中のスライドだけ',
         'イベントのページを取りに行きません',
-        '最初に保存されたもの',
-        '後から別の題名で足しても変わりません',
-        'connpass のイベント 410635',
         '「外す」を押します。',
       ],
     ],
@@ -469,14 +462,11 @@ describe('what the help said before, now in its articles', () => {
         'https://luma.com/name',
         'lists only public slides',
         'does not fetch the event’s page',
-        'the title of the first saved related link',
-        'Adding another title later does not change it',
-        'connpass event 410635',
         'press “Remove” on the link.',
       ],
     ],
   ] as const)(
-    'F36-AC10: Given the articles on event talks in %s, When they are read, Then they say that an event URL in the related links lists the slides, how the name is decided, and how to take them out',
+    'F36-AC10: Given the articles on event talks in %s, When they are read, Then they say that an event URL in the related links lists the slides, and how to take them out',
     async (lang, phrases) => {
       hasAll(await section('events', lang), phrases)
     },
@@ -512,7 +502,6 @@ describe('what the help said before, now in its articles', () => {
         '<a href="/contact">お問い合わせ</a>',
         'ハンドルの変更',
         '管理者の移し替え',
-        'イベント名の修正',
       ],
     ],
     [
@@ -543,7 +532,6 @@ describe('what the help said before, now in its articles', () => {
         '<a href="/contact">Contact</a>',
         'A new handle',
         'Moving the admins',
-        'Fixing an event’s name',
       ],
     ],
   ] as const)(

@@ -5,11 +5,7 @@ import { SERVICE_NAME } from '../../../site/service'
 export default defineArticle({
   order: 50,
   form: 'howto',
-  related: [
-    'community/event-names',
-    'community/remove-event-talk',
-    'community/create-community',
-  ],
+  related: ['community/remove-event-talk', 'community/create-community'],
   ja: {
     title: 'スライドをイベントの発表として並べる',
     lead: () =>

@@ -40,6 +40,7 @@ const event = (inCommunity: ViewerEvent['community']): ViewerEvent => ({
   host: 'kanagawapm.connpass.com',
   url: 'https://connpass.com/event/410635/',
   name: 'Kanagawa.pm #3',
+  firstTitle: null,
   community: inCommunity,
 })
 const read = (

@@ -201,7 +201,7 @@ test('F29-AC6: Given a connpass address with two trailing slashes saved first as
   expect(await ties()).toHaveLength(2)
 })
 
-test('F29-AC8: Given an event added with a title, When it is added again with another title, Then its name stays the first title', async () => {
+test('F45-AC10: Given an event added with a title and again with another, When they are saved, Then the event is given no name: its heading is read from its links', async () => {
   await seedPublic(db, 'a', 100, 'A')
   await seedPublic(db, 'b', 200, 'B')
   await add(
@@ -215,9 +215,7 @@ test('F29-AC8: Given an event added with a title, When it is added again with an
     { url: 'https://connpass.com/event/1/', title: 'Another name' },
     'b',
   )
-  expect((await allEvents()).map((event) => event.name)).toEqual([
-    'Kanagawa.pm #3',
-  ])
+  expect((await allEvents()).map((event) => event.name)).toEqual([null])
 })
 
 test('F27-AC44, F29-AC7: Given a deck in a connpass event, When a link to the same event under another group is added to it, Then it is refused and the deck stays in the event once', async () => {
@@ -232,19 +230,6 @@ test('F27-AC44, F29-AC7: Given a deck in a connpass event, When a link to the sa
     'kanagawapm.connpass.com',
   ])
   expect(await allEvents()).toHaveLength(1)
-})
-
-test('F29-AC8: Given an event first added with no title, When a link with a title is added, Then that title is its name, and a later one does not change it', async () => {
-  await seedPublic(db, 'a', 100, 'A')
-  await seedPublic(db, 'b', 200, 'B')
-  await seedPublic(db, 'c', 300, 'C')
-  await add({ url: 'https://luma.com/x1' }, 'a')
-  expect((await allEvents()).map((event) => event.name)).toEqual([null])
-  await add({ url: 'https://luma.com/x1', title: 'Hono Night #5' }, 'b')
-  await add({ url: 'https://luma.com/x1', title: 'Later' }, 'c')
-  expect((await allEvents()).map((event) => event.name)).toEqual([
-    'Hono Night #5',
-  ])
 })
 
 test('F29-AC11: Given a link in an event, When it is removed, Then it leaves the event and the event stays', async () => {
@@ -297,7 +282,8 @@ test('F27-AC88: Given a link, When its kind is changed to event and back to othe
     })
   await change({ kind: 'event', event: eventOf(link!.url) })
   expect(await kindsOf()).toEqual(['event'])
-  expect((await allEvents()).map((event) => event.name)).toEqual(['Meetup'])
+  // The event is given no name: its heading is read from its links.
+  expect((await allEvents()).map((event) => event.name)).toEqual([null])
   // Made an event twice, it is still one tie.
   await change({ kind: 'event', event: eventOf(link!.url) })
   expect(await ties()).toHaveLength(1)

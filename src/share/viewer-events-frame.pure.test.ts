@@ -25,6 +25,7 @@ const event = (
   host: 'kanagawapm.connpass.com',
   url: `https://connpass.com/event/${410600 + id}/`,
   name,
+  firstTitle: null,
   community: inCommunity,
 })
 
@@ -67,7 +68,7 @@ test('F24-AC51: Given an event in no community, When the viewer draws its line, 
 test('F24-AC51: Given an event without a name and a reader in English, When the viewer draws its line, Then it reads “Presented at” before the event’s fallback name', async () => {
   const line = flat(await viewerEventsFrame([event(1, null, community)], 'en'))
   expect(line).toContain(
-    '<span>Presented at</span><a class="viewer-event-name" href="/link/connpass.com/event/410601">connpass event 410601</a>',
+    '<span>Presented at</span><a class="viewer-event-name" href="/link/connpass.com/event/410601">connpass https://connpass.com/event/410601/</a>',
   )
   expect(line).toContain('aria-label="Events presented at"')
 })

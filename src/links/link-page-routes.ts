@@ -3,11 +3,6 @@ import { currentOwner } from '../auth/owner-middleware'
 import { communityCoverOf, communityHref } from '../communities/community'
 import { listEventCommunities } from '../communities/event-communities-store'
 import { homePagePolicy, PAGE_POLICY } from '../decks/pages'
-import {
-  defaultEventCover,
-  eventPageBody,
-  eventPageTitle,
-} from '../events/event-page'
 import { recordFrom } from '../metrics/record-routes'
 import { contentBaseOf } from '../preview/config'
 import { ERROR_PAGE_POLICY, errorPage } from '../site/error-pages'
@@ -25,6 +20,7 @@ import {
   linkMissingStyle,
   linkMissingTitle,
 } from './link-missing-page'
+import { linkPageBody, linkPageTitle } from './link-page'
 import {
   findAliasedKey,
   findEventIdsByKey,
@@ -127,7 +123,13 @@ async function eventPage(c: C, sent: string, target: LinkTarget) {
     if (!read) continue
     return target.eventRest !== null && sent !== target.eventRest
       ? c.redirect(PREFIX + target.eventRest, 301)
-      : shownEvent(c, target, read)
+      : // The language switch comes back to the path of the event, not to
+        // the canonical path of the other links.
+        shownEvent(
+          c,
+          { ...target, rest: target.eventRest ?? target.rest },
+          read,
+        )
   }
   return null
 }
@@ -142,32 +144,24 @@ async function shownEvent(
     (await listEventCommunities(c.env.DB, [eventId])).get(eventId) ?? null
   const lang = langOf(c)
   const contentBase = contentBaseOf(c.env)
-  // The language switch comes back to the path of the event, not to the
-  // canonical path of the other links.
-  return show(
-    c,
-    { ...target, rest: target.eventRest ?? target.rest },
-    {
-      title: eventPageTitle(read.event, lang),
-      body: eventPageBody(
-        {
-          ...read,
-          community: community && {
-            ...community,
-            href: communityHref(community.handle),
-          },
-          cover: community
-            ? communityCoverOf(community)
-            : defaultEventCover(eventId),
-          contentBase,
+  return show(c, target, {
+    title: linkPageTitle(read.event),
+    body: linkPageBody(
+      {
+        ...read,
+        community: community && {
+          ...community,
+          href: communityHref(community.handle),
+          cover: communityCoverOf(community),
         },
-        lang,
-      ),
-      status: 200,
-      policy: homePagePolicy(contentBase),
-      width: 'wide',
-    },
-  )
+        contentBase,
+      },
+      lang,
+    ),
+    status: 200,
+    policy: homePagePolicy(contentBase),
+    width: 'wide',
+  })
 }
 
 /** The page of an address no slides are gathered at (F45-AC12). */

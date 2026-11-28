@@ -15,8 +15,7 @@ export default defineArticle({
           管理者は、コミュニティのページの「コミュニティを編集」から、名前、説明(${n.communityDescriptionChars}
           文字まで)、ロゴ(${n.logoMb} MB まで)、カバー画像(${n.coverMb} MB
           まで)、ほかのリンク(${n.communitySites}
-          つまで)、紐づけ用リンク、そのコミュニティのイベント名を直せます。画像は
-          PNG、JPEG、WebP です。
+          つまで)、紐づけ用リンクを直せます。画像は PNG、JPEG、WebP です。
         </li>
         <li>
           管理者は、ハンドルで別の人を管理者に足せます。ほかの管理者を外すことも、自分が外れることもできます。最後の
@@ -44,9 +43,8 @@ export default defineArticle({
           From “Edit community” on the community’s page, admins can change its
           name, its description (up to ${n.communityDescriptionChars}
           characters), its logo (up to ${n.logoMb} MB), its cover image (up to
-          ${n.coverMb} MB), its other links (up to ${n.communitySites}), its
-          links that gather slides, and the names of its events. Images are PNG,
-          JPEG or WebP.
+          ${n.coverMb} MB), its other links (up to ${n.communitySites}) and its
+          links that gather slides. Images are PNG, JPEG or WebP.
         </li>
         <li>
           An admin can add another person as an admin by their handle, remove

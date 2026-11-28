@@ -16,10 +16,6 @@ const SHADES = ['-light', '', '-dark'] as const
 /** How many squares the pattern has: two rows of sixteen on a wide screen. */
 export const COVER_SQUARES = 32
 
-/** The color an event without a community shows, from its number (D-49). */
-export const colorOfNumber = (id: number): CommunityColor =>
-  COMMUNITY_COLORS[((id % 5) + 5) % 5] ?? 'red'
-
 /**
  * A sequence of numbers in [0, 1) that the same seed always gives (a
  * mulberry32 generator), so a pattern is the same on every visit.

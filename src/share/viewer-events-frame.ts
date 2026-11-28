@@ -4,8 +4,8 @@ import {
   type EventCommunityView,
 } from '../communities/community'
 import { logoOf } from '../communities/logo'
-import { eventNameOf, type NamedEvent } from '../events/event-name'
 import { eventPagePath } from '../links/link-address'
+import { headingOf, type NamedEvent } from '../links/link-heading'
 import { messages, type Lang } from '../site/i18n'
 
 const text = messages({
@@ -29,7 +29,7 @@ export const eventHref = (event: Pick<ViewerEvent, 'url'>) =>
 /** "<event> で発表" in Japanese, "Presented at <event>" in English. */
 const presentedAt = (event: ViewerEvent, lang: Lang) => {
   const link = html`<a class="viewer-event-name" href="${eventHref(event)}"
-    >${eventNameOf(event, lang)}</a
+    >${headingOf(event)}</a
   >`
   return lang === 'ja'
     ? html`${link}<span>で発表</span>`

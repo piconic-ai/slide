@@ -1,5 +1,5 @@
 import type { DeckSlug } from '../decks/deck-id'
-import type { NamedEvent } from '../events/event-name'
+import type { NamedEvent } from '../links/link-heading'
 import type { Handle } from '../share/handle'
 import type { CommunityColor, Cover } from '../site/cover-pattern'
 import type { StoredCommunityLink } from './store'

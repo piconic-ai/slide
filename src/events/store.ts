@@ -3,6 +3,7 @@ import { drizzle } from 'drizzle-orm/d1'
 import { events, relatedLinkEvents, relatedLinks } from '../db/schema'
 import { communityHref } from '../communities/community'
 import { listEventCommunities } from '../communities/event-communities-store'
+import { firstPublicTitle } from '../links/link-page-store'
 import type { DeckEvent } from './deck-event'
 
 /**
@@ -21,6 +22,7 @@ export async function listDeckEvents(
       host: events.host,
       url: events.url,
       name: events.name,
+      firstTitle: firstPublicTitle,
       first: min(relatedLinks.position),
     })
     .from(relatedLinks)
@@ -46,20 +48,4 @@ export async function listDeckEvents(
         : null,
     }
   })
-}
-
-/**
- * Gives an event the name an operator set, and who set it. False when there
- * is no such event.
- */
-export async function renameEvent(
-  database: D1Database,
-  input: Readonly<{ eventId: number; name: string; by: string; now: number }>,
-): Promise<boolean> {
-  const result = await drizzle(database)
-    .update(events)
-    .set({ name: input.name, named_by: input.by, named_at: input.now })
-    .where(eq(events.id, input.eventId))
-    .run()
-  return result.meta.changes > 0
 }

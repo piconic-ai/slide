@@ -3,7 +3,6 @@ import { drizzle } from 'drizzle-orm/d1'
 import { z } from 'zod'
 import {
   communities,
-  communityAdmins,
   communityFeedEvents,
   communityLinks,
   events,
@@ -108,26 +107,4 @@ export async function listEventCommunities(
       return community ? [[eventId, community] as const] : []
     }),
   )
-}
-
-/**
- * The people who run a community the event is in: they may rename it
- * (F29-AC22).
- */
-export async function listEventAdmins(
-  database: D1Database,
-  eventId: number,
-): Promise<ReadonlySet<string>> {
-  const communityIds = [
-    ...new Set(
-      (await listMatches(database, [eventId])).map((m) => m.communityId),
-    ),
-  ]
-  if (communityIds.length === 0) return new Set()
-  const rows = await drizzle(database)
-    .selectDistinct({ userId: communityAdmins.user_id })
-    .from(communityAdmins)
-    .where(inArray(communityAdmins.community_id, communityIds))
-    .all()
-  return new Set(rows.map((row) => row.userId))
 }

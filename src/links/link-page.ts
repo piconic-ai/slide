@@ -4,25 +4,26 @@ import { logoOf } from '../communities/logo'
 import { communityStyle } from '../communities/community-style'
 import { citationCardGrid, type CitationCard } from '../citations/cards'
 import { coverUrl } from '../share/cover'
+import type { EventCommunity } from '../events/deck-event'
+import { groupPageOfHosts } from '../events/event-url'
+import { linkCheckPrompt, linkCheckTrigger } from '../share/link-check'
 import { profilePath, sharePath } from '../share/path'
-import { colorOfNumber, coverOf, type Cover } from '../site/cover-pattern'
+import { coverOf, type Cover } from '../site/cover-pattern'
 import { messages, type Lang } from '../site/i18n'
-import type { EventCommunity } from './deck-event'
-import { eventNameOf, sourceLinkTextOf } from './event-name'
-import { groupPageOfHosts } from './event-url'
-import type { EventTalk, StoredEvent } from '../links/link-page-store'
+import { headingOf, sourceLinkTextOf } from './link-heading'
+import type { EventTalk, StoredEvent } from './link-page-store'
 
 const text = messages({
   ja: {
     cover: (name: string) => `${name} のカバー画像`,
-    talks: '発表',
+    talks: 'スライド',
     count: (count: number) => `${count} 本`,
     noCommunity: 'このグループのコミュニティはまだありません',
     create: '作る',
   },
   en: {
     cover: (name: string) => `Cover image of ${name}`,
-    talks: 'Talks',
+    talks: 'Slides',
     count: (count: number) => `${count}`,
     noCommunity: 'This group has no community yet',
     create: 'Create',
@@ -32,27 +33,16 @@ const text = messages({
 /** Where a community is made, with the group's page already filled in. */
 export const NEW_COMMUNITY_PATH = '/communities/new'
 
-/**
- * The cover of an event: its community's, or, for an event of none, the
- * default pattern in the color its number picks (D-49).
- */
-export type EventCover = Cover
-
-/** The cover of an event that is in no community. */
-export const defaultEventCover = (eventId: number): EventCover => ({
-  kind: 'pattern',
-  color: colorOfNumber(eventId),
-  seed: eventId,
-})
-
-/** What the page of one event shows. */
-export type EventPageView = Readonly<{
+/** What the page of the links to one address shows. */
+export type LinkPageView = Readonly<{
   event: StoredEvent
+  /** Where the page leads readers: the address's own page (F45-AC25). */
+  source: string
   talks: readonly EventTalk[]
   /** The hosts the links of the talks were written with. */
   linkHosts: ReadonlySet<string>
-  community: (EventCommunityView & EventCommunity) | null
-  cover: EventCover
+  /** The community the link is in, with its cover; null for none (F45-AC17). */
+  community: (EventCommunityView & EventCommunity & { cover: Cover }) | null
   /** Where covers load from; without one the cards show the names alone. */
   contentBase: URL | null
 }>
@@ -73,7 +63,7 @@ const cardOf = (talk: EventTalk, contentBase: URL | null): CitationCard => ({
  * For an event of a group with no community, the way to make one: only when
  * its links name one group.
  */
-const communityPrompt = (view: EventPageView, lang: Lang) => {
+const communityPrompt = (view: LinkPageView, lang: Lang) => {
   const group =
     view.community === null
       ? groupPageOfHosts(view.event.service, view.linkHosts)
@@ -90,34 +80,41 @@ const communityPrompt = (view: EventPageView, lang: Lang) => {
   </p>`
 }
 
-/** The title of the page of one event: its name. */
-export const eventPageTitle = (event: StoredEvent, lang: Lang) =>
-  eventNameOf(event, lang)
+/** The title of the page: its heading. */
+export const linkPageTitle = (event: StoredEvent) => headingOf(event)
 
 /**
- * The page of one event: its cover, its head (the community, the name and
- * the way to the event's own page, which is never fetched), then its talks
- * as cards. No date or place: the service does not know them.
+ * The cover, logo and name of the community the link is in, the name
+ * leading to its page (F45-AC17); nothing for a link in none.
  */
-export function eventPageBody(view: EventPageView, lang: Lang) {
+const communityHead = (view: LinkPageView, lang: Lang) =>
+  view.community === null
+    ? ''
+    : html`${coverOf(view.community.cover, text[lang].cover(view.community.name))}
+        <p class="event-community">
+          ${logoOf(view.community, 28)}
+          <a href="${view.community.href}">${view.community.name}</a>
+        </p>`
+
+/**
+ * The page of the links to one address: the community it is in, the
+ * heading, the way to the address's own page, which is never fetched and
+ * which the reader checks before following (F45-AC16, F45-AC30), then the
+ * slides as cards. No date or place: the service does not know them.
+ */
+export function linkPageBody(view: LinkPageView, lang: Lang) {
   const t = text[lang]
-  const name = eventNameOf(view.event, lang)
   // The logo's own styles come with it, as on the community's pages.
   return html`${view.community ? communityStyle : ''}
     <div class="event-page">
-      ${coverOf(view.cover, t.cover(view.community?.name ?? name))}
+      ${communityHead(view, lang)}
       <header class="event-head">
-        ${
-          view.community
-            ? html`<p class="event-community">
-                ${logoOf(view.community, 28)}
-                <a href="${view.community.href}">${view.community.name}</a>
-              </p>`
-            : ''
-        }
-        <h1>${name}</h1>
+        <h1>${headingOf(view.event)}</h1>
         <p>
-          <a href="${view.event.url}" rel="noopener nofollow ugc"
+          <a
+            href="${view.source}"
+            rel="noopener nofollow ugc"
+            ${linkCheckTrigger()}
             >${sourceLinkTextOf(view.event, lang)}</a
           >
         </p>
@@ -134,5 +131,6 @@ export function eventPageBody(view: EventPageView, lang: Lang) {
           'event-talks',
         )}
       </section>
-    </div>`
+    </div>
+    ${linkCheckPrompt(lang)}`
 }

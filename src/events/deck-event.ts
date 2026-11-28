@@ -1,5 +1,5 @@
 import type { EventCommunityView } from '../communities/community'
-import type { NamedEvent } from './event-name'
+import type { NamedEvent } from '../links/link-heading'
 
 /**
  * The community an event is shown with, as a page links to it
