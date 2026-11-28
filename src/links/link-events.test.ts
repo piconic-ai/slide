@@ -102,16 +102,43 @@ test('F27-AC87: Given the four kinds, When the author adds a link of each by cho
   expect(await kindsOf()).toEqual(['video', 'article', 'event', 'other'])
 })
 
-test('F29-AC28: Given an event address, When the author chooses another kind for it, Then it is that kind and in no event', async () => {
-  await seedPublic(db, 'talk', 100, 'Talk')
-  await add({
-    kind: 'article',
-    url: 'https://kanagawapm.connpass.com/event/1/',
-  })
-  expect(await kindsOf()).toEqual(['article'])
-  expect(await allEvents()).toEqual([])
-  expect(await ties()).toEqual([])
-})
+test.each(['video', 'article', 'other'])(
+  'F45-AC37: Given an event address, When the author adds it choosing the kind %s, Then it is still an event and tied to its event',
+  async (kind) => {
+    await seedPublic(db, 'talk', 100, 'Talk')
+    await add({ kind, url: 'https://kanagawapm.connpass.com/event/1/' })
+    expect(await kindsOf()).toEqual(['event'])
+    expect(await allEvents()).toMatchObject([
+      { key: 'https://connpass.com/event/1' },
+    ])
+    expect(await ties()).toMatchObject([{ host: 'kanagawapm.connpass.com' }])
+  },
+)
+
+test.each([
+  ['a query', 'https://connpass.com/event/7/?foo=1'],
+  ['leading zeros', 'https://connpass.com/event/007'],
+  [
+    'a group and a tracking query',
+    'https://g.connpass.com/event/7?utm_source=x',
+  ],
+])(
+  'F45-AC37: Given a connpass address with %s added with the kind other, When it is saved, Then it is tied to the event its /link/ page looks up',
+  async (_, url) => {
+    await seedPublic(db, 'talk', 100, 'Talk')
+    await add({ kind: 'other', url })
+    expect((await allEvents()).map((event) => event.key)).toEqual([
+      'https://connpass.com/event/7',
+    ])
+    expect(await ties()).toHaveLength(1)
+    const page = await server.fetch(
+      new Request(`${TEST_ORIGIN}/link/connpass.com/event/7`),
+      env,
+    )
+    expect(page.status).toBe(200)
+    expect(await page.text()).toContain('<span class="deck-name">Talk</span>')
+  },
+)
 
 test('F29-AC28: Given an address of no known event shape, When the author chooses the kind event, Then it has the event of its host and path', async () => {
   await seedPublic(db, 'talk', 100, 'Talk')
@@ -247,9 +274,10 @@ test('F29-AC11: Given a link in an event, When it is removed, Then it leaves the
   expect(await allEvents()).toHaveLength(1)
 })
 
-test('F29-AC11: Given a link in an event, When its kind is changed away from event, Then it leaves the event', async () => {
+test('F29-AC11: Given a link of another site made an event, When its kind is changed away from event, Then it leaves the event', async () => {
   await seedPublic(db, 'talk', 100, 'Talk')
-  await add({ url: 'https://luma.com/x1' })
+  await add({ kind: 'event', url: 'https://example.com/meetup/1' })
+  expect(await ties()).toHaveLength(1)
   const [link] = await listLinks(db, 'talk')
   expect(
     await setLinkKind(db, {
@@ -262,6 +290,30 @@ test('F29-AC11: Given a link in an event, When its kind is changed away from eve
   ).toBe('changed')
   expect(await kindsOf()).toEqual(['video'])
   expect(await ties()).toEqual([])
+})
+
+test('F45-AC37: Given a link to an event of Luma, When another kind is chosen for it in the list, Then it stays an event, tied as it was', async () => {
+  await seedPublic(db, 'talk', 100, 'Talk')
+  await add({ url: 'https://luma.com/x1' })
+  const before = await ties()
+  const [link] = await listLinks(db, 'talk')
+  for (const kind of ['video', 'article', 'other']) {
+    const response = await server.fetch(
+      new Request(`${TEST_ORIGIN}/my/slides/talk/links/kinds`, {
+        method: 'POST',
+        headers: {
+          Cookie: owner,
+          Origin: TEST_ORIGIN,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({ [`kind-${link!.id}`]: kind }).toString(),
+      }),
+      env,
+    )
+    expect(response.status).toBe(303)
+    expect(await kindsOf()).toEqual(['event'])
+    expect(await ties()).toEqual(before)
+  }
 })
 
 test('F27-AC88: Given a link, When its kind is changed to event and back to other, Then each kind is the one listed', async () => {

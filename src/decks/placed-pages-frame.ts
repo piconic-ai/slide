@@ -1,6 +1,6 @@
 import { html } from 'hono/html'
 import type { DeckEvent } from '../events/deck-event'
-import { linkPagePath } from '../links/link-address'
+import { eventPagePath, linkPagePath } from '../links/link-address'
 import { headingOf } from '../links/link-heading'
 import type { ShownLink } from '../links/link-page-store'
 import type { StoredLink } from '../links/store'
@@ -48,7 +48,7 @@ const pageOfLink = (link: StoredLink): PlacedPage => {
 }
 
 const pageOfEvent = (event: DeckEvent): PlacedPage => ({
-  href: linkPagePath(event.url),
+  href: eventPagePath(event.url),
   heading: headingOf(event),
   community: event.community?.name ?? null,
 })

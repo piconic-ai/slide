@@ -20,7 +20,12 @@ import {
   linkMissingTitle,
 } from './link-missing-page'
 import { linkPageBody, linkPageTitle } from './link-page'
-import { findAliasedKey, readLinkPage, type LinkPage } from './link-page-store'
+import {
+  findAliasedKey,
+  readEventPageOf,
+  readGatheredPage,
+  type LinkPage,
+} from './link-page-store'
 
 type C = Context<{ Bindings: Env }>
 
@@ -107,12 +112,28 @@ function show(c: C, target: LinkTarget, page: Shown) {
 }
 
 /**
- * The page of the links to the address: of the event it stands for, or of
- * the links gathered by its key (F45-AC35). Null when neither shows.
+ * The page of the event the address stands for, or null when there is no
+ * event or it has no public talk. The page of an event has one path
+ * (`eventRest`): asked at another, the answer moves there.
  */
-async function linkPage(c: C, target: LinkTarget) {
+async function eventPage(c: C, sent: string, target: LinkTarget) {
   const viewer = (await currentOwner(c))?.userId ?? null
-  const read = await readLinkPage(c.env.DB, target, viewer)
+  const read = await readEventPageOf(c.env.DB, target, viewer)
+  if (!read) return null
+  return target.eventRest !== null && sent !== target.eventRest
+    ? c.redirect(PREFIX + target.eventRest, 301)
+    : // The language switch comes back to the path of the event, not to the
+      // canonical path of the other links.
+      shownPage(c, { ...target, rest: target.eventRest ?? target.rest }, read)
+}
+
+/**
+ * The page of the links gathered by the key of the address, or null when
+ * too few slides carry it for a page (F45-AC2).
+ */
+async function gatheredPage(c: C, target: LinkTarget) {
+  const viewer = (await currentOwner(c))?.userId ?? null
+  const read = await readGatheredPage(c.env.DB, target, viewer)
   return read && shownPage(c, target, read)
 }
 
@@ -175,19 +196,31 @@ linkPageRoutes.get('/link', (c) => {
     ? parseLinkPath(to.slice(PREFIX.length))
     : null
   if (!read || read.kind === 'refused') return refused(c)
-  return c.redirect(linkPagePath(read.url), 302)
+  // The page of an event of another site has the address as written as its
+  // path: a `to` written that way goes back there, any other to the one path.
+  const target = linkTargetOf(read.url)
+  const asWritten = to.slice(PREFIX.length) === target.eventRest
+  return c.redirect(PREFIX + (asWritten ? target.eventRest : target.rest), 302)
 })
 
 /**
  * The page of the links to one address; an address nothing is gathered at
  * answers the page of F45-AC12. The order is F45-AC13's: refuse, move, then
- * the page.
+ * the page: of the event the address stands for, or of the links gathered
+ * by its key (F45-AC35). An event of another site is looked up by the
+ * address as written before the move to the canonical path, which would
+ * compare away what tells it from another event (its `www.`, the form its
+ * site's rule rewrites).
  */
 linkPageRoutes.get('/link/*', async (c) => {
-  const read = parseLinkPath(sentRestOf(c))
+  const sent = sentRestOf(c)
+  const read = parseLinkPath(sent)
   if (read.kind === 'refused') return refused(c)
   const target = linkTargetOf(read.url)
-  const moved = await movedTo(c.env.DB, sentRestOf(c), target)
+  const written = target.eventShaped ? null : await eventPage(c, sent, target)
+  if (written !== null) return written
+  const moved = await movedTo(c.env.DB, sent, target)
   if (moved !== null) return c.redirect(moved, 301)
-  return (await linkPage(c, target)) ?? missing(c, target)
+  const event = target.eventShaped ? await eventPage(c, sent, target) : null
+  return event ?? (await gatheredPage(c, target)) ?? missing(c, target)
 })

@@ -135,12 +135,19 @@ const publicTalks = (db: ReturnType<typeof drizzle>, viewer: string | null) =>
       coverPath: deployments.cover_path,
       linkHost: relatedLinkEvents.host,
       linkTitle: relatedLinks.title,
+      gatherKey: relatedLinks.gather_key,
     })
     .from(relatedLinkEvents)
     .innerJoin(relatedLinks, eq(relatedLinks.id, relatedLinkEvents.link_id))
     .innerJoin(decks, openDeck(viewer))
     .innerJoin(accounts, eq(accounts.user_id, decks.owner_user_id))
     .innerJoin(deployments, readyVersion)
+
+/** The order of a list of slides: the most recently published first. */
+const newestFirst = (
+  a: Readonly<{ publishedAt: number; slug: string }>,
+  b: Readonly<{ publishedAt: number; slug: string }>,
+) => b.publishedAt - a.publishedAt || (a.slug < b.slug ? -1 : 1)
 
 /** What the page of the links to one address is made of. */
 export type LinkPage = Readonly<{
@@ -163,6 +170,9 @@ const ofEvent = (eventId: number) => eq(relatedLinkEvents.event_id, eventId)
  * Null when there is no such event or it has no public talk: that is the
  * same for everyone. The viewer's mutes and blocks only leave talks out of
  * the list, down to none (F45-AC15).
+ * The public slides that carry the same address under another kind are
+ * listed with them, each slide once (F45-AC38): the links that are no event
+ * and have the gathered key of a link to the event on a public slide.
  */
 export async function readEventPage(
   database: D1Database,
@@ -200,8 +210,20 @@ export async function readEventPage(
       .all(),
   ])
   if (!event || links.length === 0) return null
-  // A deck with two links to the event comes twice; it is listed once.
-  const decksOnce = [...new Map(rows.map((row) => [row.deckId, row])).values()]
+  const keys = new Set(
+    links.map((link) => link.gatherKey).filter((key) => key !== null),
+  )
+  const others =
+    keys.size === 0
+      ? []
+      : await gatheredLinks(db, viewer)
+          .where(gatheredBy([...keys]))
+          .all()
+  // A deck with two links to the event, or with one of each kind, comes
+  // twice; it is listed once.
+  const decksOnce = [
+    ...new Map([...rows, ...others].map((row) => [row.deckId, row])).values(),
+  ]
   const firstTitle =
     links.find((link) => link.linkTitle !== null)?.linkTitle ?? null
   return {
@@ -211,7 +233,7 @@ export async function readEventPage(
       event,
       firstLinkHost: links[0]?.linkHost ?? null,
     }),
-    talks: talkSchema.array().parse(decksOnce),
+    talks: talkSchema.array().parse(decksOnce).sort(newestFirst),
     linkHosts: new Set(links.map((row) => row.linkHost)),
   }
 }
@@ -275,7 +297,7 @@ const gatheredBy = (keys: readonly string[]) =>
  * way out follow the oldest link (F45-AC10, F45-AC25); the viewer's mutes
  * and blocks only leave slides out of the list (F45-AC15).
  */
-async function readGatheredPage(
+export async function readGatheredPage(
   database: D1Database,
   target: LinkTarget,
   viewer: string | null,
@@ -321,11 +343,10 @@ async function readGatheredPage(
 }
 
 /**
- * The page of links of an address (F45-AC35): of the event kept under its
- * key, the first with a public talk; with none, of the links gathered by
- * its key. Null when neither shows.
+ * The page of the event kept under the key of an address (F45-AC35), or
+ * null when there is none or it has no public talk.
  */
-export async function readLinkPage(
+export async function readEventPageOf(
   database: D1Database,
   target: LinkTarget,
   viewer: string | null,
@@ -334,7 +355,7 @@ export async function readLinkPage(
     const read = await readEventPage(database, id, viewer)
     if (read) return read
   }
-  return readGatheredPage(database, target, viewer)
+  return null
 }
 
 /**
