@@ -47,6 +47,8 @@ beforeEach(async () => {
     now: 1,
   })
   eventId = (await db.select().from(events).get())!.id
+  // A name from the time names were kept.
+  await db.update(events).set({ name: 'Kept' }).where(eq(events.id, eventId))
 })
 afterAll(() => platform.dispose())
 
@@ -70,108 +72,32 @@ async function post(
 }
 const stored = async () =>
   db.select().from(events).where(eq(events.id, eventId)).get()
-const eventPage = async (lang = 'ja') =>
-  (
-    await (
-      await server.fetch(
-        // The page of the event (F45-AC9), which reads no `?lang=`.
-        new Request(`${TEST_ORIGIN}/link/connpass.com/event/410635`, {
-          headers: { 'Accept-Language': lang },
-        }),
-        env,
-      )
-    ).text()
-  ).replace(/\s+/g, ' ')
 
-test('F29-AC15: Given the operator page, When it opens, Then it has the form to rename an event', async () => {
+test('F45-AC20: Given the operator page, When it opens, Then it has no form to rename an event', async () => {
   const response = await server.fetch(
     new Request(`${OPERATOR_ORIGIN}/`, {
       headers: { [ACCESS_TOKEN_HEADER]: await team.sign() },
     }),
     env,
   )
-  const body = (await response.text()).replace(/\s+/g, ' ')
-  expect(body).toContain('<h2>イベント名を直す</h2>')
-  expect(body).toContain('action="/events/rename"')
+  expect(response.status).toBe(200)
+  const body = await response.text()
+  expect(body).not.toContain('イベント名')
+  expect(body).not.toContain('/events/rename')
 })
 
-test.each([
-  () => String(eventId),
-  () => `/events/${eventId}`,
-  () => `${TEST_ORIGIN}/events/${eventId}`,
-])(
-  'F29-AC15: Given the operator names an event by %s, When they rename it, Then the new name is on its page and who renamed it is kept',
-  async (target) => {
-    const response = await post({
-      target: target(),
-      name: '  Kanagawa.pm #3 (2026)  ',
-    })
-    expect(response.status).toBe(303)
-    expect(response.headers.get('location')).toBe('/?result=event_renamed')
-    expect(await stored()).toMatchObject({
-      name: 'Kanagawa.pm #3 (2026)',
-      named_by: 'op@example.com',
-      named_at: expect.any(Number),
-    })
-    expect(await eventPage()).toContain('<h1>Kanagawa.pm #3 (2026)</h1>')
-  },
-)
-
-test('F29-AC15: Given a renamed event, When a link with another title is added, Then the operator’s name stays', async () => {
-  await post({ target: String(eventId), name: 'Renamed' })
-  await seedPublic(database, 'more', 200, 'More')
-  await addLink(database, {
-    deckId: 'more',
-    ownerUserId: OWNER_ID,
-    link: {
-      kind: 'event',
-      url: URL1,
-      title: 'Another',
-      event: eventRefOf(URL1)!,
-    },
-    now: 2,
-  })
-  expect((await stored())?.name).toBe('Renamed')
+test('F45-AC20: Given the operator, with and without the Access token, When they post a new name for an event, Then there is no such way and the name stays', async () => {
+  for (const token of [true, false]) {
+    const response = await post(
+      { target: String(eventId), name: 'Renamed' },
+      { token },
+    )
+    expect(response.status).toBe(404)
+  }
+  expect((await stored())?.name).toBe('Kept')
 })
 
-test.each([
-  [{ target: 'https://other.example/events/1', name: 'X' }, 'invalid_event'],
-  [{ target: '@owner/talk', name: 'X' }, 'invalid_event'],
-  [{ target: '0', name: 'X' }, 'invalid_event'],
-  [{ target: '999999', name: 'X' }, 'event_not_found'],
-  [{ target: '1', name: '' }, 'invalid_event_name'],
-  [{ target: '1', name: '   ' }, 'invalid_event_name'],
-  [{ target: '1', name: 'a​b\nc' }, 'invalid_event_name'],
-  [{ target: '1', name: 'x'.repeat(101) }, 'invalid_event_name'],
-] as const)(
-  'F29-AC15: Given %o, When the operator sends it, Then it is refused as %s and the name stays',
-  async (fields, result) => {
-    const response = await post({
-      ...fields,
-      target: fields.target === '1' ? String(eventId) : fields.target,
-    })
-    expect(response.headers.get('location')).toBe(`/?result=${result}`)
-    expect((await stored())?.name).toBe('Kanagawa.pm #3')
-  },
-)
-
-test('F29-AC15: Given no Access token, or a request from another origin, When an event is renamed, Then it is refused and the name stays', async () => {
-  expect(
-    (await post({ target: String(eventId), name: 'X' }, { token: false }))
-      .status,
-  ).toBe(404)
-  expect(
-    (
-      await post(
-        { target: String(eventId), name: 'X' },
-        { origin: 'https://evil.example' },
-      )
-    ).status,
-  ).toBe(403)
-  expect((await stored())?.name).toBe('Kanagawa.pm #3')
-})
-
-test('F29-AC15: Given a signed-in author on the public origin, When they post the operator form there, Then no rename happens', async () => {
+test('F45-AC20: Given a signed-in author on the public origin, When they post a new name for an event there, Then there is no such way and the name stays', async () => {
   const cookie = await signIn(env, 'bob', { id: '2' })
   const response = await server.fetch(
     new Request(`${TEST_ORIGIN}/events/rename`, {
@@ -186,5 +112,5 @@ test('F29-AC15: Given a signed-in author on the public origin, When they post th
     env,
   )
   expect(response.status).toBe(404)
-  expect((await stored())?.name).toBe('Kanagawa.pm #3')
+  expect((await stored())?.name).toBe('Kept')
 })

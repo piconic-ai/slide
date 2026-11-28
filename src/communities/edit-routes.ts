@@ -5,8 +5,6 @@ import { checkHandle } from '../auth/handle-rules'
 import { currentOwner } from '../auth/owner-middleware'
 import type { Owner } from '../auth/owner-session'
 import { deckTitles, notFoundBody, renderPage } from '../decks/pages'
-import { mayRenameEvent, parseEventName } from '../events/event-rename'
-import { renameEvent } from '../events/store'
 import { FACE_ASKED_AGAIN, FACE_KEPT } from '../profile/face'
 import { cleanPng } from '../profile/picture-png'
 import { profilePath } from '../share/path'
@@ -19,7 +17,6 @@ import {
   editPageTitle,
   type EditNotice,
 } from './edit-page'
-import { listEventAdmins } from './event-communities-store'
 import { adminNoticeOf, type AdminNotice } from './admin-notice'
 import { adminsPanel, deletePanel } from './admin-page'
 import {
@@ -40,11 +37,7 @@ import {
 } from './image-store'
 import { markTaken, type FormBody } from './new-form'
 import { findCommunity, isCommunityAdmin } from './page-store'
-import {
-  listRenamableEvents,
-  replaceCommunityLinks,
-  updateCommunity,
-} from './store'
+import { replaceCommunityLinks, updateCommunity } from './store'
 import { readNewCalendarsSoon, waitUntilOf } from '../feeds/reader-routes'
 
 type AppEnv = { Bindings: Env }
@@ -97,10 +90,7 @@ const editPage = async <E extends AppEnv>(
   status: 200 | 400 | 409 = 200,
 ) => {
   const lang = langOf(c)
-  const [events, admins] = await Promise.all([
-    listRenamableEvents(c.env.DB, input.community.id),
-    listCommunityAdmins(c.env.DB, input.community.id),
-  ])
+  const admins = await listCommunityAdmins(c.env.DB, input.community.id)
   const below = html`${adminsPanel(
     { community: input.community, admins, viewer: input.viewer },
     lang,
@@ -108,7 +98,7 @@ const editPage = async <E extends AppEnv>(
   return renderPage(
     c,
     editPageTitle(lang),
-    editPageBody({ ...input, events, below }, lang),
+    editPageBody({ ...input, below }, lang),
     status,
     undefined,
     'narrow',
@@ -248,36 +238,6 @@ communityEditForms.post(
       backToEdit(asked.community, `${image}-removed` as const),
       303,
     )
-  },
-)
-
-/**
- * Renames an event (F29-AC22): only the admins of a community the event is
- * in may.
- */
-communityEditForms.post(
-  '/communities/:id/events/:event/rename',
-  csrf(),
-  async (c) => {
-    const asked = await adminRequest(c, communityIdOf(c.req.param('id')))
-    const eventId = communityIdOf(c.req.param('event'))
-    if (!asked || eventId === null) return notFound(c)
-    const admins = await listEventAdmins(c.env.DB, eventId)
-    if (
-      !admins.has(asked.owner.userId) ||
-      !mayRenameEvent({ kind: 'person', userId: asked.owner.userId }, admins)
-    )
-      return notFound(c)
-    const name = parseEventName((await c.req.parseBody()).name)
-    if (name === null)
-      return c.redirect(backToEdit(asked.community, 'name-refused'), 303)
-    await renameEvent(c.env.DB, {
-      eventId,
-      name,
-      by: asked.owner.userId,
-      now: Math.floor(Date.now() / 1000),
-    })
-    return c.redirect(backToEdit(asked.community, 'renamed'), 303)
   },
 )
 

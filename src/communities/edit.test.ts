@@ -3,7 +3,7 @@ import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
-import { communities, communityAdmins, events } from '../db/schema'
+import { communities, events } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import { chunkTypes, png, withPngText } from '../profile/test-picture'
 import {
@@ -411,7 +411,7 @@ describe('the logo and the cover', () => {
   })
 })
 
-describe('event names', () => {
+describe('no way to rename an event', () => {
   const eventId = async () =>
     (await orm
       .select()
@@ -427,47 +427,20 @@ describe('event names', () => {
     })
   })
 
-  test('F29-AC22: F30-AC25: Given an admin of the event’s community, When they rename it, Then the event page shows the new name', async () => {
+  test('F45-AC20: Given an admin of the event’s community, When the editing page opens and a new name is posted, Then there is neither a field nor a way to rename, and the heading stays', async () => {
     const id = await eventId()
-    expect(await flat(await request('/@kanagawapm/edit'))).toContain(
-      'value="Old name"',
-    )
+    const page = await flat(await request('/@kanagawapm/edit'))
+    expect(page).not.toContain('Old name')
+    expect(page).not.toContain('/rename')
     const response = await postForm(`/communities/${ID}/events/${id}/rename`, [
       ['name', 'Kanagawa.pm #3'],
     ])
-    expect(response.status).toBe(303)
+    expect(response.status).toBe(404)
+    expect((await orm.select().from(events).get())?.name).not.toBe(
+      'Kanagawa.pm #3',
+    )
     expect(
       await flat(await request('/link/connpass.com/event/410635', {}, '')),
-    ).toContain('<h1>Kanagawa.pm #3</h1>')
-  })
-
-  test('F29-AC22: Given someone not an admin, signed out, or an admin of another community, When they rename the event, Then it is refused and the name stays', async () => {
-    const id = await eventId()
-    await seedCommunity(db, {
-      id: 50,
-      handle: 'other',
-      links: ['https://other.connpass.com/'],
-      creator: '2',
-    })
-    for (const [path, cookie] of [
-      [`/communities/${ID}/events/${id}/rename`, bob],
-      [`/communities/${ID}/events/${id}/rename`, ''],
-      [`/communities/50/events/${id}/rename`, bob],
-    ] as const)
-      expect(
-        (await postForm(path, [['name', 'Hijacked']], cookie)).status,
-      ).toBe(404)
-    expect((await orm.select().from(events).get())?.name).toBe('Old name')
-  })
-
-  test('F29-AC22: Given an admin who left, When they rename the event, Then it is refused', async () => {
-    await orm.delete(communityAdmins)
-    expect(
-      (
-        await postForm(`/communities/${ID}/events/${await eventId()}/rename`, [
-          ['name', 'x'],
-        ])
-      ).status,
-    ).toBe(404)
+    ).toContain('<h1>Old name</h1>')
   })
 })

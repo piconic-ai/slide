@@ -3,7 +3,7 @@ import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
-import { blocks, communities, communityAdmins, events } from '../db/schema'
+import { blocks, communities, events } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   OWNER_ID,
@@ -13,10 +13,7 @@ import {
   TEST_ORIGIN,
   testEnv,
 } from '../publication/test-support'
-import {
-  listEventAdmins,
-  listEventCommunities,
-} from './event-communities-store'
+import { listEventCommunities } from './event-communities-store'
 import {
   resetCommunities,
   seedCommunity,
@@ -65,7 +62,7 @@ const flat = async (path: string, cookie = '') =>
     ).text()
   ).replace(/\s+/g, ' ')
 
-test('F29-AC21: Given an event in a community, When its page opens, Then it shows the community, linked, and the community’s pattern in its color', async () => {
+test('F45-AC17: Given an event in a community, When its page opens, Then it shows the community, linked, and the community’s pattern in its color', async () => {
   await seedCommunity(db, {
     id: 77,
     handle: 'kanagawapm',
@@ -80,7 +77,7 @@ test('F29-AC21: Given an event in a community, When its page opens, Then it show
   expect(body).not.toContain('このグループのコミュニティはまだありません')
 })
 
-test('F29-AC19: Given an event in a community, When its page opens, Then its head starts with the community’s logo, its initial or the uploaded one, before the linked name', async () => {
+test('F45-AC17: Given an event in a community, When its page opens, Then its head starts with the community’s logo, its initial or the uploaded one, before the linked name', async () => {
   await seedCommunity(db, {
     id: 77,
     handle: 'kanagawapm',
@@ -102,7 +99,7 @@ test('F29-AC19: Given an event in a community, When its page opens, Then its hea
   expect(uploaded).toContain('alt=""')
 })
 
-test('F29-AC21: Given a community with an uploaded cover, When its event page opens, Then that cover shows', async () => {
+test('F45-AC17: Given a community with an uploaded cover, When its event page opens, Then that cover shows', async () => {
   await seedCommunity(db, {
     id: 77,
     handle: 'kanagawapm',
@@ -114,7 +111,7 @@ test('F29-AC21: Given a community with an uploaded cover, When its event page op
   expect(body).not.toContain('class="cover-pattern"')
 })
 
-test('Given an event in no community, When its page opens, Then the way to make one stays and no community shows', async () => {
+test('F45-AC27: Given an event in no community, When its page opens, Then the way to make one stays and no community shows', async () => {
   const body = await flat(EVENT_PAGE)
   expect(body).toContain('このグループのコミュニティはまだありません')
   expect(body).toContain(
@@ -133,7 +130,7 @@ test('F27-AC88: Given a deck’s event in a community, When its editing page ope
   expect(body).toContain('Kanagawa.pm のイベントとして並びます。')
 })
 
-test('Given an event in two communities, When it is shown, Then the one whose link was added first is used, and the admins of both may rename it', async () => {
+test('Given an event in two communities, When it is shown, Then the one whose link was added first is used', async () => {
   // A deck keeps one link to an event (F27-AC44): the other group is on another.
   await seedPublic(db, 'other', 200, 'Other')
   await seedTalkLink(db, {
@@ -156,18 +153,14 @@ test('Given an event in two communities, When it is shown, Then the one whose li
   expect((await listEventCommunities(db, [id])).get(id)?.handle).toBe(
     'yokohama',
   )
-  expect(await listEventAdmins(db, id)).toEqual(new Set(['y', OWNER_ID]))
-  await orm.delete(communityAdmins).where(eq(communityAdmins.user_id, 'y'))
-  expect(await listEventAdmins(db, id)).toEqual(new Set([OWNER_ID]))
 })
 
 test('Given no event or an event in none, When communities are asked for, Then none come', async () => {
   expect(await listEventCommunities(db, [])).toEqual(new Map())
   expect(await listEventCommunities(db, [await eventId()])).toEqual(new Map())
-  expect(await listEventAdmins(db, await eventId())).toEqual(new Set())
 })
 
-test('F29-AC24: F32-AC22: Given a reader who blocked the author of a talk, When they open the event page, Then the talk is in neither the list nor the count; others still see it', async () => {
+test('F45-AC15: F32-AC22: Given a reader who blocked the author of a talk, When they open the event page, Then the talk is in neither the list nor the count; others still see it', async () => {
   await signIn(env, 'bob', { id: '2' })
   await seedPublic(db, 'reply', 200, 'Bob talk', '2')
   await seedTalkLink(db, {

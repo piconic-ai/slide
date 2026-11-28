@@ -1,6 +1,5 @@
 import { html } from 'hono/html'
 import type { HtmlEscapedString } from 'hono/utils/html'
-import { eventNameOf } from '../links/link-heading'
 import { profilePath } from '../share/path'
 import { messages, type Lang } from '../site/i18n'
 import { SERVICE_NAME } from '../site/service'
@@ -27,7 +26,6 @@ import {
 } from './image-policy'
 import { linkFields } from './link-fields'
 import { defaultSubmit } from './new-page'
-import type { RenamableEvent } from './store'
 import { frameHelpLink } from '../help/frame-links'
 
 type Html = HtmlEscapedString | Promise<HtmlEscapedString>
@@ -39,9 +37,7 @@ export type EditNotice =
   | 'cover'
   | 'logo-removed'
   | 'cover-removed'
-  | 'renamed'
   | 'image-refused'
-  | 'name-refused'
   | null
 
 export const EDIT_NOTICES: readonly Exclude<EditNotice, null>[] = [
@@ -50,9 +46,7 @@ export const EDIT_NOTICES: readonly Exclude<EditNotice, null>[] = [
   'cover',
   'logo-removed',
   'cover-removed',
-  'renamed',
   'image-refused',
-  'name-refused',
 ]
 
 const text = messages({
@@ -97,10 +91,6 @@ const text = messages({
     } satisfies Record<SiteRefusal, string>,
     save: '保存する',
     cancel: 'やめる',
-    events: 'イベント名',
-    eventsNote: 'このコミュニティに入っているイベントの名前を直せます。',
-    eventName: (name: string) => `${name} の名前`,
-    rename: '直す',
     choice: {
       tooLarge: (mb: number) => `画像は ${mb} MB までです。`,
       unsupported: 'PNG、JPEG、WebP の画像だけ使えます。',
@@ -117,10 +107,8 @@ const text = messages({
       cover: 'カバー画像を変えました。',
       'logo-removed': 'ロゴを頭文字に戻しました。',
       'cover-removed': 'カバー画像を既定の模様に戻しました。',
-      renamed: 'イベント名を直しました。',
       'image-refused':
         '画像を受け取れませんでした。PNG、JPEG、WebP の画像を選び直してください。',
-      'name-refused': 'イベント名は 1〜100 文字で入れてください。',
     } satisfies Record<Exclude<EditNotice, null>, string>,
   },
   en: {
@@ -164,10 +152,6 @@ const text = messages({
     } satisfies Record<SiteRefusal, string>,
     save: 'Save',
     cancel: 'Cancel',
-    events: 'Event names',
-    eventsNote: 'Fix the names of the events in this community.',
-    eventName: (name: string) => `Name of ${name}`,
-    rename: 'Fix',
     choice: {
       tooLarge: (mb: number) => `An image is ${mb} MB at most.`,
       unsupported: 'Only PNG, JPEG and WebP images can be used.',
@@ -184,10 +168,8 @@ const text = messages({
       cover: 'The cover image was changed.',
       'logo-removed': 'The logo is back to the initial.',
       'cover-removed': 'The cover image is back to the default pattern.',
-      renamed: 'The event name was fixed.',
       'image-refused':
         'The image could not be taken. Please choose a PNG, JPEG or WebP image again.',
-      'name-refused': 'An event name is 1 to 100 characters.',
     } satisfies Record<Exclude<EditNotice, null>, string>,
   },
 })
@@ -340,49 +322,16 @@ function siteRows(form: EditCommunityForm, lang: Lang) {
   </fieldset>`
 }
 
-function renameRows(
-  community: Community,
-  events: readonly RenamableEvent[],
-  lang: Lang,
-) {
-  const t = text[lang]
-  if (events.length === 0) return ''
-  return html`<section class="panel community-events-panel">
-    <h2>${t.events}</h2>
-    <p class="field-note">${t.eventsNote}</p>
-    ${events.map((event) => {
-      const name = eventNameOf(event, lang)
-      return html`<form
-        class="community-rename"
-        method="post"
-        action="${communityActionPath(community.id, `events/${event.id}/rename`)}"
-      >
-        <input
-          name="name"
-          type="text"
-          required
-          maxlength="100"
-          value="${event.name ?? ''}"
-          placeholder="${name}"
-          aria-label="${t.eventName(name)}"
-        />
-        <button class="button-secondary" type="submit">${t.rename}</button>
-      </form>`
-    })}
-  </section>`
-}
-
 /**
  * A community's editing page (F30-AC25), for its admins only: its handle
  * (shown, not changed), name, links, description, color, logo, cover and other
- * links, then "save" and "cancel"; the names of its events; and, below,
+ * links, then "save" and "cancel"; and, below,
  * the parts the admins and deletion add.
  */
 export function editPageBody(
   input: Readonly<{
     community: Community
     form: EditCommunityForm
-    events: readonly RenamableEvent[]
     notice: EditNotice | AdminNotice
     /** The admins and the deletion, drawn by their own parts. */
     below?: Html | string
@@ -488,7 +437,7 @@ ${form.description}</textarea>
           <a class="button-secondary" href="${path}">${t.cancel}</a>
         </div>
       </form>
-      ${renameRows(community, input.events, lang)} ${input.below ?? ''}
+      ${input.below ?? ''}
     </div>`
 }
 

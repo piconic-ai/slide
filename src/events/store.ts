@@ -47,19 +47,3 @@ export async function listDeckEvents(
     }
   })
 }
-
-/**
- * Gives an event the name an operator set, and who set it. False when there
- * is no such event.
- */
-export async function renameEvent(
-  database: D1Database,
-  input: Readonly<{ eventId: number; name: string; by: string; now: number }>,
-): Promise<boolean> {
-  const result = await drizzle(database)
-    .update(events)
-    .set({ name: input.name, named_by: input.by, named_at: input.now })
-    .where(eq(events.id, input.eventId))
-    .run()
-  return result.meta.changes > 0
-}

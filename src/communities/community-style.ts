@@ -305,18 +305,10 @@ export const communityStyle = html`<style>
   .community-cover-preview > .cover-image {
     margin: 0 0 12px;
   }
-  .community-form-buttons,
-  .community-rename {
+  .community-form-buttons {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-  }
-  .community-rename {
-    margin: 12px 0 0;
-  }
-  .community-rename > input {
-    flex: 1 1 16em;
-    min-width: 0;
   }
   .community-form-page .panel {
     margin-top: 40px;
