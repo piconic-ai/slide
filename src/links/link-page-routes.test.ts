@@ -338,13 +338,14 @@ test('F45-AC34: Given the switch of the page of an event of another site, When f
   expect(response.headers.get('Location')).toBe('/link/www.example.com/conf')
 })
 
-test('F45-AC9: Given an event of another site kept with www., When /events/:id opens, Then it moves for good to the path without it, where the event is found', async () => {
+test('F45-AC9: Given an event of another site kept with www., When /events/:id opens, Then it moves for good to the path with it, where the event is found', async () => {
   await seedEventOfAnotherSite('conf', 'https://www.example.com/conf/')
   const [event] = await drizzle(db).select().from(events)
   const moved = await open(`/events/${event!.id}`)
   expect(moved.status).toBe(301)
-  expect(moved.headers.get('Location')).toBe('/link/example.com/conf')
+  expect(moved.headers.get('Location')).toBe('/link/www.example.com/conf')
   expect(moved.headers.get('X-Robots-Tag')).toBe(NOINDEX)
+  expect((await open('/link/www.example.com/conf')).status).toBe(200)
 })
 
 test('F30-AC74: Given /@link, When opened, Then no profile answers there', async () => {

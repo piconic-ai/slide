@@ -1,6 +1,6 @@
 import { html } from 'hono/html'
 import { eventNameOf } from '../events/event-name'
-import { linkPagePath } from '../links/link-address'
+import { eventPagePath } from '../links/link-address'
 import { websiteLabel } from '../profile/profile-lines'
 import { coverUrl } from '../share/cover'
 import { dayFormats } from '../share/dates'
@@ -184,7 +184,7 @@ const talkCard = (talk: CommunityTalk, contentBase: URL | null, lang: Lang) => {
 function eventRow(event: CommunityEvent, contentBase: URL | null, lang: Lang) {
   const t = text[lang]
   const name = eventNameOf(event, lang)
-  const href = linkPagePath(event.url)
+  const href = eventPagePath(event.url)
   const shown = event.talks.slice(0, CAROUSEL_TALKS)
   const more = event.talks.length - shown.length
   const regionId = `community-event-${event.id}`

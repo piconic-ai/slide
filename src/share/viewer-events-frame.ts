@@ -5,7 +5,7 @@ import {
 } from '../communities/community'
 import { logoOf } from '../communities/logo'
 import { eventNameOf, type NamedEvent } from '../events/event-name'
-import { linkPagePath } from '../links/link-address'
+import { eventPagePath } from '../links/link-address'
 import { messages, type Lang } from '../site/i18n'
 
 const text = messages({
@@ -24,7 +24,7 @@ export type ViewerEvent = NamedEvent &
 
 /** Where an event's page is: the page of links of its address (F45). */
 export const eventHref = (event: Pick<ViewerEvent, 'url'>) =>
-  linkPagePath(event.url)
+  eventPagePath(event.url)
 
 /** "<event> で発表" in Japanese, "Presented at <event>" in English. */
 const presentedAt = (event: ViewerEvent, lang: Lang) => {
