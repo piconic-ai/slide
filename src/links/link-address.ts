@@ -127,9 +127,13 @@ function eventOf(
     return { eventKey, eventRest: eventKey?.slice(SCHEME_LENGTH) ?? null }
   }
   // Another site: the event has the host and path as written. A query the
-  // compared form keeps means no event has this address; one it drops (a
-  // tracking name) does not count.
-  const queried = new URL(written).search !== '' && new URL(key).search !== ''
+  // address was written with and the compared form keeps means no event has
+  // this address. A name the compared form drops (a tracking name) does not
+  // count, nor does one a site rule makes up (Vimeo's `h` from the path).
+  const writtenNames = new URL(written).searchParams
+  const queried = [...new URL(key).searchParams.keys()].some((name) =>
+    writtenNames.has(name),
+  )
   const eventKey = queried ? null : (eventRefOf(written)?.key ?? null)
   return { eventKey, eventRest: eventKey?.slice(SCHEME_LENGTH) ?? null }
 }
