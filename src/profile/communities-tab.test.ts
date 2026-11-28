@@ -137,7 +137,7 @@ describe('the communities tab of a profile', () => {
     expect(page).not.toContain('aria-label="Hono Conf の最近のスライド"')
   })
 
-  test('F31-AC8, F32-AC4: Given the reader blocked an author, When the tab opens, Then that author’s slides leave the recent ones', async () => {
+  test('F31-AC8, F32-AC22: Given the reader blocked an author, When the tab opens, Then that author’s slides leave the recent ones', async () => {
     await seedTalk('owners', 10)
     await seedTalk('bobs', 20, BOB)
     await block(db, { blocker: CAROL, blocked: OWNER_ID, now: 30 })
@@ -150,7 +150,7 @@ describe('the communities tab of a profile', () => {
     )
   })
 
-  test('F31-AC18, F32-AC4: Given a community the author runs but does not follow, When a reader who blocked an author opens the tab, Then that author’s slides leave its recent ones too', async () => {
+  test('F31-AC18, F32-AC22: Given a community the author runs but does not follow, When a reader who blocked an author opens the tab, Then that author’s slides leave its recent ones too', async () => {
     await unfollowCommunity(db, { userId: CAROL, communityId: HONO })
     await seedTalk('owners', 10, OWNER_ID, 'hono')
     await seedTalk('bobs', 20, BOB, 'hono')
