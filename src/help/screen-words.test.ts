@@ -82,7 +82,6 @@ const NOT_SCREEN_WORDS: readonly string[] = [
   'サイトのデータを消す',
   'delete site data',
   '置いて',
-  'connpass event 410635',
   '△△さんの『□□』3 ページ',
   'Page 3 of ‘…’ by …',
   'slide.community のスライドと記事と、アカウントの情報を、すべてこのフォルダに書き出して',
