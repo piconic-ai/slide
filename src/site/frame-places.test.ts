@@ -38,9 +38,9 @@ vi.mock('./settings-blocks-frame', async () => {
   const frame = await mark('settings-blocks')
   return { settingsBlocksFrame: () => frame }
 })
-vi.mock('../decks/events-frame', async () => {
-  const frame = await mark('presented-events')
-  return { presentedEventsFrame: () => frame }
+vi.mock('../decks/placed-pages-frame', async () => {
+  const frame = await mark('placed-pages')
+  return { placedPagesFrame: () => frame }
 })
 
 const platform = await getPlatformProxy<Env>({ persist: false })
@@ -104,12 +104,12 @@ test('Given the settings, When they are drawn, Then the people blocked come righ
   )
 })
 
-test('Given the page of one slide, When it is drawn, Then the events presented at stand right under the related links', async () => {
+test('Given the page of one slide, When it is drawn, Then the pages the slide appears on stand right under the related links', async () => {
   const page = await get('/my/slides/keynote', alice)
   inOrder(
     page,
     'data-deck-frame="links"',
-    marker('presented-events'),
+    marker('placed-pages'),
     'data-deck-frame="delete"',
   )
 })

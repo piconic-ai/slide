@@ -64,7 +64,7 @@ const publishedAt = sql`coalesce(${decks.first_published_at}, ${deployments.read
  * The public slides in the communities the reader follows, each once with
  * the community it is shown under (`pick` 1): the slides readers may open
  * from a list (a ready public version, not taken down), but those of
- * authors the reader muted or blocked (F31-AC7, F32-AC4). The list and its
+ * authors the reader muted or blocked (F31-AC7, F32-AC22). The list and its
  * count read the same rows.
  */
 const followedTalkRows = (viewer: string) => {

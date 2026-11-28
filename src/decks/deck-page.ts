@@ -4,11 +4,12 @@ import { messages, type Lang } from '../site/i18n'
 import type { Handle } from '../share/handle'
 import type { DeckSlug } from './deck-id'
 import { articleFrame, type ArticleSummary } from './article-frame'
-import { linksFrame } from './links-frame'
-import { presentedEventsFrame } from './events-frame'
+import { linkPlacesOf, linksFrame } from './links-frame'
+import { placedPagesFrame } from './placed-pages-frame'
 import type { LinkNotice } from '../links/link'
+import type { ShownLink } from '../links/link-page-store'
 import type { StoredLink } from '../links/store'
-import { communitiesOf, type DeckEvent } from '../events/deck-event'
+import type { DeckEvent } from '../events/deck-event'
 import { deletionFrame } from './deletion-frame'
 import { downloadFrame } from './download-frame'
 import type { DownloadLink } from '../site/download-links'
@@ -42,6 +43,8 @@ export type DeckPageView = Readonly<{
   }>
   /** The events the related links make the slide a talk of. */
   events: readonly DeckEvent[]
+  /** The related links whose page of links shows. */
+  shown: readonly ShownLink[]
   /** The article under the slides; null while there is none. */
   article: ArticleSummary | null
   /** What can be downloaded; none until work E fills it. */
@@ -57,7 +60,7 @@ export type DeckPageView = Readonly<{
  * - the slides: their versions with where publication stands, and the drop
  *   zone for a new version;
  * - before publication only, the way to change the end of the URL;
- * - the article, the related links and the events they make it a talk of;
+ * - the article, the related links and the pages they list the slide on;
  * - downloads, when there are any;
  * - deletion.
  *
@@ -86,12 +89,17 @@ export const deckPageBody = (view: DeckPageView, lang: Lang) =>
       {
         slug: view.slug,
         links: view.links.list,
-        communities: communitiesOf(view.events),
+        places: linkPlacesOf(view.links.list, view.events, view.shown),
         notice: view.links.notice,
       },
       lang,
     )}
-    ${presentedEventsFrame(view.events, lang)}
+    ${placedPagesFrame(
+      view.events.filter((event) =>
+        view.shown.some((link) => link.eventId === event.id),
+      ),
+      lang,
+    )}
     ${downloadFrame(view.downloads ?? [], lang)}
     ${deletionFrame(view.slug, lang)}
   </div>`

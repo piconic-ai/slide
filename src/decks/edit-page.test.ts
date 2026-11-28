@@ -78,7 +78,7 @@ test('F03-AC156 and F02-AC55: Given a slide with a received version, When its pa
     'share-url',
     'article',
     'links',
-    'events',
+    'placed-pages',
     'downloads',
     'delete',
   ])

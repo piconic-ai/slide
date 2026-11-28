@@ -42,13 +42,13 @@ export default defineArticle({
             など)のイベントは、いまのところ並びません。
           </li>
           <li>
-            種類が「イベント」の行の下に、どこに並ぶか(「(コミュニティ名)
-            のイベントとして並びます。」など)が出ます。
+            リンクの行の下に、どこに並ぶか(「(コミュニティ名)
+            のページに並びます。」「リンクのページに並びます。」)が出ます。どこにも並ばない行には、出ません。
           </li>
           <li>
             スライドが一般公開されると、そのイベントのページに並びます。同じイベントの
             URL
-            を入れたほかの作者のスライドも、同じページに並びます。スライドが入っているイベントは、スライドの編集の画面の「発表したイベント」の枠で確かめられます。
+            を入れたほかの作者のスライドも、同じページに並びます。スライドが並ぶページは、スライドの編集の画面の「このスライドが並ぶページ」の枠で確かめられます。
           </li>
         </ol>
         <h2>決まり</h2>
@@ -112,14 +112,15 @@ export default defineArticle({
             listed for now.
           </li>
           <li>
-            Under a row of the kind Event, one sentence says where it is listed
-            (such as “Listed as a talk of an event of (community)”).
+            Under the row of the link, one sentence says where it is listed
+            (“Listed on the page of (community).” or “Listed on the page of this
+            link.”). A row listed nowhere has none.
           </li>
           <li>
             When the slides are public, they are listed on the event’s page,
             together with other authors’ slides that link to the same event. The
-            “Events presented at” area on the edit page shows the events the
-            slides are in.
+            “Pages this slide appears on” area on the edit page shows the pages
+            the slides are on.
           </li>
         </ol>
         <h2>The rules</h2>

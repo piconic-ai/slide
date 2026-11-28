@@ -14,6 +14,7 @@ import {
 import { applyMigrations } from '../db/test-migrations'
 import {
   OWNER_ID,
+  seedDeck,
   seedPublic,
   signIn,
   TEST_ORIGIN,
@@ -320,7 +321,7 @@ describe("a community's page", () => {
     })
   }
 
-  test('F30-AC18: Given a community, When its page opens, Then the cover, the head and the tabs come in order, and no count stands in the head', async () => {
+  test('F30-AC67: Given a community, When its page opens, Then the cover, the head and the tabs "Links", "Slides", "Followers" come in order, and no count stands in the head', async () => {
     await seedEvents()
     const body = await flat(await open('/@kanagawapm'))
     const at = (needle: string) => body.indexOf(needle)
@@ -341,15 +342,25 @@ describe("a community's page", () => {
       at('class="profile-tabs"'),
     )
     expect(head).not.toMatch(/class="count"/)
-    expect(body).toMatch(/イベント <span class="count">2<\/span>/)
-    expect(body).toMatch(/スライド <span class="count">9<\/span>/)
     // Its maker follows it from the start (F31-AC17).
-    expect(body).toMatch(/フォロワー <span class="count">1<\/span>/)
+    const tabs = (page: string) =>
+      [
+        ...page
+          .slice(page.indexOf('class="profile-tabs"'))
+          .matchAll(/>([^<>]+) <span class="count">(\d+)<\/span>/g),
+      ].map(([, name, count]) => `${name} ${count}`)
+    expect(tabs(body)).toEqual(['リンク 2', 'スライド 9', 'フォロワー 1'])
+    expect(tabs(await flat(await open('/@kanagawapm?lang=en')))).toEqual([
+      'Links 2',
+      'Slides 9',
+      'Followers 1',
+    ])
+    expect(body).not.toMatch(/>イベント </)
     // Not an admin: no way to edit.
     expect(body).not.toContain('/@kanagawapm/edit')
   })
 
-  test('F30-AC19: Given events with talks, When the events tab opens, Then the newest event comes first, each shows its count, six slides and "n more" to its page', async () => {
+  test('F30-AC68: Given links with talks, When the links tab opens, Then the link whose first talk went public last comes first, each shows its heading to its page of links, its count, six slides and "n more" to that page', async () => {
     await seedEvents()
     const body = await flat(await open('/@kanagawapm'))
     expect(body.indexOf('Kanagawa.pm #2')).toBeLessThan(
@@ -373,6 +384,30 @@ describe("a community's page", () => {
     )
   })
 
+  test("F30-AC68: Given a link whose only talk is a draft and a community with no link, When the links tab opens, Then the draft's link is not listed, and the empty tab says so in both languages", async () => {
+    await seedEvents()
+    await seedDeck(db, 'draft')
+    await seedTalkLink(db, {
+      deckId: 'draft',
+      url: `${KANAGAWA}3/`,
+      title: 'Kanagawa.pm #3',
+    })
+    const body = await flat(await open('/@kanagawapm'))
+    expect(body).not.toContain('Kanagawa.pm #3')
+    expect(body).toMatch(/リンク <span class="count">2<\/span>/)
+    await seedCommunity(db, {
+      id: 6,
+      handle: 'empty',
+      links: ['https://empty.connpass.com/'],
+    })
+    expect(await flat(await open('/@empty'))).toContain(
+      '<p class="empty">まだリンクはありません。</p>',
+    )
+    expect(await flat(await open('/@empty?lang=en'))).toContain(
+      '<p class="empty">No links yet.</p>',
+    )
+  })
+
   test('F30-AC21: Given talks, When the slides tab opens, Then every public talk comes once, newest first', async () => {
     await seedEvents()
     const body = await flat(await open('/@kanagawapm/slides'))
@@ -381,7 +416,7 @@ describe("a community's page", () => {
     expect(body).toContain('aria-current="page" >スライド')
   })
 
-  test('F30-AC38: F32-AC4: Given a reader who blocked bob, When they open the community, Then bob’s talk is in neither list nor count; someone else still sees it', async () => {
+  test('F30-AC38: F32-AC22: Given a reader who blocked bob, When they open the community, Then bob’s talk is in neither list nor count; someone else still sees it', async () => {
     await seedEvents()
     await orm.insert(blocks).values({
       blocker_user_id: OWNER_ID,
@@ -390,7 +425,7 @@ describe("a community's page", () => {
     })
     const events = await flat(await open('/@kanagawapm', owner))
     expect(events).not.toContain('Kanagawa.pm #2')
-    expect(events).toMatch(/イベント <span class="count">1<\/span>/)
+    expect(events).toMatch(/リンク <span class="count">1<\/span>/)
     const slides = await flat(await open('/@kanagawapm/slides', owner))
     expect(slides).not.toContain('Two')
     expect(slides).toMatch(/スライド <span class="count">8<\/span>/)

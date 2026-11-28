@@ -193,7 +193,7 @@ const publishedAt = sql`coalesce(${decks.first_published_at}, ${deployments.read
 /**
  * The newest public slides of each community, up to `each` (F31-AC8,
  * D-53): the slides readers may open from a list, but those of authors the
- * reader muted or blocked (F32-AC4), each once in a community.
+ * reader muted or blocked (F32-AC22), each once in a community.
  */
 export async function listRecentCommunityTalks(
   database: D1Database,

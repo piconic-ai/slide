@@ -119,7 +119,7 @@ test('F45-AC27: Given an event in no community, When its page opens, Then the wa
   )
 })
 
-test('F27-AC88: Given a deck’s event in a community, When its editing page opens, Then the event is listed with the community', async () => {
+test('F29-AC29: Given a deck’s event in a community, When its editing page opens, Then the row of the link says it is listed on the community’s page', async () => {
   await seedCommunity(db, {
     id: 77,
     handle: 'kanagawapm',
@@ -127,7 +127,7 @@ test('F27-AC88: Given a deck’s event in a community, When its editing page ope
     links: ['https://kanagawapm.connpass.com/'],
   })
   const body = await flat('/my/slides/talk', owner)
-  expect(body).toContain('Kanagawa.pm のイベントとして並びます。')
+  expect(body).toContain('Kanagawa.pm のページに並びます。')
 })
 
 test('Given an event in two communities, When it is shown, Then the one whose link was added first is used', async () => {

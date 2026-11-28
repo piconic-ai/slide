@@ -167,7 +167,7 @@ describe('the new slides of followed communities on the top page', () => {
     expect(page).not.toMatch(/data-communities="(yes|no)"/)
   })
 
-  test('F31-AC7, F32-AC4: Given the visitor blocked one author and muted another, When the top page reads the list, Then neither author’s slides come', async () => {
+  test('F31-AC7, F32-AC22: Given the visitor blocked one author and muted another, When the top page reads the list, Then neither author’s slides come', async () => {
     await seedTalk('owners', 10, 'kanagawapm')
     await seedTalk('carols', 20, 'kanagawapm', CAROL)
     await seedTalk('bobs', 30, 'kanagawapm', BOB)

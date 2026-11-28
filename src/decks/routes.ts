@@ -33,6 +33,7 @@ import { notifyCommunityPublishedQuietly } from '../notifications/store'
 import { readCalendarsForEventSoon, waitUntilOf } from '../feeds/reader-routes'
 import { kindChanges } from '../links/kind-changes'
 import { listDeckEvents } from '../events/store'
+import { listShownLinks } from '../links/link-page-store'
 import { parseResult, pointedId } from '../publication/panel'
 import { readHandle } from '../share/store'
 import { sharePath } from '../share/path'
@@ -122,6 +123,7 @@ deckForms.get('/:deck', async (c) => {
     links,
     article,
     deckEvents,
+    shown,
   ] = await Promise.all([
     pointedDeployment
       ? readPointedVersion(c.env.DB, deck.id, pointedDeployment)
@@ -134,6 +136,7 @@ deckForms.get('/:deck', async (c) => {
     listLinks(c.env.DB, deck.id),
     readArticle(c.env.DB, deck.id),
     listDeckEvents(c.env.DB, deck.id),
+    listShownLinks(c.env.DB, deck.id),
   ])
   const name = summary ? ownDeckName(summary) : deck.slug
   return renderPage(
@@ -150,6 +153,7 @@ deckForms.get('/:deck', async (c) => {
         urlName: { renamable, notice: parseSlugNotice(c.req.query('slug')) },
         links: { list: links, notice: parseLinkRefusal(c.req.query('links')) },
         events: deckEvents,
+        shown,
         article: article && { article, length: bodyLength(article.body) },
         publication: {
           state: publication,

@@ -74,6 +74,7 @@ const deck = (patch: Partial<DeckPageView> = {}): DeckPageView => ({
   },
   links: { list: [], notice: null },
   events: [],
+  shown: [],
   article: null,
   ...patch,
 })
