@@ -3,9 +3,11 @@ import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
 import { applyMigrations } from '../db/test-migrations'
 import { listLinks } from '../links/store'
-import { seedCommunity } from '../communities/test-communities'
 import {
-  resetTables,
+  resetCommunities,
+  seedCommunity,
+} from '../communities/test-communities'
+import {
   seedDeck,
   seedPublic,
   signIn,
@@ -24,7 +26,7 @@ let owner = ''
 let other = ''
 beforeAll(() => applyMigrations(db))
 beforeEach(async () => {
-  await resetTables(db)
+  await resetCommunities(db)
   owner = await signIn(env)
   other = await signIn(env, 'other', { id: '2' })
   await seedPublic(db, 'talk', 100, 'Talk')
@@ -171,7 +173,14 @@ test("F29-AC29: Given a link that goes into a community, a link whose page of li
   expect(await page()).not.toContain('イベントとして並びます')
 })
 
-test('F29-AC18: Given links to two events, one of them twice, When the slide page opens, Then the events frame lists each event once in the order added, and has no way to choose', async () => {
+test('F29-AC30: Given links to two events with a page, one of them twice and one in a community, and a link to an event with no public slide, When the slide page opens, Then the frame lists each page once in the order added, with its community, and has no way to choose', async () => {
+  await seedCommunity(db, {
+    id: 5,
+    handle: 'kanagawapm',
+    name: 'Kanagawa.pm',
+    links: ['https://kanagawapm.connpass.com/'],
+  })
+  await seedDeck(db, 'draft')
   await post('/my/slides/talk/links', {
     url: 'https://luma.com/x1',
     title: 'Hono Night #5',
@@ -180,30 +189,50 @@ test('F29-AC18: Given links to two events, one of them twice, When the slide pag
     url: 'https://kanagawapm.connpass.com/event/410635/',
   })
   await post('/my/slides/talk/links', { url: 'https://lu.ma/x1/' })
-  const events = frame(await page(), 'events')
-  expect(events).toContain('<h2>発表したイベント</h2>')
-  expect(
-    [
-      ...events.matchAll(/<a class="link-row-title" href="([^"]*)" >([^<]*)</g),
-    ].map(([, href, name]) => [href, name]),
-  ).toEqual([
-    ['/link/luma.com/x1', 'Hono Night #5'],
+  await post('/my/slides/draft/links', { url: 'https://luma.com/x1' })
+  await post('/my/slides/draft/links', { url: 'https://luma.com/x2' })
+  const rows = (pages: string) =>
+    pages
+      .split('<li class="link-row">')
+      .slice(1)
+      .map((row) => [
+        /<a class="link-row-title" href="([^"]*)"/.exec(row)?.[1],
+        /<a class="link-row-title"[^>]*>([^<]*)</.exec(row)?.[1],
+        /<span class="link-row-site"\s*>([^<]*)</.exec(row)?.[1] ?? null,
+      ])
+  const pages = frame(await page(), 'placed-pages')
+  expect(pages).toContain('<h2>このスライドが並ぶページ</h2>')
+  expect(rows(pages)).toEqual([
+    ['/link/luma.com/x1', 'Hono Night #5', null],
     [
       '/link/connpass.com/event/410635',
       'connpass https://connpass.com/event/410635/',
+      'Kanagawa.pm',
     ],
   ])
-  expect(events).toContain('関連リンクから決まるので、ここでは選べません。')
-  expect(events).not.toMatch(/<form|<select|<input|<button/)
+  expect(pages).toContain('関連リンクから決まるので、ここでは選べません。')
+  expect(pages).not.toMatch(/<form|<select|<input|<button/)
+  expect(frame(await page('en'), 'placed-pages')).toContain(
+    '<h2>Pages this slide appears on</h2>',
+  )
+  // The draft is on the page of an event another slide made public; the
+  // event only it links to has no page.
+  expect(rows(frame(await page('ja', 'draft'), 'placed-pages'))).toEqual([
+    ['/link/luma.com/x1', 'Hono Night #5', null],
+  ])
+  expect(await page()).not.toContain('発表したイベント')
 })
 
-test('F29-AC18: Given no link of the kind event, When the slide page opens, Then the events frame says in one sentence that events come from the related links', async () => {
+test('F29-AC30: Given no related link with a page, When the slide page opens, Then the frame says in one sentence that the related links decide the pages', async () => {
   await post('/my/slides/talk/links', { url: 'https://youtube.com/watch?v=1' })
-  const events = frame(await page(), 'events')
-  expect(events).toContain(
-    '<p class="field-note">関連リンクに、種類が「イベント」のリンクを足すと、そのイベントがここに並びます。</p>',
+  const pages = frame(await page(), 'placed-pages')
+  expect(pages).toContain(
+    '<p class="field-note">並ぶページは、関連リンクから決まります。いまは、並ぶページがありません。</p>',
   )
-  expect(events).not.toContain('<ul')
+  expect(pages).not.toContain('<ul')
+  expect(frame(await page('en'), 'placed-pages')).toContain(
+    '<p class="field-note">The related links decide the pages. For now it appears on none.</p>',
+  )
 })
 
 test('F29-AC16: Given fetch watched, When event links are added, their kinds saved and the slide page opened, Then nothing is fetched', async () => {

@@ -48,7 +48,7 @@ export default defineArticle({
           <li>
             スライドが一般公開されると、そのイベントのページに並びます。同じイベントの
             URL
-            を入れたほかの作者のスライドも、同じページに並びます。スライドが入っているイベントは、スライドの編集の画面の「発表したイベント」の枠で確かめられます。
+            を入れたほかの作者のスライドも、同じページに並びます。スライドが並ぶページは、スライドの編集の画面の「このスライドが並ぶページ」の枠で確かめられます。
           </li>
         </ol>
         <h2>決まり</h2>
@@ -119,8 +119,8 @@ export default defineArticle({
           <li>
             When the slides are public, they are listed on the event’s page,
             together with other authors’ slides that link to the same event. The
-            “Events presented at” area on the edit page shows the events the
-            slides are in.
+            “Pages this slide appears on” area on the edit page shows the pages
+            the slides are on.
           </li>
         </ol>
         <h2>The rules</h2>
