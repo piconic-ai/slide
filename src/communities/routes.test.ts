@@ -384,6 +384,66 @@ describe("a community's page", () => {
     )
   })
 
+  test('F30-AC68: F45-AC4: F45-AC17: F32-AC22: Given links that are no event in a community, When the links tab opens, Then each is listed like an event, one author alone too, its heading leads to a page headed by the community, and a link left with no slide by a block is not listed', async () => {
+    await seedEvents()
+    await seedCommunity(db, {
+      id: 6,
+      handle: 'example',
+      name: 'Example',
+      links: ['https://example.com/'],
+    })
+    for (let i = 0; i < 7; i++) {
+      await seedPublic(db, `post-${i}`, 600 + i, `Post ${i}`)
+      await seedTalkLink(db, {
+        deckId: `post-${i}`,
+        url: 'https://example.com/post?utm_source=x',
+        kind: 'article',
+        title: i === 0 ? 'The post' : '',
+      })
+    }
+    await seedPublic(db, 'bobs', 900, 'Bobs', BOB)
+    for (const url of ['https://example.com/bob', `${KANAGAWA}9/`])
+      await seedTalkLink(db, { deckId: 'bobs', url, owner: BOB, kind: 'other' })
+    const headings = (body: string) =>
+      [...body.matchAll(/<h2> ?<a href="([^"]*)" ?>([^<]*)<\/a>/g)].map(
+        ([, href, name]) => `${href} ${name}`,
+      )
+    // Whoever looks, signed in or not, an admin or not.
+    for (const cookie of ['', bob]) {
+      const body = await flat(await open('/@example', cookie))
+      expect(headings(body)).toEqual([
+        '/link/example.com/bob example.com https://example.com/bob',
+        '/link/example.com/post The post',
+      ])
+      expect(body).toMatch(/リンク <span class="count">2<\/span>/)
+      const post = body.slice(body.indexOf('>The post<'))
+      expect(post).toContain('スライド 7 本')
+      expect(post.match(/class="deck-card"/g)).toHaveLength(6)
+      expect(post).toMatch(
+        /<li class="carousel-more"> ?<a href="\/link\/example\.com\/post" ?>ほか 1 本<\/a ?> ?<\/li>/,
+      )
+      expect(body).toMatch(
+        /id="community-link-2" role="region" aria-label="The post のスライド" tabindex="0"/,
+      )
+    }
+    // The page the heading leads to is headed by the community (F45-AC17).
+    const page = await open('/link/example.com/post')
+    expect(page.status).toBe(200)
+    expect(await flat(page)).toContain('href="/@example"')
+    // A link of a kind other than event to an event's address is its own
+    // entry of the community that holds the group.
+    expect(headings(await flat(await open('/@kanagawapm')))).toHaveLength(3)
+    await orm.insert(blocks).values({
+      blocker_user_id: OWNER_ID,
+      blocked_user_id: BOB,
+      created_at: 1,
+    })
+    const blocked = await flat(await open('/@example', owner))
+    expect(headings(blocked)).toEqual(['/link/example.com/post The post'])
+    expect(blocked).toMatch(/リンク <span class="count">1<\/span>/)
+    expect(blocked).toMatch(/スライド <span class="count">7<\/span>/)
+  })
+
   test("F30-AC68: Given a link whose only talk is a draft and a community with no link, When the links tab opens, Then the draft's link is not listed, and the empty tab says so in both languages", async () => {
     await seedEvents()
     await seedDeck(db, 'draft')

@@ -105,7 +105,7 @@ export async function showCommunity<E extends { Bindings: Env }>(
   const lang = langOf(c)
   const view: CommunityTabView =
     at.tab === 'links'
-      ? { kind: 'links', links: talks.events }
+      ? { kind: 'links', links: talks.links }
       : at.tab === 'slides'
         ? { kind: 'slides', slides: talks.slides }
         : {
@@ -142,7 +142,7 @@ export async function showCommunity<E extends { Bindings: Env }>(
           ),
         },
         counts: {
-          links: talks.events.length,
+          links: talks.links.length,
           slides: talks.slides.length,
           followers,
         },

@@ -12,7 +12,7 @@ import { messages, type Lang } from '../site/i18n'
 import {
   communityCoverOf,
   type Community,
-  type CommunityEvent,
+  type CommunityLink,
   type CommunityTalk,
 } from './community'
 import { communityStyle } from './community-style'
@@ -180,15 +180,19 @@ const talkCard = (talk: CommunityTalk, contentBase: URL | null, lang: Lang) => {
  * links (F45), how many slides, and the slides sent sideways, up to
  * CAROUSEL_TALKS, then "n more" to that page. The buttons that send them
  * stay hidden until the page's script finds the row wider than its frame.
- * For now every link is an event; the other links come with their columns.
  */
-function linkRow(event: CommunityEvent, contentBase: URL | null, lang: Lang) {
+function linkRow(
+  event: CommunityLink,
+  index: number,
+  contentBase: URL | null,
+  lang: Lang,
+) {
   const t = text[lang]
   const name = headingOf(event)
   const href = eventPagePath(event.url)
   const shown = event.talks.slice(0, CAROUSEL_TALKS)
   const more = event.talks.length - shown.length
-  const regionId = `community-event-${event.id}`
+  const regionId = `community-link-${index + 1}`
   return html`<section class="community-event">
     <div class="community-event-head">
       <div>
@@ -238,7 +242,7 @@ function linkRow(event: CommunityEvent, contentBase: URL | null, lang: Lang) {
 
 /** What the open tab of a community's page lists. */
 export type CommunityTabView =
-  | Readonly<{ kind: 'links'; links: readonly CommunityEvent[] }>
+  | Readonly<{ kind: 'links'; links: readonly CommunityLink[] }>
   | Readonly<{ kind: 'slides'; slides: readonly CommunityTalk[] }>
   /** The followers, which the work on following lists. */
   | Readonly<{ kind: 'followers'; list: ReturnType<typeof html> | string }>
@@ -249,7 +253,7 @@ function tabBody(view: CommunityTabView, contentBase: URL | null, lang: Lang) {
     case 'links':
       return view.links.length === 0
         ? html`<p class="empty">${t.noLinks}</p>`
-        : html`${view.links.map((link) => linkRow(link, contentBase, lang))}`
+        : html`${view.links.map((link, index) => linkRow(link, index, contentBase, lang))}`
     case 'slides':
       return view.slides.length === 0
         ? html`<p class="empty">${t.noSlides}</p>`

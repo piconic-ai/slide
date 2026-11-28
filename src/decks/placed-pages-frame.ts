@@ -56,11 +56,12 @@ export const placedPagesOf = (
   events: readonly DeckEvent[],
   shown: readonly ShownLink[],
 ): readonly PlacedPage[] => {
-  const paths = new Map(shown.map((link) => [link.linkId, link.path]))
+  const placed = new Map(shown.map((link) => [link.linkId, link]))
   const pages = new Map<string, PlacedPage>()
   for (const link of links) {
-    const href = paths.get(link.id)
-    if (href === undefined || pages.has(href)) continue
+    const shownLink = placed.get(link.id)
+    if (shownLink === undefined || pages.has(shownLink.path)) continue
+    const href = shownLink.path
     const event =
       link.kind === 'event'
         ? events.find((each) => each.id === link.eventId)
@@ -69,7 +70,7 @@ export const placedPagesOf = (
     pages.set(href, {
       href,
       heading: event ? headingOf(event) : headingOfLink(link),
-      community: event?.community?.name ?? null,
+      community: event ? (event.community?.name ?? null) : shownLink.community,
     })
   }
   return [...pages.values()]

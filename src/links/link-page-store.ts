@@ -98,6 +98,23 @@ export const firstPublicTitle = sql<string | null>`(
     AND ${notHiddenOf(titled)}
   ORDER BY le.created_at, le.rowid LIMIT 1)`
 
+/**
+ * For a row of `related_links` that is no event, in a list: the title of
+ * the oldest titled link with its key on a slide anyone may open, as
+ * `readGatheredPage` picks it for the page (F45-AC10).
+ */
+export const firstGatheredTitle = sql<string | null>`(
+  SELECT l.title FROM related_links AS l
+  JOIN decks AS titled_deck ON titled_deck.id = l.deck_id
+  JOIN accounts AS a ON a.user_id = titled_deck.owner_user_id
+  JOIN deployments AS p ON p.id = titled_deck.public_deployment_id
+    AND p.deck_id = titled_deck.id AND p.state = 'ready'
+  WHERE l.gather_key = "related_links"."gather_key" AND l.title IS NOT NULL
+    AND NOT EXISTS (SELECT 1 FROM related_link_events AS le
+      WHERE le.link_id = l.id)
+    AND ${notHiddenOf(titled)}
+  ORDER BY l.created_at, l.rowid LIMIT 1)`
+
 /** A public slide given as a talk of an event. */
 export type EventTalk = Readonly<{
   handle: Handle
@@ -402,13 +419,22 @@ export async function readEventPageOf(
 /**
  * A related link of a deck whose page of links shows: the event it is of
  * (null for a link that is no event) and the path of the page its slide is
- * listed on.
+ * listed on. A link that is no event names the community it is in by the host
+ * it was written with (F29-AC29), the one whose link was added first; an
+ * event's community comes with the event.
  */
 export type ShownLink = Readonly<{
   linkId: string
   eventId: number | null
   path: string
+  community: string | null
 }>
+
+/** For a row of `related_links`: the name of the community holding its host. */
+const hostCommunityName = sql<string | null>`(
+  SELECT c.name FROM community_links AS cl
+  JOIN communities AS c ON c.id = cl.community_id
+  WHERE cl.host = ${relatedLinks.link_host} ORDER BY cl.id LIMIT 1)`
 
 /** What is known of the public slides that carry one gathered key. */
 type KeyRow = Readonly<{
@@ -467,6 +493,7 @@ export async function listShownLinks(
       linkId: relatedLinks.id,
       eventId: relatedLinkEvents.event_id,
       key: relatedLinks.gather_key,
+      community: hostCommunityName,
     })
     .from(relatedLinks)
     .leftJoin(relatedLinkEvents, eq(relatedLinkEvents.link_id, relatedLinks.id))
@@ -536,9 +563,18 @@ export async function listShownLinks(
       ),
     ]),
   )
-  return own.flatMap(({ linkId, eventId, key }) => {
+  return own.flatMap(({ linkId, eventId, key, community }) => {
     const path =
       eventId === null ? pathsOfKeys.get(key ?? '') : pathOfEvent.get(eventId)
-    return path ? [{ linkId, eventId, path }] : []
+    return path
+      ? [
+          {
+            linkId,
+            eventId,
+            path,
+            community: eventId === null ? community : null,
+          },
+        ]
+      : []
   })
 }

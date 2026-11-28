@@ -27,6 +27,8 @@ import {
 import type { Handle } from '../share/handle'
 import { removeCommunityAdmin } from './admin-store'
 import { imageKey } from './image-policy'
+import { checkCommunityLinks } from './link-rules'
+import { replaceCommunityLinks } from './store'
 import {
   resetCommunities,
   seedCommunity,
@@ -287,12 +289,26 @@ describe('deleting', () => {
     )
   })
 
-  test('F30-AC33: F30-AC8: Given a community with talks and pictures, When it is deleted, Then its page is not found, its links, admins and pictures go, its handle is held, and slides, related links and the event page stay', async () => {
+  test('F30-AC71: F30-AC8: Given a community with talks and pictures, When it is deleted, Then its page is not found, its links, admins and pictures go, its handle is held, slides, related links and the event page stay, and the page of a link only the community showed is not found', async () => {
     await seedPublic(db, 'talk', 100, 'Talk')
     await seedTalkLink(db, {
       deckId: 'talk',
       url: 'https://kanagawapm.connpass.com/event/410635/',
     })
+    // A link that is no event, on one author's slide: only the community
+    // shows its page (F45-AC4).
+    const links = checkCommunityLinks([
+      'https://kanagawapm.connpass.com/',
+      'https://example.com/',
+    ])
+    if (!links.ok) throw new Error('bad links')
+    await replaceCommunityLinks(db, { communityId: ID, ...links, now: 2000 })
+    await seedTalkLink(db, {
+      deckId: 'talk',
+      url: 'https://example.com/post',
+      kind: 'article',
+    })
+    expect((await open('/link/example.com/post', '')).status).toBe(200)
     const form = new FormData()
     form.append(
       'image',
@@ -336,8 +352,13 @@ describe('deleting', () => {
         now + HANDLE_HOLD_SECONDS + 1,
       ),
     ).toBe('available')
-    expect(await orm.select().from(relatedLinks)).toHaveLength(1)
+    expect(await orm.select().from(relatedLinks)).toHaveLength(2)
+    // An event keeps its page with one slide (F45-AC3); the other link's
+    // page is the one of an address nobody gathered (F45-AC12).
     expect((await open('/link/connpass.com/event/410635', '')).status).toBe(200)
+    const gone = await open('/link/example.com/post', '')
+    expect(gone.status).toBe(404)
+    expect(await gone.text()).toContain('この URL の集まりは、まだありません')
     expect((await open('/@owner/talk', '')).status).not.toBe(404)
   })
 })

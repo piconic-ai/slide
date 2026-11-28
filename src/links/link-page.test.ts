@@ -883,7 +883,7 @@ test('F45-AC38: Given one slide with the address as an event and, written with a
   expect(talkNames(await flat('/link/peatix.com/event/123'))).toEqual(['Both'])
 })
 
-test('F45-AC4: F45-AC17: Given a link that is no event on one author’s slide, When a community holds the host it was written with, Then its page shows with the community at its head, the slide’s own pages lead to it, and without the community it is gone again', async () => {
+test('F45-AC4: F45-AC17: F29-AC29: Given a link that is no event on one author’s slide, When a community holds the host it was written with, Then its page shows with the community at its head, the slide’s own pages lead to it, and without the community it is gone again', async () => {
   await seedPublic(db, 'talk', 100, 'Owner talk')
   await seedPublic(db, 'www', 200, 'Owner www')
   await add('talk', POST, 'A post', owner, 'article')
@@ -907,7 +907,8 @@ test('F45-AC4: F45-AC17: Given a link that is no event on one author’s slide, 
   )
   expect(body).toContain('aria-label="Example のカバー画像"')
   expect(body).not.toContain('このグループのコミュニティはまだありません')
-  expect(await manage()).toContain('リンクのページに並びます。')
+  // The row of the link names the community (F29-AC29).
+  expect(await manage()).toContain('Example のページに並びます。')
   expect(await flat('/@owner/talk')).toContain(
     `<a class="related-link-page" href="${POST_PAGE}"`,
   )
