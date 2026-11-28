@@ -436,9 +436,9 @@ describe('event names', () => {
       ['name', 'Kanagawa.pm #3'],
     ])
     expect(response.status).toBe(303)
-    expect(await flat(await request(`/events/${id}`, {}, ''))).toContain(
-      '<h1>Kanagawa.pm #3</h1>',
-    )
+    expect(
+      await flat(await request('/link/connpass.com/event/410635', {}, '')),
+    ).toContain('<h1>Kanagawa.pm #3</h1>')
   })
 
   test('F29-AC22: Given someone not an admin, signed out, or an admin of another community, When they rename the event, Then it is refused and the name stays', async () => {

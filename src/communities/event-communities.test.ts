@@ -51,6 +51,8 @@ const eventId = async () =>
     .from(events)
     .where(eq(events.key, 'https://connpass.com/event/410635'))
     .get())!.id
+// Where the event's page is (F45-AC9).
+const EVENT_PAGE = '/link/connpass.com/event/410635'
 const flat = async (path: string, cookie = '') =>
   (
     await (
@@ -71,7 +73,7 @@ test('F29-AC21: Given an event in a community, When its page opens, Then it show
     links: ['https://kanagawapm.connpass.com/'],
   })
   await orm.update(communities).set({ color: 'green' })
-  const body = await flat(`/events/${await eventId()}`)
+  const body = await flat(EVENT_PAGE)
   expect(body).toContain('<a href="/@kanagawapm">Kanagawa.pm</a>')
   expect(body).toContain('aria-label="Kanagawa.pm のカバー画像"')
   expect(body).toContain('var(--community-green')
@@ -87,7 +89,7 @@ test('F29-AC19: Given an event in a community, When its page opens, Then its hea
   })
   const head = (body: string) =>
     /<p class="event-community">(.*?)<\/p>/s.exec(body)?.[1] ?? ''
-  const page = await flat(`/events/${await eventId()}`)
+  const page = await flat(EVENT_PAGE)
   // The logo is drawn 28px square: its styles come with the page.
   expect(page).toMatch(/\.community-logo-28 \{\s*width: 28px;\s*height: 28px;/)
   const initial = head(page)
@@ -95,7 +97,7 @@ test('F29-AC19: Given an event in a community, When its page opens, Then its hea
     /class="community-logo community-logo-28"[^>]*aria-hidden="true"\s*>K<\/span\s*>\s*<a href="\/@kanagawapm">Kanagawa\.pm<\/a>/,
   )
   await orm.update(communities).set({ logo_at: 4321 })
-  const uploaded = head(await flat(`/events/${await eventId()}`))
+  const uploaded = head(await flat(EVENT_PAGE))
   expect(uploaded).toContain('src="/communities/77/logo?v=4321"')
   expect(uploaded).toContain('alt=""')
 })
@@ -107,13 +109,13 @@ test('F29-AC21: Given a community with an uploaded cover, When its event page op
     links: ['https://kanagawapm.connpass.com/'],
   })
   await orm.update(communities).set({ cover_at: 1234 })
-  const body = await flat(`/events/${await eventId()}`)
+  const body = await flat(EVENT_PAGE)
   expect(body).toContain('src="/communities/77/cover?v=1234"')
   expect(body).not.toContain('class="cover-pattern"')
 })
 
 test('Given an event in no community, When its page opens, Then the way to make one stays and no community shows', async () => {
-  const body = await flat(`/events/${await eventId()}`)
+  const body = await flat(EVENT_PAGE)
   expect(body).toContain('このグループのコミュニティはまだありません')
   expect(body).toContain(
     '/communities/new?link=https%3A%2F%2Fkanagawapm.connpass.com%2F',
@@ -165,7 +167,7 @@ test('Given no event or an event in none, When communities are asked for, Then n
   expect(await listEventAdmins(db, await eventId())).toEqual(new Set())
 })
 
-test('F29-AC24: F32-AC4: Given a reader who blocked the author of a talk, When they open the event page, Then the talk is in neither the list nor the count; others still see it', async () => {
+test('F29-AC24: F32-AC22: Given a reader who blocked the author of a talk, When they open the event page, Then the talk is in neither the list nor the count; others still see it', async () => {
   await signIn(env, 'bob', { id: '2' })
   await seedPublic(db, 'reply', 200, 'Bob talk', '2')
   await seedTalkLink(db, {
@@ -176,7 +178,7 @@ test('F29-AC24: F32-AC4: Given a reader who blocked the author of a talk, When t
   await orm
     .insert(blocks)
     .values({ blocker_user_id: OWNER_ID, blocked_user_id: '2', created_at: 1 })
-  const path = `/events/${await eventId()}`
+  const path = EVENT_PAGE
   const mine = await flat(path, owner)
   expect(mine).not.toContain('Bob talk')
   expect(mine).toContain('<span class="event-talks-count">1 本</span>')
@@ -207,7 +209,7 @@ test('Given the group’s address only on a private deck and a public talk witho
     .from(events)
     .where(eq(events.key, 'https://connpass.com/event/5'))
     .get())!.id
-  const body = await flat(`/events/${id}`)
+  const body = await flat('/link/connpass.com/event/5')
   expect(body).toContain('Open talk')
   expect(body).not.toContain('href="/@hono"')
   expect((await listEventCommunities(db, [id])).size).toBe(0)

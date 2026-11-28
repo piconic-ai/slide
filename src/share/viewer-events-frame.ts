@@ -5,6 +5,7 @@ import {
 } from '../communities/community'
 import { logoOf } from '../communities/logo'
 import { eventNameOf, type NamedEvent } from '../events/event-name'
+import { linkPagePath } from '../links/link-address'
 import { messages, type Lang } from '../site/i18n'
 
 const text = messages({
@@ -14,14 +15,20 @@ const text = messages({
 
 /** An event the slides were presented at, with the community it is shown with. */
 export type ViewerEvent = NamedEvent &
-  Readonly<{ id: number; community: EventCommunityView | null }>
+  Readonly<{
+    id: number
+    /** Its address (`events.url`), which its page of links is found by. */
+    url: string
+    community: EventCommunityView | null
+  }>
 
-/** Where an event's page is. */
-export const eventHref = (eventId: number) => `/events/${eventId}`
+/** Where an event's page is: the page of links of its address (F45). */
+export const eventHref = (event: Pick<ViewerEvent, 'url'>) =>
+  linkPagePath(event.url)
 
 /** "<event> で発表" in Japanese, "Presented at <event>" in English. */
 const presentedAt = (event: ViewerEvent, lang: Lang) => {
-  const link = html`<a class="viewer-event-name" href="${eventHref(event.id)}"
+  const link = html`<a class="viewer-event-name" href="${eventHref(event)}"
     >${eventNameOf(event, lang)}</a
   >`
   return lang === 'ja'

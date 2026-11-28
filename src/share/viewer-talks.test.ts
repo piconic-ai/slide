@@ -209,14 +209,14 @@ test('F24-AC47: Given slides in two events, When the viewer opens, Then the even
   expect(page).toContain('Kanagawa.pm #3 のほかの発表')
 })
 
-test('F24-AC48: Given both sections, When the viewer opens, Then “イベントを見る” and “コミュニティを見る” stand beside their headings', async () => {
+test('F24-AC52: Given both sections, When the viewer opens, Then “イベントを見る” and “コミュニティを見る” stand beside their headings', async () => {
   await withCommunity()
   for (const [index, deck] of ['e1', 'e2', 'e3', 'e4'].entries())
     await talkOf(EVENT, deck, 200 + index)
   await talkOf(OTHER_EVENT, 'o1', 300)
   const page = await viewer()
   expect(page).toMatch(
-    /<h2 id="same-event">[^<]+<\/h2><a href="\/events\/\d+">イベントを見る<\/a>/,
+    /<h2 id="same-event">[^<]+<\/h2><a href="\/link\/connpass\.com\/event\/\d+">イベントを見る<\/a>/,
   )
   expect(page).toContain(
     '<h2 id="same-community">Kanagawa.pm のほかのイベントの発表</h2><a href="/@kanagawapm">コミュニティを見る</a>',

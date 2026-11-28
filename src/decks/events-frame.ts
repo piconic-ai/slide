@@ -1,6 +1,7 @@
 import { html } from 'hono/html'
 import type { DeckEvent } from '../events/deck-event'
 import { eventNameOf } from '../events/event-name'
+import { linkPagePath } from '../links/link-address'
 import { messages, type Lang } from '../site/i18n'
 
 const text = messages({
@@ -37,7 +38,9 @@ export const presentedEventsFrame = (
                 (event) =>
                   html`<li class="link-row">
                     <span class="link-row-body">
-                      <a class="link-row-title" href="/events/${event.id}"
+                      <a
+                        class="link-row-title"
+                        href="${linkPagePath(event.url)}"
                         >${eventNameOf(event, lang)}</a
                       >
                       ${

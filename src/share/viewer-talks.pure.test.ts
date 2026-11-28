@@ -38,6 +38,7 @@ const event = (inCommunity: ViewerEvent['community']): ViewerEvent => ({
   service: 'connpass',
   ref: '410635',
   host: 'kanagawapm.connpass.com',
+  url: 'https://connpass.com/event/410635/',
   name: 'Kanagawa.pm #3',
   community: inCommunity,
 })
@@ -148,7 +149,7 @@ const noCitations = {
 }
 
 describe('the sections', () => {
-  test('F24-AC48: Given both sections, When they are drawn, Then each heading stands with the way to the event or the community', async () => {
+  test('F24-AC52: Given both sections, When they are drawn, Then each heading stands with the way to the event or the community', async () => {
     const view = toViewerTalks(
       read(talks('e', 4), talks('o', 1)),
       noCitations,
@@ -157,7 +158,7 @@ describe('the sections', () => {
     const event = flat(await viewerSameEventFrame(view, 'ja'))
     const home = flat(await viewerSameCommunityFrame(view, 'ja'))
     expect(event).toContain(
-      '<h2 id="same-event">Kanagawa.pm #3 のほかの発表</h2><a href="/events/5">イベントを見る</a>',
+      '<h2 id="same-event">Kanagawa.pm #3 のほかの発表</h2><a href="/link/connpass.com/event/410635">イベントを見る</a>',
     )
     expect(event).toContain('aria-labelledby="same-event"')
     expect(home).toContain(
@@ -166,14 +167,14 @@ describe('the sections', () => {
     expect(home).toContain('href="/@owner/o0"')
   })
 
-  test('F24-AC48: Given a reader in English, When the sections are drawn, Then the headings and the ways read in English', async () => {
+  test('F24-AC52: Given a reader in English, When the sections are drawn, Then the headings and the ways read in English', async () => {
     const view = toViewerTalks(
       read(talks('e', 4), talks('o', 1)),
       noCitations,
       null,
     )
     expect(flat(await viewerSameEventFrame(view, 'en'))).toContain(
-      'Other talks at Kanagawa.pm #3</h2><a href="/events/5">View the event</a>',
+      'Other talks at Kanagawa.pm #3</h2><a href="/link/connpass.com/event/410635">View the event</a>',
     )
     expect(flat(await viewerSameCommunityFrame(view, 'en'))).toContain(
       'Talks at other events of Kanagawa.pm</h2><a href="/@kanagawapm">View the community</a>',
@@ -192,7 +193,7 @@ describe('the sections', () => {
     },
   )
 
-  test('F24-AC39: Given names with markup, When the sections are drawn, Then they are written as text', async () => {
+  test('F24-AC51: Given names with markup, When the sections are drawn, Then they are written as text', async () => {
     const view = toViewerTalks(
       {
         event: {

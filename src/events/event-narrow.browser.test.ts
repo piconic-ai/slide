@@ -1,10 +1,7 @@
-import { eq } from 'drizzle-orm'
-import { drizzle } from 'drizzle-orm/d1'
 import { chromium, type Browser } from 'playwright'
 import { afterAll, beforeAll, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
-import { events } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import { eventRefOf } from './event-url'
 import { addLink } from '../links/store'
@@ -34,7 +31,9 @@ const URLS = [
 
 let browser: Browser
 let cookie = ''
-let eventId = 0
+// /events/:id moves for good to the page of links, and the page the test
+// opens through a route handler does not follow that redirect.
+const LINK_PAGE = '/link/connpass.com/event/410635'
 beforeAll(async () => {
   await applyMigrations(db)
   cookie = await signIn(env)
@@ -64,11 +63,6 @@ beforeAll(async () => {
       },
       now: 1,
     })
-  eventId = (await drizzle(db)
-    .select()
-    .from(events)
-    .where(eq(events.key, 'https://connpass.com/event/410635'))
-    .get())!.id
   browser = await chromium.launch()
 })
 afterAll(async () => {
@@ -102,7 +96,7 @@ const overflow = (): number =>
   document.documentElement.scrollWidth - document.documentElement.clientWidth
 
 test.each([
-  ['the event page', (): string => `/events/${eventId}`, false],
+  ['the event page', (): string => LINK_PAGE, false],
   ['the related links of one slide', (): string => '/my/slides/talk-0', true],
 ] as const)(
   'F29-AC25: Given %s with long names on a 375px screen, When it settles, Then nothing runs past the screen',
@@ -131,7 +125,7 @@ test.each([
 ])(
   'F29-AC21: Given the event page on a %ipx screen, When it settles, Then the default cover shows two rows of %i whole squares',
   async (width, across) => {
-    const page = await open(`/events/${eventId}`, width, false)
+    const page = await open(LINK_PAGE, width, false)
     const boxes = await page.evaluate(() =>
       [...document.querySelectorAll('.cover-pattern > span')]
         .filter((element) => element.checkVisibility())
@@ -157,7 +151,7 @@ test.each([
 test.each([1280, 375])(
   'F29-AC27: Given the event page on a %ipx screen, When it settles, Then its cover starts 40px below the line under the site header',
   async (width) => {
-    const page = await open(`/events/${eventId}`, width, false)
+    const page = await open(LINK_PAGE, width, false)
     const gap = await page.evaluate(() => {
       const header = document.querySelector('.site-header')!
       const cover = document.querySelector('.event-page > .cover-pattern')!

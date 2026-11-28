@@ -34,7 +34,12 @@ export type CommunityTalk = Readonly<{
 
 /** One of a community's events, with its public talks, newest first. */
 export type CommunityEvent = NamedEvent &
-  Readonly<{ id: number; talks: readonly CommunityTalk[] }>
+  Readonly<{
+    id: number
+    /** Its address (`events.url`), which its page of links is found by. */
+    url: string
+    talks: readonly CommunityTalk[]
+  }>
 
 /** Where a community's logo and cover are served, by its number. */
 export const logoPath = (communityId: number, at: number) =>
