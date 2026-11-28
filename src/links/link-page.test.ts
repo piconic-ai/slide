@@ -6,6 +6,7 @@ import server from '../app/routes'
 import { blocks, decks, events, mutes, suspensions } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
+  OWNER_ID,
   resetTables,
   seedDeck,
   seedDeployment,
@@ -14,7 +15,8 @@ import {
   TEST_ORIGIN,
   testEnv,
 } from '../publication/test-support'
-import { listLinks } from './store'
+import { eventRefOf } from '../events/event-url'
+import { listLinks, setLinkKind } from './store'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
@@ -497,6 +499,56 @@ test.each([
     expect((await orm.select().from(events).get())?.url).toMatch(/^https:/u)
     const moved = await get(`/events/${await eventIdOf(key)}?lang=en`)
     expect(moved.status).toBe(301)
+    expect(moved.headers.get('location')).toBe(page)
+    expect(talkNames(await flat(page))).toEqual(['Talk'])
+  },
+)
+
+/** A public deck of the owner with one link, made an event as the tool does. */
+async function seedEventOfAnotherSite(deck: string, name: string, url: string) {
+  await seedPublic(db, deck, 100, name)
+  await add(deck, url)
+  const [link] = await listLinks(db, deck)
+  await setLinkKind(db, {
+    deckId: deck,
+    ownerUserId: OWNER_ID,
+    linkId: link!.id,
+    kinding: { kind: 'event', event: eventRefOf(url)! },
+    now: 1,
+  })
+}
+
+test('F45-AC9: Given two events of another site that differ only by www., each with its own slide, When /events/:id of each opens, Then each moves to its own page, which lists its own slide', async () => {
+  await seedEventOfAnotherSite(
+    'with',
+    'With www',
+    'https://www.example.com/conf',
+  )
+  await seedEventOfAnotherSite('without', 'Without', 'https://example.com/conf')
+  const cases = [
+    ['https://www.example.com/conf', '/link/www.example.com/conf', 'With www'],
+    ['https://example.com/conf', '/link/example.com/conf', 'Without'],
+  ] as const
+  for (const [key, page, name] of cases) {
+    const moved = await get(`/events/${await eventIdOf(key)}`)
+    expect(moved.status).toBe(301)
+    expect(moved.headers.get('location')).toBe(page)
+    const landed = await get(page)
+    expect(landed.status).toBe(200)
+    expect(talkNames((await landed.text()).replace(/\s+/g, ' '))).toEqual([
+      name,
+    ])
+  }
+})
+
+test.each([
+  ['https://loom.com/embed/x', '/link/loom.com/embed/x'],
+  ['https://vimeo.com/123/abc', '/link/vimeo.com/123/abc'],
+])(
+  'F45-AC9: Given %s made an event by the tool, When /events/:id opens, Then it moves to %s, which lists the slide',
+  async (url, page) => {
+    await seedEventOfAnotherSite('talk', 'Talk', url)
+    const moved = await get(`/events/${await eventIdOf(url)}`)
     expect(moved.headers.get('location')).toBe(page)
     expect(talkNames(await flat(page))).toEqual(['Talk'])
   },

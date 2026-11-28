@@ -1,6 +1,6 @@
 import { html } from 'hono/html'
 import type { DeckEvent } from '../events/deck-event'
-import { linkPagePath } from '../links/link-address'
+import { eventPagePath } from '../links/link-address'
 import { headingOf } from '../links/link-heading'
 import { messages, type Lang } from '../site/i18n'
 
@@ -39,7 +39,9 @@ export const placedPagesFrame = (pages: readonly DeckEvent[], lang: Lang) => {
                 (page) =>
                   html`<li class="link-row">
                     <span class="link-row-body">
-                      <a class="link-row-title" href="${linkPagePath(page.url)}"
+                      <a
+                        class="link-row-title"
+                        href="${eventPagePath(page.url)}"
                         >${headingOf(page)}</a
                       >
                       ${
