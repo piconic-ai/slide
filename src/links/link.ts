@@ -1,4 +1,4 @@
-import { eventRefOf, type EventRef } from '../events/event-url'
+import { eventRefOf, isEventAddress, type EventRef } from '../events/event-url'
 import { parseHttpsUrl, type HttpsUrlRefusal } from '../share/https-url'
 import { kindOfUrl } from './kind'
 
@@ -28,8 +28,11 @@ export type LinkInput = Readonly<
 
 /**
  * The kind of a link and what goes with it: the event its address stands
- * for when it is an event. Null when an event is asked of something that is
- * not an http(s) address, which a parsed link never is.
+ * for when it is an event. An address shaped like an event of connpass,
+ * Doorkeeper or Luma is an event whatever kind is asked for it, so it is
+ * gathered by the key of its event (F45-AC37); the address of another site
+ * is an event only when that kind is asked. Null when an event is asked of
+ * something that is not an http(s) address, which a parsed link never is.
  */
 export function kindedOf(
   kind: LinkKind,
@@ -38,9 +41,9 @@ export function kindedOf(
   | { kind: Exclude<LinkKind, 'event'> }
   | { kind: 'event'; event: EventRef }
   | null {
-  if (kind !== 'event') return { kind }
+  if (kind !== 'event' && !isEventAddress(url)) return { kind }
   const event = eventRefOf(url)
-  return event && { kind, event }
+  return event && { kind: 'event', event }
 }
 
 /** Why a link was refused; each one has its own sentence on the page. */
