@@ -3,6 +3,7 @@ import { drizzle } from 'drizzle-orm/d1'
 import { decks, relatedLinkEvents, relatedLinks } from '../db/schema'
 import type { EventRef } from '../events/event-url'
 import { MAX_LINKS, type LinkInput, type LinkKind } from './link'
+import { gatherKeyOf, linkHostOf } from './gather'
 import { normalizedUrlOf } from './normalize'
 import { sanitizedUrlOf } from './sanitize'
 
@@ -161,10 +162,10 @@ export async function addLink(
   const normalized = normalizedUrlOf(link.url)
   const insert = database
     .prepare(
-      `INSERT INTO related_links (id, deck_id, kind, url, normalized_url, sanitized_url, title, position, created_at)
+      `INSERT INTO related_links (id, deck_id, kind, url, normalized_url, sanitized_url, title, position, created_at, gather_key, link_host)
       SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7,
         (SELECT coalesce(max(position), 0) + 1 FROM related_links WHERE deck_id = ?2),
-        ?8
+        ?8, ?11, ?12
       WHERE EXISTS (
         SELECT 1 FROM decks
         WHERE id = ?2 AND owner_user_id = ?9 AND deleted_at IS NULL)
@@ -183,6 +184,8 @@ export async function addLink(
       now,
       ownerUserId,
       MAX_LINKS,
+      gatherKeyOf(link.url),
+      linkHostOf(link.url),
     )
   const [result] = await database.batch([
     insert,

@@ -96,6 +96,36 @@ test('F27-AC48: Given an address written in another form, When it is added, Then
   ])
 })
 
+test('F45-AC5, F45-AC23: Given addresses of one video with different starts, When they are added, Then each link keeps its own compared form, one key to be gathered by and the host it was written with', async () => {
+  await seedPublic(db, 'talk', 100, 'Talk')
+  await add({ url: 'https://WWW.YouTube.com./watch?v=abc&t=30&utm_source=x' })
+  await add({ url: 'https://youtu.be/abc?t=60' })
+  await add({ url: 'https://sp.nicovideo.jp:8443/watch/sm9/?from=30#top' })
+  expect(
+    (await rows()).map((row) => [
+      row.normalized_url,
+      row.gather_key,
+      row.link_host,
+    ]),
+  ).toEqual([
+    [
+      'https://youtube.com/watch?t=30&v=abc',
+      'https://youtube.com/watch?v=abc',
+      'www.youtube.com',
+    ],
+    [
+      'https://youtube.com/watch?t=60&v=abc',
+      'https://youtube.com/watch?v=abc',
+      'youtu.be',
+    ],
+    [
+      'https://nicovideo.jp:8443/watch/sm9?from=30',
+      'https://nicovideo.jp:8443/watch/sm9',
+      'sp.nicovideo.jp',
+    ],
+  ])
+})
+
 test('F27-AC4: Given a link, When the author removes it, Then the deck page and the viewer no longer show it', async () => {
   await seedPublic(db, 'talk', 100, 'Talk')
   await add()

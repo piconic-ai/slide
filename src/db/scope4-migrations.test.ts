@@ -9,14 +9,21 @@ import { applyMigrations } from './test-migrations'
 // the third scope's last state (0058) and main's 0059 to 0061 (the Luma feed
 // host, the community notifications and the Luma event aliases, which main
 // reviewed on its own), whose data they keep. They are numbered without a gap,
-// so the last one (the scope of the agent connections) is in the list.
+// so the last one (the scope of the agent connections) is in the list. The
+// migrations after it are applied here too, and must keep the same data.
 
 const LAST_OF_SCOPE3 = '0058_community_follows.sql'
 // The last migration of main; the fourth scope's follow it.
 const FROM_MAIN = '0061_luma_event_aliases.sql'
 
+// The last migration of the fourth scope; later ones are not its own.
+const LAST_OF_SCOPE4 = '0070_mcp_scope.sql'
+
 const scope4 = readdirSync('migrations')
-  .filter((name) => name.endsWith('.sql') && name > FROM_MAIN)
+  .filter(
+    (name) =>
+      name.endsWith('.sql') && name > FROM_MAIN && name <= LAST_OF_SCOPE4,
+  )
   .sort()
 
 // What would take away or rebuild a table or a column, comments left out.
@@ -64,7 +71,7 @@ beforeAll(async () => {
     VALUES (7, 'u-alice', 41)`)
   await db.run(sql`INSERT INTO community_follows (user_id, community_id, created_at)
     VALUES ('u-bob', 7, 70)`)
-  // Main's 0059 to 0061 and the fourth scope's 0062 to 0070.
+  // Main's 0059 to 0061, the fourth scope's 0062 to 0070 and what follows.
   await applyMigrations(database, { after: LAST_OF_SCOPE3 })
 })
 afterAll(() => platform.dispose())
