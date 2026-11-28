@@ -106,3 +106,22 @@ test('F24-AC51: Given no event, When the viewer draws the place, Then it holds n
   expect(String(viewerEventsFrame([], 'ja'))).toBe('')
   expect(String(viewerEventsFrame([], 'en'))).toBe('')
 })
+
+test.each([
+  ['https://loom.com/embed/x', '/link/loom.com/embed/x'],
+  ['https://vimeo.com/123/abc', '/link/vimeo.com/123/abc'],
+  ['https://www.example.com/conf/', '/link/www.example.com/conf'],
+])(
+  'F24-AC51: Given an event of another site at %s, When the viewer draws its line, Then it leads to the page at the address as written, %s',
+  async (url, path) => {
+    const line = flat(
+      await viewerEventsFrame(
+        [{ ...event(1, 'Talk night'), service: 'web', url }],
+        'ja',
+      ),
+    )
+    expect(line).toContain(
+      `<a class="viewer-event-name" href="${path}">Talk night</a>`,
+    )
+  },
+)

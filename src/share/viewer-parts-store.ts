@@ -1,5 +1,4 @@
 import { readViewerCitations } from '../citations/store'
-import { linkPagePath } from '../links/link-address'
 import { listShownLinks } from '../links/link-page-store'
 import { listLinks, type StoredLink } from '../links/store'
 import { readProfile } from '../profile/store'
@@ -8,8 +7,8 @@ import { listDeckEvents } from '../events/store'
 import { readViewerTalks } from './viewer-talks-store'
 
 /**
- * A related link as the viewer shows it: with the path of its page of links
- * while that page shows (F45-AC18).
+ * A related link as the viewer shows it: with the path of the page of links
+ * its slide is listed on, while that page shows (F45-AC18).
  */
 export type ViewerLink = StoredLink & Readonly<{ pagePath?: string }>
 
@@ -58,9 +57,10 @@ export async function readViewerParts(
       linksAndPages,
       eventsAndTalks,
     ])
-  const pages = new Set(shown.map((link) => link.linkId))
-  const links: readonly ViewerLink[] = stored.map((link) =>
-    pages.has(link.id) ? { ...link, pagePath: linkPagePath(link.href) } : link,
-  )
+  const paths = new Map(shown.map((link) => [link.linkId, link.path]))
+  const links: readonly ViewerLink[] = stored.map((link) => {
+    const pagePath = paths.get(link.id)
+    return pagePath ? { ...link, pagePath } : link
+  })
   return { author, citations, links, events, talks }
 }

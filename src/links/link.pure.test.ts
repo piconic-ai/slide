@@ -164,3 +164,30 @@ describe('linkLabelOf', () => {
     )
   })
 })
+
+test.each(['video', 'article', 'other', 'event', undefined])(
+  'F45-AC37: Given a connpass address with a query and the kind %s, When the form is read, Then the link is an event with the key of its event',
+  (kind) => {
+    const parsed = parseLinkInput({
+      kind,
+      url: 'https://kanagawapm.connpass.com/event/007/?foo=1',
+    })
+    expect(parsed).toMatchObject({
+      ok: true,
+      link: {
+        kind: 'event',
+        event: { key: 'https://connpass.com/event/7', service: 'connpass' },
+      },
+    })
+  },
+)
+
+test('F45-AC37: Given an address of another site, When the form is read, Then it is an event only when that kind is chosen', () => {
+  const url = 'https://peatix.com/event/123'
+  expect(parseLinkInput({ kind: 'other', url })).toMatchObject({
+    link: { kind: 'other' },
+  })
+  expect(parseLinkInput({ kind: 'event', url })).toMatchObject({
+    link: { kind: 'event', event: { key: url, service: 'web' } },
+  })
+})
