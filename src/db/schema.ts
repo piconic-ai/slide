@@ -564,6 +564,17 @@ export const relatedLinks = sqliteTable(
      * only on a row a Worker before migration 0052 added.
      */
     sanitized_url: text(),
+    /**
+     * The key links are gathered by on one page (gatherKeyOf, F45). Null only
+     * on a row a Worker before migration 0071 added: it is gathered with no
+     * other link.
+     */
+    gather_key: text(),
+    /**
+     * The host name the address was written with (linkHostOf). Null only on
+     * a row a Worker before migration 0071 added.
+     */
+    link_host: text(),
     /** Null when none was typed: the link shows its site name. */
     title: text(),
     /** Grows with every link added and is never reused: the order of adding. */
@@ -580,6 +591,8 @@ export const relatedLinks = sqliteTable(
       sql`${table.title} IS NULL OR length(${table.title}) BETWEEN 1 AND 100`,
     ),
     uniqueIndex('related_links_order').on(table.deck_id, table.position),
+    index('related_links_gather_key').on(table.gather_key),
+    index('related_links_link_host').on(table.link_host),
   ],
 )
 

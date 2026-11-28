@@ -430,6 +430,8 @@ erDiagram
         INTEGER created_at
         TEXT normalized_url
         TEXT sanitized_url
+        TEXT gather_key
+        TEXT link_host
     }
     decks
     deployments
