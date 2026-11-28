@@ -67,6 +67,7 @@ export const OTHER_PATHS = [
   '/follows/new',
   '/events/1',
   '/link/connpass.com/event/1',
+  '/link',
   '/covers/none.png',
   '/covers/none/none.png',
   '/uploads/none',
