@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.4.9](https://github.com/piconic-ai/slide/compare/v0.4.8...v0.4.9) - 2026-11-28
+
+- docs: コミュニティに外部のスライドを集める仕様を足す(F46) by @kfly8 in https://github.com/piconic-ai/slide/pull/747
+
 ## [v0.4.8](https://github.com/piconic-ai/slide/compare/v0.4.7...v0.4.8) - 2026-11-27
 
 - カードの「フォロー中」の印を、出どころが変わったときに追わせる by @kfly8 in https://github.com/piconic-ai/slide/pull/728
