@@ -224,10 +224,10 @@ Pullfrog のレビューの指摘(#738、#741、#745、#746、#751、#752)を受
 
 ## イベントでないリンクのページ(link7 で実装済み)
 
-`readLinkPage(db, target, viewer)`(`src/links/link-page-store.ts`)は、F45-AC35 の順で読む。
+経路(`src/links/link-page-routes.ts`)は、F45-AC35 の順で読む(順は上の「経路」)。
 
-1. `eventKeysOf(target)` の鍵のイベントを順に見て、一般公開中のスライドのあるものがあれば、そのイベントのページ(`readEventPage`)。
-2. 無ければ、`related_links.gather_key = target.gatherKey` で、`related_link_events` に行の無いリンクを引く(`readGatheredPage`)。
+1. `readEventPageOf(db, target, viewer)`: `eventKeysOf(target)` の鍵のイベントに、一般公開中のスライドがあれば、そのイベントのページ(`readEventPage`)。同じ URL をイベント以外の種類で添えたスライドも並ぶ(F45-AC38。上の「レビューを受けて決めた規則」)。
+2. 無ければ、`readGatheredPage(db, target, viewer)`: `related_links.gather_key = target.gatherKey` で、`related_link_events` に行の無いリンクを引く。
 
 ページを出すかは、純粋な `pageShown`(`src/links/link-heading.ts`)が決める。一般公開中のスライドが 1 本以上あり、かつ、イベントとして保存されている、URL がイベントの形である、コミュニティに入っている、作者が 2 人以上、のどれかである。
 
@@ -236,7 +236,7 @@ Pullfrog のレビューの指摘(#738、#741、#745、#746、#751、#752)を受
 - `pageShown` が false なら `null` で、経路は「まだありません」のページを出す。1 人だけの URL と、だれも入れていない URL は、本文も同じになる(F45-AC2)。
 - 一覧だけに、見る人のミュートとブロックを当てる。0 本になっても、ページは 200 である(F45-AC15)。
 - 「一般公開中」の条件は、イベントと同じ結合(`openDeck`、`readyVersion`)を使う(F45-AC14)。
-- connpass などの URL でも、`related_link_events` に行の無いリンク(種類をイベント以外に変えたもの)は、この枝で集まる。URL がイベントの形なので、1 人でもページが出る(F45-AC3)。
+- connpass などの URL は、種類にかかわらずイベントに結びつくので(F45-AC37)、この枝に来るのは、規則の前に保存された、`related_link_events` に行の無いリンクだけである。URL がイベントの形なので、1 人でもページが出る(F45-AC3)。
 
 ページの中身は、イベントと同じ `linkPageBody` で作る。
 
@@ -249,19 +249,23 @@ Pullfrog のレビューの指摘(#738、#741、#745、#746、#751、#752)を受
 
 ### ページの出ているリンク(`listShownLinks`)
 
-`listShownLinks(db, deckId)` は、イベントのリンクに加えて、イベントでないリンクのうち、その `gather_key` で `pageShown` が true になるものを返す(`eventId` は `null`)。問い合わせは、そのスライドのリンクの読み出しのほかに、イベントの分が 1 回、イベントでないリンクの分が 1 回(`gather_key IN (…)` を `GROUP BY` し、`count(DISTINCT …)` で本数と作者の数を取る)で、リンクの数によらない。
+`listShownLinks(db, deckId)` は、そのスライドの関連リンクのうち、スライドがどこかのリンクのページに並ぶものを、そのページの path(`path`)と一緒に返す。
 
-- 保存された鍵のうち、`linkTargetOf(鍵).gatherKey` が鍵と同じでないものは、数えない。`/link/…` の path から、その鍵に戻れないからである(下の「connpass の番号の先頭の 0」)。ページへ進むリンクが 404 を指さないようにしている。
-- viewer(`readViewerParts`、`src/share/viewer-parts-store.ts`)は、この結果に含まれるリンクに `pagePath`(`linkPagePath(link.href)`)を付ける。`viewerLinksFrame` は、その行に、外へのリンクとは別の `<a class="related-link-page">`「このリンクを添えたスライド」(Slides with this link)を添える(F45-AC18)。イベントのリンクにも付く。正規の形が HTML に出るのは、この href だけである(F27-AC89)。
-- 1 本の管理の行の下の文(`linkPlacesOf`)は、イベントでないリンクにも「リンクのページに並びます。」を出す。「このスライドが並ぶページ」の枠は、`placedPagesOf`(`src/decks/placed-pages-frame.ts`)が、関連リンクの順に、ページごとに 1 度ずつ並べる。イベントでないリンクの見出しは、そのスライド自身のリンクの題名、無ければホスト名と鍵である。ページの見出し(最初に保存された題名)とは、ほかの人の題名が先にあるとき、違う。
+| リンク | 並ぶページ(`path`) | 条件 |
+| --- | --- | --- |
+| イベントのリンク | `eventPagePath(events.url)` | そのイベントに、一般公開中のスライドのリンクがある |
+| イベントでないリンクで、`gather_key` の同じイベントのリンクが一般公開中のスライドにある | そのイベントのページ(2 つあれば、番号の小さいほう) | 上と同じ。`readEventPage` が、このリンクのスライドも並べる(F45-AC38) |
+| そのほかのイベントでないリンク | `/link/<正規の形>` | その `gather_key` で `pageShown` が true |
+
+- 問い合わせは、そのスライドのリンクの読み出しのほかに、イベントの分が 1 回、イベントでないリンクの分が 1 回で、リンクの数によらない(スライドを開くときの問い合わせの数は変わらない。`src/cost/per-use.test.ts`)。イベントでないリンクの分は、`gather_key IN (…)` を、鍵とイベントで `GROUP BY` し、イベントの行(イベントの番号と URL)と、イベントでないリンクの行(本数と作者の数)を、1 回で取る。
+- 保存された鍵のうち、`linkTargetOf(鍵).gatherKey` が鍵と同じでないものは、鍵のページには数えない。`/link/…` の path から、その鍵に戻れないからである。ページへ進むリンクが 404 を指さないようにしている。
+- 「ページあり」と、そのページに自分のスライドが載ることは、一致する。これまでは、同じ URL をほかの人が種類「イベント」にしていると、イベントでないリンクは、スライドの並ばないイベントのページへ案内されていた(#746)。
+- viewer(`readViewerParts`、`src/share/viewer-parts-store.ts`)は、この結果の `path` を `pagePath` に付ける。`viewerLinksFrame` は、その行に、外へのリンクとは別の `<a class="related-link-page">`「このリンクを添えたスライド」(Slides with this link)を添える(F45-AC18)。イベントのリンクにも付く。正規の形が HTML に出るのは、この href だけである(F27-AC89)。
+- 1 本の管理の行の下の文(`linkPlacesOf`)は、イベントでないリンクにも「リンクのページに並びます。」を出す。「このスライドが並ぶページ」の枠は、`placedPagesOf`(`src/decks/placed-pages-frame.ts`)が、関連リンクの順に、`path` ごとに 1 度ずつ並べる。イベントでないリンクの見出しは、そのスライド自身のリンクの題名、無ければホスト名と鍵である。ページの見出し(イベント名、または最初に保存された題名)とは、違うことがある。
 
 ### connpass の番号の先頭の 0
 
-種類をイベント以外にした connpass の URL `https://connpass.com/event/007/` は、保存される集める鍵が `https://connpass.com/event/007` で、`/link/` の側は、イベントの鍵にそろえた `connpass.com/event/7` になる。2 つは合わないので、このリンクは集まらない。直すには、保存する鍵の規則(`gatherKeyOf`)を変え、すでにある行を作り直す migration が要る。link7 は migration を足さないので、直していない。`listShownLinks` は、このリンクを「ページが出ている」としない。
-
-### 仕様との関係で確かめること
-
-- ほかのサイトの URL を、1 人が種類「イベント」で、別の 2 人がほかの種類で入れているとき、`/link/…` はイベントのページになり、ほかの種類の 2 人のスライドは並ばない(F45-AC35 の「まずイベントの鍵で引く」のとおり)。イベントのリンクが無くなると、2 人のページになる。このとき、2 人のスライドの viewer の行には、ページへ進むリンクが付く(行き先は、イベントのページ)。
+種類をイベント以外にした connpass の URL `https://connpass.com/event/007/` は、保存される集める鍵が `https://connpass.com/event/007` で、`/link/` の側は、イベントの鍵にそろえた `connpass.com/event/7` になる。2 つは合わないので、集める鍵では集まらなかった(#745 と同じ原因)。2026-11-28 から、イベントの形の URL は、種類にかかわらずイベントの鍵で集めるので(F45-AC37)、新しく足すリンクでは起きない。規則の前に保存された行は、種類を選び直すまで、集まらないままである(同じ書き方 `event/007` のイベントのリンクが、一般公開中のスライドにあるときだけ、そのイベントのページに並ぶ)。
 
 ## 言語(link2 で実装済み)
 

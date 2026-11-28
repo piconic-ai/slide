@@ -1,6 +1,6 @@
 import { html } from 'hono/html'
 import type { DeckEvent } from '../events/deck-event'
-import { eventPagePath, linkPagePath } from '../links/link-address'
+import { linkPagePath } from '../links/link-address'
 import { headingOf } from '../links/link-heading'
 import type { ShownLink } from '../links/link-page-store'
 import type { StoredLink } from '../links/store'
@@ -28,49 +28,49 @@ export type PlacedPage = Readonly<{
 }>
 
 /**
- * The page of a link that is no event, headed by the link's own title: the
+ * The heading of a link that is no event, from the link's own title: the
  * page itself is headed by the first title saved, which may be another's.
  */
-const pageOfLink = (link: StoredLink): PlacedPage => {
-  const href = linkPagePath(link.href)
-  const url = new URL(`https://${href.slice('/link/'.length)}`)
-  return {
-    href,
-    heading: headingOf({
-      service: 'web',
-      host: url.host,
-      url: url.href,
-      name: null,
-      firstTitle: link.title,
-    }),
-    community: null,
-  }
+const headingOfLink = (link: StoredLink): string => {
+  const url = new URL(
+    `https://${linkPagePath(link.href).slice('/link/'.length)}`,
+  )
+  return headingOf({
+    service: 'web',
+    host: url.host,
+    url: url.href,
+    name: null,
+    firstTitle: link.title,
+  })
 }
-
-const pageOfEvent = (event: DeckEvent): PlacedPage => ({
-  href: eventPagePath(event.url),
-  heading: headingOf(event),
-  community: event.community?.name ?? null,
-})
 
 /**
  * The pages of links a slide appears on, in the order of its related links,
- * each page once (F29-AC30): of the links whose page shows.
+ * each page once (F29-AC30): of the links whose page shows, at the path the
+ * slide is listed on. A link that is no event may be listed on the page of
+ * an event with the same address (F45-AC38); two links of one page make one
+ * row, headed by the first.
  */
 export const placedPagesOf = (
   links: readonly StoredLink[],
   events: readonly DeckEvent[],
   shown: readonly ShownLink[],
 ): readonly PlacedPage[] => {
-  const ids = new Set(shown.map((link) => link.linkId))
+  const paths = new Map(shown.map((link) => [link.linkId, link.path]))
   const pages = new Map<string, PlacedPage>()
-  for (const link of links.filter((each) => ids.has(each.id))) {
+  for (const link of links) {
+    const href = paths.get(link.id)
+    if (href === undefined || pages.has(href)) continue
     const event =
       link.kind === 'event'
         ? events.find((each) => each.id === link.eventId)
         : null
-    const page = event ? pageOfEvent(event) : pageOfLink(link)
-    if (event !== undefined && !pages.has(page.href)) pages.set(page.href, page)
+    if (event === undefined) continue
+    pages.set(href, {
+      href,
+      heading: event ? headingOf(event) : headingOfLink(link),
+      community: event?.community?.name ?? null,
+    })
   }
   return [...pages.values()]
 }
