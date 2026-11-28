@@ -18,6 +18,7 @@ import {
   seedCommunity,
 } from '../communities/test-communities'
 import {
+  OWNER_ID,
   seedDeck,
   seedDeployment,
   seedPublic,
@@ -25,8 +26,9 @@ import {
   TEST_ORIGIN,
   testEnv,
 } from '../publication/test-support'
+import { eventRefOf } from '../events/event-url'
 import { linkPagePath } from './link-address'
-import { listLinks } from './store'
+import { listLinks, setLinkKind } from './store'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
@@ -683,7 +685,7 @@ test('F45-AC14: F45-AC15: Given a link of two authors, When one is suspended, Th
   expect(await gone.text()).toContain(MISSING)
 })
 
-test('F45-AC35: F27-AC90: Given one address made an event by one author and added as another kind by two more, When its pages open, Then the address without a query is the page of the event, and with a query the links are gathered whatever their kind', async () => {
+test('F45-AC35: F45-AC38: F27-AC90: Given one address made an event by one author and added as another kind by two more, When its pages open, Then the page of the event lists all three, and with a query the links are gathered whatever their kind', async () => {
   await seedTwo()
   await seedPublic(db, 'third', 300, 'Carol talk', '3')
   const carol = await signIn(env, 'carol', { id: '3' })
@@ -691,9 +693,17 @@ test('F45-AC35: F27-AC90: Given one address made an event by one author and adde
   await add('talk', 'https://www.peatix.com/event/123', '', owner, 'event')
   await add('reply', PEATIX, '', bob, 'article')
   await add('third', PEATIX, '', carol, 'other')
-  // The event is looked up first; the links of other kinds are not on it.
-  expect(talkNames(await flat('/link/peatix.com/event/123'))).toEqual([
+  // The event is looked up as written, www. and all; the slides that carry
+  // the same address under another kind are listed with it.
+  expect(talkNames(await flat('/link/www.peatix.com/event/123'))).toEqual([
+    'Carol talk',
+    'Bob talk',
     'Owner talk',
+  ])
+  // No event was written without www.: there the other links are gathered.
+  expect(talkNames(await flat('/link/peatix.com/event/123'))).toEqual([
+    'Carol talk',
+    'Bob talk',
   ])
   await add('reply', `${PEATIX}?day=2`, '', bob, 'video')
   await add('third', `${PEATIX}/?day=2`, '', carol, 'other')
@@ -701,27 +711,160 @@ test('F45-AC35: F27-AC90: Given one address made an event by one author and adde
     'Carol talk',
     'Bob talk',
   ])
-  // Without the event, the same address gathers the links of the two.
+  // Without the event, its path moves to the one of the links of the two.
   await removeLink('talk', owner)
+  const moved = await get('/link/www.peatix.com/event/123')
+  expect(moved.status).toBe(301)
+  expect(moved.headers.get('location')).toBe('/link/peatix.com/event/123')
   expect(talkNames(await flat('/link/peatix.com/event/123'))).toEqual([
     'Carol talk',
     'Bob talk',
   ])
 })
 
-test('F45-AC3: Given connpass addresses kept as another kind, When their pages open, Then one slide is enough for an event-shaped link, and a number written with leading zeros is not found', async () => {
+test('F45-AC37: Given connpass addresses added with another kind, with a query and with leading zeros, When their pages open, Then they are gathered by the key of their event, one slide being enough', async () => {
   await seedTwo()
-  await add('talk', 'https://connpass.com/event/7/', '', owner, 'other')
+  await add('talk', 'https://connpass.com/event/7/?foo=1', '', owner, 'other')
   await add('talk', 'https://connpass.com/event/008/', '', owner, 'other')
-  await add('reply', 'https://connpass.com/event/008/', '', bob, 'other')
-  expect(await orm.select().from(events).all()).toEqual([])
+  await add('reply', 'https://g.connpass.com/event/8/', '', bob, 'article')
+  expect(
+    (await orm.select().from(events).all()).map((event) => event.key),
+  ).toEqual(['https://connpass.com/event/7', 'https://connpass.com/event/8'])
   expect(talkNames(await flat('/link/connpass.com/event/7'))).toEqual([
     'Owner talk',
   ])
+  const written = await get('/link/connpass.com/event/7/?foo=1')
+  expect(written.headers.get('location')).toBe('/link/connpass.com/event/7')
   expect(linkPagePath('https://connpass.com/event/008/')).toBe(
     '/link/connpass.com/event/8',
   )
-  expect((await get('/link/connpass.com/event/8')).status).toBe(404)
+  expect(talkNames(await flat('/link/connpass.com/event/8'))).toEqual([
+    'Bob talk',
+    'Owner talk',
+  ])
+})
+
+test('F45-AC38: Given a connpass address kept as another kind without its event, as a row from before the rule, When the page of the event opens, Then the slide is listed with the talks of the event', async () => {
+  await seedTwo()
+  await add('talk', 'https://connpass.com/event/7/', '', owner)
+  await add('reply', 'https://g.connpass.com/event/7', '', bob)
+  const [old] = await listLinks(db, 'reply')
+  await setLinkKind(db, {
+    deckId: 'reply',
+    ownerUserId: '2',
+    linkId: old!.id,
+    kinding: { kind: 'other' },
+    now: 1,
+  })
+  expect(talkNames(await flat('/link/connpass.com/event/7'))).toEqual([
+    'Bob talk',
+    'Owner talk',
+  ])
+})
+
+/** A public deck of the owner with one link, made an event as the tool does. */
+async function seedEventOfAnotherSite(deck: string, name: string, url: string) {
+  await seedPublic(db, deck, 100, name)
+  await add(deck, url)
+  const [link] = await listLinks(db, deck)
+  await setLinkKind(db, {
+    deckId: deck,
+    ownerUserId: OWNER_ID,
+    linkId: link!.id,
+    kinding: { kind: 'event', event: eventRefOf(url)! },
+    now: 1,
+  })
+}
+
+test('F45-AC9: Given two events of another site that differ only by www., each with its own slide, When /events/:id of each opens, Then each moves to its own page, which lists its own slide', async () => {
+  await seedEventOfAnotherSite(
+    'with',
+    'With www',
+    'https://www.example.com/conf',
+  )
+  await seedEventOfAnotherSite('without', 'Without', 'https://example.com/conf')
+  const cases = [
+    ['https://www.example.com/conf', '/link/www.example.com/conf', 'With www'],
+    ['https://example.com/conf', '/link/example.com/conf', 'Without'],
+  ] as const
+  for (const [key, page, name] of cases) {
+    const moved = await get(`/events/${await eventIdOf(key)}`)
+    expect(moved.status).toBe(301)
+    expect(moved.headers.get('location')).toBe(page)
+    const landed = await get(page)
+    expect(landed.status).toBe(200)
+    expect(talkNames((await landed.text()).replace(/\s+/g, ' '))).toEqual([
+      name,
+    ])
+  }
+})
+
+test.each([
+  ['https://loom.com/embed/x', '/link/loom.com/embed/x'],
+  ['https://vimeo.com/123/abc', '/link/vimeo.com/123/abc'],
+])(
+  'F45-AC9: Given %s made an event by the tool, When /events/:id opens, Then it moves to %s, which lists the slide',
+  async (url, page) => {
+    await seedEventOfAnotherSite('talk', 'Talk', url)
+    const moved = await get(`/events/${await eventIdOf(url)}`)
+    expect(moved.headers.get('location')).toBe(page)
+    expect(talkNames(await flat(page))).toEqual(['Talk'])
+  },
+)
+
+test('F45-AC38: Given one address added as an event on one public slide and under other kinds on seven more, When its page of links opens, Then all eight are listed newest first and counted once each', async () => {
+  const url = 'https://peatix.com/event/123'
+  await seedEventOfAnotherSite('event', 'As event', url)
+  for (const n of [1, 2, 3, 4, 5, 6, 7]) {
+    const mine = n % 2 === 1
+    await seedPublic(
+      db,
+      `more${n}`,
+      100 + n,
+      `More ${n}`,
+      mine ? OWNER_ID : '2',
+    )
+    // Written differently each time: one gathered key all the same.
+    await add(`more${n}`, `${url}/?utm_source=${n}`, '', mine ? owner : bob)
+  }
+  // A draft with the address is the author's own.
+  await seedDeck(db, 'draft')
+  await seedDeployment(db, 'draft')
+  await add('draft', url)
+  const response = await get('/link/peatix.com/event/123')
+  expect(response.status).toBe(200)
+  const body = (await response.text()).replace(/\s+/g, ' ')
+  expect(talkNames(body)).toEqual([
+    'More 7',
+    'More 6',
+    'More 5',
+    'More 4',
+    'More 3',
+    'More 2',
+    'More 1',
+    'As event',
+  ])
+  expect(body).toContain('<span class="event-talks-count">8 本</span>')
+  // Blocking an author leaves only that author's slides out.
+  await orm
+    .insert(blocks)
+    .values({ blocker_user_id: '2', blocked_user_id: OWNER_ID, created_at: 1 })
+  expect(
+    talkNames(await flat('/link/peatix.com/event/123', { Cookie: bob })),
+  ).toEqual(['More 6', 'More 4', 'More 2'])
+})
+
+test('F45-AC38: Given one slide with the address as an event and, written with a query, under another kind, When the page opens, Then the slide is listed once', async () => {
+  await seedEventOfAnotherSite('both', 'Both', 'https://peatix.com/event/123')
+  await add('both', 'https://youtube.com/watch?v=abc')
+  await seedPublic(db, 'video', 200, 'Video', '2')
+  await add('video', 'https://youtube.com/watch?v=abc&t=5', '', bob)
+  // The video is no event: its page gathers both slides, the event's only one.
+  expect(talkNames(await flat('/link/youtube.com/watch?v=abc'))).toEqual([
+    'Video',
+    'Both',
+  ])
+  expect(talkNames(await flat('/link/peatix.com/event/123'))).toEqual(['Both'])
 })
 
 test('F45-AC4: F45-AC17: F29-AC29: Given a link that is no event on one author’s slide, When a community holds the host it was written with, Then its page shows with the community at its head, the slide’s own pages lead to it, and without the community it is gone again', async () => {
