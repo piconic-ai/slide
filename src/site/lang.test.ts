@@ -130,3 +130,17 @@ test('Given a page in Japanese, When the footer is shown, Then it links to the s
     /<strong lang="ja" aria-current="true"\s*>日本語<\/strong/,
   )
 })
+
+test.each([
+  ['/link/example.com/a?lang=en', {}, 'ja'],
+  ['/link/example.com/a?lang=ja', { Cookie: 'language=en' }, 'en'],
+  ['/link/example.com/a?lang=ja', { 'Accept-Language': 'en' }, 'en'],
+  ['/link/?lang=en', {}, 'ja'],
+] as const)(
+  "F45-AC33: Given %s with %j, whose query is the link's own, When opened, Then the page is in %s and no cookie is written",
+  async (path, headers, lang) => {
+    const response = await get(path, headers)
+    expect(response.headers.get('Set-Cookie')).toBeNull()
+    expect(await langOfPage(response)).toBe(lang)
+  },
+)

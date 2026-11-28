@@ -1,5 +1,6 @@
 import { describe, expect, it, test } from 'vitest'
 import {
+  eventKeysOf,
   eventPagePath,
   linkPagePath,
   linkTargetOf,
@@ -273,4 +274,18 @@ describe('parseLinkPath and linkTargetOf', () => {
       expect(`/link/${again.eventRest}`).toBe(path)
     },
   )
+})
+
+test('F45-AC35: Given the keys an event may be kept under, When they are told, Then an event of connpass has one, an event of another site the one written with its www. or without, and an address with a query none', () => {
+  const keys = (url: string) => eventKeysOf(linkTargetOf(url))
+  expect(keys('https://kanagawapm.connpass.com/event/410635/?a=1')).toEqual([
+    'https://connpass.com/event/410635',
+  ])
+  expect(keys('https://www.example.com/conf/')).toEqual([
+    'https://www.example.com/conf',
+  ])
+  expect(keys('https://example.com/conf/')).toEqual([
+    'https://example.com/conf',
+  ])
+  expect(keys('https://example.com/conf?day=1')).toEqual([])
 })

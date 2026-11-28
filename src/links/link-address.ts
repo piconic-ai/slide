@@ -150,6 +150,16 @@ export function linkTargetOf(url: string): LinkTarget {
 }
 
 /**
+ * The keys an event of the address may be kept under (F45-AC35): the one key
+ * of the address as written, or none when the address has a query and so can
+ * be no event. An event of another site is looked up with the `www.` it was
+ * written with and no other way: `www.example.com/conf` and
+ * `example.com/conf` are two events.
+ */
+export const eventKeysOf = (target: LinkTarget): readonly string[] =>
+  target.eventKey === null ? [] : [target.eventKey]
+
+/**
  * The one path of the page of links an https address belongs to: the page
  * links of any kind but "event" are gathered on.
  */

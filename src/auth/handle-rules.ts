@@ -20,6 +20,7 @@ export const ROUTE_HANDLES: readonly string[] = [
   'follows',
   'goodbye',
   'help',
+  'link',
   'login',
   'maintenance',
   'mcp',

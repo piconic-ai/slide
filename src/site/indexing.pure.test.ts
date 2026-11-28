@@ -105,3 +105,10 @@ test('Given texts with dates, When a path next to a text is checked, Then it is 
   for (const path of ['/terms/', '/privacy/other', '/contact', '/Terms'])
     expect(isIndexablePath(path, given)).toBe(false)
 })
+
+test('F45-AC36: Given a page of links, When checked, Then it may be indexed, and /link alone, which only switches the language, may not', () => {
+  expect(isIndexablePath('/link/connpass.com/event/410635')).toBe(true)
+  expect(isIndexablePath('/link/example.com/a?b=1')).toBe(true)
+  expect(isIndexablePath('/link')).toBe(false)
+  expect(isIndexablePath('/links/example.com')).toBe(false)
+})
