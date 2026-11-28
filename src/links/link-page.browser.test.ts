@@ -161,6 +161,15 @@ test.each(
       }
     }, width)
     expect(past).toEqual({ overflow: 0, wide: [] })
+    if (signedIn) {
+      // What is measured holds the sentence under each row and the frame of
+      // the pages the slide appears on (F29-AC29, F29-AC30).
+      const frames = '[data-deck-frame="links"] .link-row-place'
+      expect(await page.locator(frames).count()).toBe(URLS.length)
+      expect(
+        await page.locator('#placed-pages .link-row-title').allTextContents(),
+      ).toContain(LONG)
+    }
     await page.close()
   },
   20000,
