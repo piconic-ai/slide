@@ -52,7 +52,7 @@ const PAIRED = `luma_event_aliases a
  * its number, its links and its name. When both are there, the id's links
  * move to the name's event, which takes the id's name while it has none
  * (and no operator named it); the id's event is left with no talk, so its
- * page is not found (F29-AC12). An id key no feed paired is left alone.
+ * page is not found (F45-AC12, F45-AC14). An id key no feed paired is left alone.
  */
 export async function joinAliasedEvents(database: D1Database): Promise<void> {
   const moveLinks = database.prepare(

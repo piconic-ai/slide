@@ -176,7 +176,7 @@ describe('making a community', () => {
 })
 
 describe('matching events', () => {
-  test('F30-AC14: Given an event linked before the community was made, When the community is made with its group, Then the event is in it', async () => {
+  test('F30-AC65: Given an event linked before the community was made, When the community is made with its group, Then the event is in it', async () => {
     await seedTalkLink(database, { deckId: 'talk', url: KANAGAWA_EVENT })
     await seedCommunity(database, {
       id: 1,
@@ -188,7 +188,7 @@ describe('matching events', () => {
     ])
   })
 
-  test('F30-AC14: Given a community, When an event of its own site and of its Doorkeeper group are linked after it, Then both are in it and an event of another host is not', async () => {
+  test('F30-AC65: Given a community, When an event of its own site and of its Doorkeeper group are linked after it, Then both are in it and an event of another host is not', async () => {
     await seedCommunity(database, {
       id: 1,
       handle: 'kanagawapm',
@@ -215,7 +215,7 @@ describe('matching events', () => {
     )
   })
 
-  test('F30-AC14: Given one connpass event linked with two groups, When each group has a community, Then the event is in both', async () => {
+  test('F30-AC65: Given one connpass event linked with two groups, When each group has a community, Then the event is in both', async () => {
     await seedTalkLink(database, { deckId: 'talk', url: KANAGAWA_EVENT })
     await seedTalkLink(database, {
       deckId: 'other',
@@ -236,7 +236,7 @@ describe('matching events', () => {
     expect(await listCommunityEventIds(database, 2)).toEqual([id])
   })
 
-  test('F30-AC15: Given a community with two links, When one is taken away, Then the events it brought leave and the others stay', async () => {
+  test('F30-AC66: Given a community with two links, When one is taken away, Then the events it brought leave and the others stay', async () => {
     await seedTalkLink(database, { deckId: 'talk', url: KANAGAWA_EVENT })
     await seedTalkLink(database, {
       deckId: 'other',
@@ -263,7 +263,7 @@ describe('matching events', () => {
     ).toEqual(['https://kanagawa.pm/'])
   })
 
-  test('F30-AC15: Given a link taken away, When it is added back, Then its events come back', async () => {
+  test('F30-AC66: Given a link taken away, When it is added back, Then its events come back', async () => {
     await seedTalkLink(database, { deckId: 'talk', url: KANAGAWA_EVENT })
     await seedCommunity(database, {
       id: 1,

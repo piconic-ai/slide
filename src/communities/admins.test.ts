@@ -242,7 +242,7 @@ describe('admins', () => {
     ['not an admin', () => bob],
     ['signed out', () => ''],
   ])(
-    'F30-AC26: Given someone %s, When they send the admin and deletion forms, Then each is refused and nothing changes',
+    'F30-AC70: Given someone %s, When they send the admin and deletion forms, Then each is refused and nothing changes',
     async (_who, cookieOf) => {
       const cookie = cookieOf()
       expect(

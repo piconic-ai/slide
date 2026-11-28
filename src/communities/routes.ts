@@ -43,7 +43,7 @@ const now = () => Math.floor(Date.now() / 1000)
 /**
  * The page that makes a community. Someone not signed in is sent to sign
  * in (F30-AC10). From an event's page, the group's page comes along as the
- * first link (F30-AC40).
+ * first link (F30-AC73).
  */
 communityForms.get(NEW_COMMUNITY_PATH, async (c) => {
   const owner = await currentOwner(c)

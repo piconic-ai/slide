@@ -2,9 +2,9 @@ import { comparedHostOf, isTrackingQuery, nameOf, siteOf } from './normalize'
 
 /**
  * The address a link leads to and is shown as, for the safety of the reader
- * who follows it (F27-AC59〜F27-AC61, F26-AC100): the tracking parts of the
- * query and the parts a site leaves out of its addresses (Luma's invitation
- * token `tk`, Medium's `source`) are taken out. The lists are the data of
+ * who follows it (F27-AC89, F27-AC60, F27-AC61, F26-AC100): the tracking
+ * parts of the query and the parts a site leaves out of its addresses
+ * (Luma's invitation token `tk`, Medium's `source`) are taken out. The lists are the data of
  * `url-rules.ts`, shared with the compared form (`normalize.ts`).
  *
  * `href` is an `https:` or `http:` address as the URL parser writes it, so

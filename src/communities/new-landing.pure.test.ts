@@ -14,7 +14,7 @@ test.each([
     '/communities/new',
   ],
 ])(
-  'F30-AC40: Given the sign-in was asked to return to %s, When it lands, Then it goes to %s, the group carried only when it is an address',
+  'F30-AC73: Given the sign-in was asked to return to %s, When it lands, Then it goes to %s, the group carried only when it is an address',
   (to, landing) => {
     expect(landingOf(to)).toBe(landing)
   },
@@ -27,7 +27,7 @@ test.each([
   '/communities/newer',
   '/communities/new@evil.example',
 ])(
-  'F30-AC40: Given %s, which only looks like the page, When the landing is read, Then it is not taken',
+  'F30-AC73: Given %s, which only looks like the page, When the landing is read, Then it is not taken',
   (to) => {
     expect(newCommunityLanding(to)).toBeNull()
     expect(landingOf(to)).toBe('/my/slides')

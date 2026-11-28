@@ -226,7 +226,7 @@ test.each([
 const viewerHrefs = async () =>
   [...(await viewerLinks()).matchAll(/href="([^"]*)"/g)].map((m) => m[1])
 
-test('F27-AC59: Given a link added with tracking parts, When the viewer, the manage page and the profile are opened, Then the link leads to the sanitized address and neither the address as added nor its compared form is in any of them', async () => {
+test('F27-AC89: Given a link added with tracking parts, When the viewer, the manage page and the profile are opened, Then the link leads to the sanitized address and neither the address as added nor its compared form is in any of them', async () => {
   await seedPublic(db, 'talk', 100, 'Talk')
   const added = 'https://www.example.com/a/?utm_source=x&b=1&fbclid=y#Top'
   await add({ kind: 'other', url: added })
@@ -286,7 +286,7 @@ test('F27-AC52: Given a link with invisible and direction characters after its h
   expect(await viewerLinks()).not.toMatch(/[​‮⁦]/u)
 })
 
-test('F27-AC59: Given a link a Worker before migration 0052 added, When the viewer shows it, Then it leads to the address sanitized from its url', async () => {
+test('F27-AC89: Given a link a Worker before migration 0052 added, When the viewer shows it, Then it leads to the address sanitized from its url', async () => {
   await seedPublic(db, 'talk', 100, 'Talk')
   await orm.insert(relatedLinks).values({
     id: 'old',
@@ -316,7 +316,7 @@ test('F27-AC53: Given a deck with a link, When the viewer opens, Then every rela
   expect(page).toContain('このリンクを開きますか')
 })
 
-test('F27-AC59: Given a stored link without a sanitized address whose url the parser cannot read, When the viewer opens, Then the page is still shown with the rest of its links', async () => {
+test('F27-AC89: Given a stored link without a sanitized address whose url the parser cannot read, When the viewer opens, Then the page is still shown with the rest of its links', async () => {
   await seedPublic(db, 'talk', 100, 'Talk')
   await add({ url: 'https://example.com/a?utm_source=x' })
   await orm.insert(relatedLinks).values({

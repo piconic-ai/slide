@@ -2,7 +2,7 @@ const DAY = 24 * 60 * 60
 
 /**
  * A link added to a public slide tells the followers of the community it
- * joins only while the slide is this young (F20-AC16): a link added long
+ * joins only while the slide is this young (F20-AC21): a link added long
  * after publication is not news. Counted from the first publication.
  */
 export const COMMUNITY_NOTICE_WINDOW_SECONDS = 7 * DAY

@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import { readEditForm } from './edit-form'
 
-test('F30-AC25: Given a good editing form, When it is read, Then the name, description, color, other links and links are valid', () => {
+test('F30-AC69: Given a good editing form, When it is read, Then the name, description, color, other links and links are valid', () => {
   expect(
     readEditForm({
       name: 'Kanagawa.pm',
@@ -17,7 +17,7 @@ test('F30-AC25: Given a good editing form, When it is read, Then the name, descr
   })
 })
 
-test('F30-AC25: Given a bad other link between empty ones, When it is read, Then the problem stays on its own field and three fields show', () => {
+test('F30-AC69: Given a bad other link between empty ones, When it is read, Then the problem stays on its own field and three fields show', () => {
   const read = readEditForm({
     name: 'K',
     site: ['', 'nope', ''],

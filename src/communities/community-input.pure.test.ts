@@ -40,7 +40,7 @@ describe('F30-AC37: the name and the description', () => {
   )
 })
 
-describe('F30-AC25: the other links', () => {
+describe('F30-AC69: the other links', () => {
   test('Given up to three addresses and empty fields, When they are read, Then they are kept in https', () => {
     expect(
       parseSites(['http://kanagawa.pm/', '', 'https://x.com/kanagawapm']),

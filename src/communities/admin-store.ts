@@ -124,7 +124,7 @@ export async function removeCommunityAdmin(
 }
 
 /**
- * Deletes a community (D-39, F30-AC33): in one batch, its handle is let go
+ * Deletes a community (D-39, F30-AC71): in one batch, its handle is let go
  * of (no one takes it for 90 days, F30-AC8), and its feed events, links,
  * admins, follows and row go. Slides, related links and events stay. Its pictures
  * leave R2 after. False when there was no such community.

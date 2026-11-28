@@ -50,7 +50,7 @@ function eventLine(event: ViewerEvent, lang: Lang) {
 
 /**
  * Where the viewer shows, under the title, the events the slides were
- * presented at, in the order their related links were added (F24-AC39,
+ * presented at, in the order their related links were added (F24-AC51,
  * F24-AC40): the community's logo, the event's name to its page,
  * "presented at" and the community's name to its page. An event in no
  * community has neither logo nor community. With no event it holds nothing

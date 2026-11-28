@@ -232,7 +232,7 @@ test('F27-AC44, F29-AC7: Given a deck in a connpass event, When a link to the sa
   expect(await allEvents()).toHaveLength(1)
 })
 
-test('F29-AC11: Given a link in an event, When it is removed, Then it leaves the event and the event stays', async () => {
+test('F45-AC24: Given a link in an event, When it is removed, Then it leaves the event and the event stays', async () => {
   await seedPublic(db, 'talk', 100, 'Talk')
   await add({ url: 'https://luma.com/x1', title: 'Night' })
   const [link] = await listLinks(db, 'talk')
@@ -247,7 +247,7 @@ test('F29-AC11: Given a link in an event, When it is removed, Then it leaves the
   expect(await allEvents()).toHaveLength(1)
 })
 
-test('F29-AC11: Given a link in an event, When its kind is changed away from event, Then it leaves the event', async () => {
+test('F29-AC28: Given a link in an event, When its kind is changed away from event, Then it leaves the event', async () => {
   await seedPublic(db, 'talk', 100, 'Talk')
   await add({ url: 'https://luma.com/x1' })
   const [link] = await listLinks(db, 'talk')
@@ -264,7 +264,7 @@ test('F29-AC11: Given a link in an event, When its kind is changed away from eve
   expect(await ties()).toEqual([])
 })
 
-test('F27-AC88: Given a link, When its kind is changed to event and back to other, Then each kind is the one listed', async () => {
+test('F27-AC90: Given a link, When its kind is changed to event and back to other, Then each kind is the one listed', async () => {
   await seedPublic(db, 'talk', 100, 'Talk')
   await add({
     kind: 'other',
@@ -292,7 +292,7 @@ test('F27-AC88: Given a link, When its kind is changed to event and back to othe
   expect(await ties()).toEqual([])
 })
 
-test("F27-AC88: Given another author's link, When its kind is changed or it is removed, Then nothing changes", async () => {
+test("F27-AC90: Given another author's link, When its kind is changed or it is removed, Then nothing changes", async () => {
   await seedPublic(db, 'talk', 100, 'Talk')
   await add({ url: 'https://luma.com/x1' })
   const [link] = await listLinks(db, 'talk')
@@ -350,7 +350,7 @@ test('F29-AC11: Given a full deck, When an event link is refused, Then no event 
   expect(await allEvents()).toEqual([])
 })
 
-test('F29-AC11: Given decks in an event, When one is deleted and its author leaves with the other, Then their ties go and the event stays', async () => {
+test('F45-AC24: Given decks in an event, When one is deleted and its author leaves with the other, Then their ties go and the event stays', async () => {
   await seedPublic(db, 'a', 100, 'A')
   await seedPublic(db, 'b', 200, 'B')
   await add({ url: 'https://luma.com/x1' }, 'a')
@@ -362,7 +362,7 @@ test('F29-AC11: Given decks in an event, When one is deleted and its author leav
   expect(await allEvents()).toHaveLength(1)
 })
 
-test('F29-AC16: Given fetch watched, When event links are added, changed and removed, Then nothing is fetched', async () => {
+test('F45-AC19: Given fetch watched, When event links are added, changed and removed, Then nothing is fetched', async () => {
   await seedPublic(db, 'talk', 100, 'Talk')
   const fetched = vi.spyOn(globalThis, 'fetch')
   try {

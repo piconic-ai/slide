@@ -110,7 +110,7 @@ const fullForm = (over: Record<string, string> = {}) =>
   ] as const
 
 describe('the editing page', () => {
-  test('F30-AC25: Given an admin, When they save the name, description, other links and links, Then the community shows them', async () => {
+  test('F30-AC69: Given an admin, When they save the name, description, other links and links, Then the community shows them', async () => {
     const response = await save([
       ['name', 'Kanagawa.pm 2'],
       ['description', 'Perl の勉強会 https://example.com/'],
@@ -137,7 +137,7 @@ describe('the editing page', () => {
     ])
   })
 
-  test('F30-AC25: Given four other links, When saved, Then the fourth is refused and nothing changes', async () => {
+  test('F30-AC69: Given four other links, When saved, Then the fourth is refused and nothing changes', async () => {
     const response = await save([
       ...fullForm().filter(([k]) => k !== 'site'),
       ['site', 'https://a.example/'],
@@ -180,7 +180,7 @@ describe('the editing page', () => {
     ).toBe('Kanagawa.pm')
   })
 
-  test('F30-AC26: Given an admin, a person who is not one and someone signed out, When each opens the editing page, Then only the admin can, and only the admin sees "edit"', async () => {
+  test('F30-AC70: Given an admin, a person who is not one and someone signed out, When each opens the editing page, Then only the admin can, and only the admin sees "edit"', async () => {
     expect((await request('/@kanagawapm/edit')).status).toBe(200)
     // F36-AC43: the editing page leads to the article on running a community.
     expect(await (await request('/@kanagawapm/edit')).text()).toContain(
@@ -200,7 +200,7 @@ describe('the editing page', () => {
     ['not an admin', () => bob],
     ['signed out', () => ''],
   ])(
-    'F30-AC26: Given someone %s, When they send every editing form, Then each is refused and nothing changes',
+    'F30-AC70: Given someone %s, When they send every editing form, Then each is refused and nothing changes',
     async (_who, cookieOf) => {
       const cookie = cookieOf()
       expect(

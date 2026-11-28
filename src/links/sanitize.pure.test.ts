@@ -128,7 +128,7 @@ describe('sanitizedUrlOf: Medium', () => {
 })
 
 describe('sanitizedUrlOf: what it keeps', () => {
-  test('F27-AC59: Given parts that are not sanitized, When it is sanitized, Then the trailing slash, the case of the path, the port and the fragment stay as typed', () => {
+  test('F27-AC89: Given parts that are not sanitized, When it is sanitized, Then the trailing slash, the case of the path, the port and the fragment stay as typed', () => {
     for (const href of [
       'https://example.com/a/',
       'https://example.com/A/b//',
@@ -140,7 +140,7 @@ describe('sanitizedUrlOf: what it keeps', () => {
       expect(sanitizedUrlOf(href)).toBe(href)
   })
 
-  test('F27-AC59: Given ? and # after a tracking part, When it is sanitized, Then only the query is read, not the fragment', () => {
+  test('F27-AC89: Given ? and # after a tracking part, When it is sanitized, Then only the query is read, not the fragment', () => {
     expect(hrefOf('https://example.com/a?utm_source=x#b?fbclid=y')).toBe(
       'https://example.com/a#b?fbclid=y',
     )
