@@ -2,7 +2,16 @@
  * What the page of links of an address reads from D1 (F45): the event the
  * address stands for, or the links gathered by its key.
  */
-import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  sql,
+} from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { alias } from 'drizzle-orm/sqlite-core'
 import { z } from 'zod'
@@ -210,15 +219,26 @@ export async function readEventPage(
       .all(),
   ])
   if (!event || links.length === 0) return null
-  const keys = new Set(
-    links.map((link) => link.gatherKey).filter((key) => key !== null),
-  )
-  const others =
-    keys.size === 0
-      ? []
-      : await gatheredLinks(db, viewer)
-          .where(gatheredBy([...keys]))
-          .all()
+  // The keys of the event's public links come from a subquery, not as bound
+  // values: an event whose links were written with many queries has more keys
+  // than D1 binds in one statement.
+  const eventKeys = publicTalks(db, null).where(ofEvent(eventId)).as('keys')
+  const others = !links.some((link) => link.gatherKey !== null)
+    ? []
+    : await gatheredLinks(db, viewer)
+        .where(
+          and(
+            inArray(
+              relatedLinks.gather_key,
+              db
+                .select({ key: eventKeys.gatherKey })
+                .from(eventKeys)
+                .where(isNotNull(eventKeys.gatherKey)),
+            ),
+            isNull(relatedLinkEvents.link_id),
+          ),
+        )
+        .all()
   // A deck with two links to the event, or with one of each kind, comes
   // twice; it is listed once.
   const decksOnce = [
