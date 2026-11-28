@@ -2,11 +2,12 @@ import { asc, eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
+import { readCommunityTalks } from '../communities/page-store'
 import { listCommunityEventIds } from '../communities/store'
 import { seedCommunity, seedTalkLink } from '../communities/test-communities'
-import { events, relatedLinkEvents } from '../db/schema'
+import { accounts, events, relatedLinkEvents } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
-import { seedDeck, seedPerson } from '../publication/test-support'
+import { seedDeck, seedPerson, seedPublic } from '../publication/test-support'
 import { joinAliasedEvents } from './alias-store'
 import { readDueFeeds } from './reader-routes'
 import { fakeReader, resetFeeds } from './test-feeds'
@@ -195,4 +196,31 @@ test('F33-AC20: Given a feed that paired the id before, When another communityâ€
   )
   const [event] = await allEvents()
   expect(await listCommunityEventIds(database, 8)).toEqual([event!.id])
+})
+
+test('F33-AC20: F30-AC65: Given public slides that carry the Luma event by its name and by its id under the kinds other and article, When the feed pairs them, Then both are among the slides of the community, as a Luma address of the kind other is an event (F45-AC37)', async () => {
+  await db
+    .insert(accounts)
+    .values({ user_id: '722500', handle: 'owner', created_at: 1 })
+    .onConflictDoNothing()
+  await seedPublic(database, 'other-kind', 100, 'Other kind')
+  await seedPublic(database, 'article-kind', 101, 'Article kind')
+  await seedTalkLink(database, {
+    deckId: 'other-kind',
+    url: NAME,
+    kind: 'other',
+  })
+  await seedTalkLink(database, {
+    deckId: 'article-kind',
+    url: ID,
+    kind: 'article',
+  })
+
+  await readFeed()
+
+  const { slides } = await readCommunityTalks(database, 7, null)
+  expect(slides.map((talk) => talk.slug).sort()).toEqual([
+    'article-kind',
+    'other-kind',
+  ])
 })
