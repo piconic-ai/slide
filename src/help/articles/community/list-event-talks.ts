@@ -42,8 +42,8 @@ export default defineArticle({
             など)のイベントは、いまのところ並びません。
           </li>
           <li>
-            種類が「イベント」の行の下に、どこに並ぶか(「(コミュニティ名)
-            のイベントとして並びます。」など)が出ます。
+            リンクの行の下に、どこに並ぶか(「(コミュニティ名)
+            のページに並びます。」「リンクのページに並びます。」)が出ます。どこにも並ばない行には、出ません。
           </li>
           <li>
             スライドが一般公開されると、そのイベントのページに並びます。同じイベントの
@@ -112,8 +112,9 @@ export default defineArticle({
             listed for now.
           </li>
           <li>
-            Under a row of the kind Event, one sentence says where it is listed
-            (such as “Listed as a talk of an event of (community)”).
+            Under the row of the link, one sentence says where it is listed
+            (“Listed on the page of (community).” or “Listed on the page of this
+            link.”). A row listed nowhere has none.
           </li>
           <li>
             When the slides are public, they are listed on the event’s page,

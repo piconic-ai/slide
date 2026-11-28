@@ -7,10 +7,11 @@ import {
   type LinkNotice,
 } from '../links/link'
 import { kindNames, linkIcon } from '../links/link-parts'
+import type { ShownLink } from '../links/link-page-store'
 import type { StoredLink } from '../links/store'
 import { frameHelpMark } from '../help/frame-links'
 import { messages, type Lang } from '../site/i18n'
-import type { EventCommunity } from '../events/deck-event'
+import type { DeckEvent } from '../events/deck-event'
 
 const text = messages({
   ja: {
@@ -19,8 +20,8 @@ const text = messages({
     url: 'URL',
     placedIn: (community: string | null) =>
       community === null
-        ? 'イベントとして並びます。'
-        : `${community} のイベントとして並びます。`,
+        ? 'リンクのページに並びます。'
+        : `${community} のページに並びます。`,
     title: '題名',
     titleNote: '未入力の場合は、サイト名(例: zenn.dev)を出します。',
     add: '追加する',
@@ -47,8 +48,8 @@ const text = messages({
     url: 'URL',
     placedIn: (community: string | null) =>
       community === null
-        ? 'Listed as a talk of the event.'
-        : `Listed as a talk of an event of ${community}.`,
+        ? 'Listed on the page of this link.'
+        : `Listed on the page of ${community}.`,
     title: 'Title',
     titleNote: 'If left blank, the site name (e.g. zenn.dev) is shown.',
     add: 'Add',
@@ -71,15 +72,39 @@ const text = messages({
   },
 })
 
-/** Under a link of the kind event, where it is listed. */
-const placeOf = (
-  link: StoredLink,
-  communities: ReadonlyMap<number, EventCommunity | null>,
-  lang: Lang,
-) =>
-  link.kind === 'event'
+/**
+ * Where a related link is listed (F29-AC29): on the page of the community it
+ * goes into, or, with no community, on its own page of links.
+ */
+export type LinkPlace = Readonly<{ community: string | null }>
+
+/**
+ * The place of each related link, by its id; a link listed nowhere has none.
+ * A link goes into the community of its event; a link in no community has a
+ * place while its page of links shows.
+ */
+export const linkPlacesOf = (
+  links: readonly StoredLink[],
+  events: readonly DeckEvent[],
+  shown: readonly ShownLink[],
+): ReadonlyMap<string, LinkPlace> => {
+  const places = new Map<string, LinkPlace>()
+  const pages = new Set(shown.map((link) => link.linkId))
+  for (const link of links) {
+    if (link.kind !== 'event') continue
+    const community =
+      events.find((event) => event.id === link.eventId)?.community ?? null
+    if (community) places.set(link.id, { community: community.name })
+    else if (pages.has(link.id)) places.set(link.id, { community: null })
+  }
+  return places
+}
+
+/** Under a link that is listed somewhere, where. */
+const placeOf = (place: LinkPlace | undefined, lang: Lang) =>
+  place
     ? html`<span class="link-row-place"
-        >${text[lang].placedIn(communities.get(link.eventId)?.name ?? null)}</span
+        >${text[lang].placedIn(place.community)}</span
       >`
     : ''
 
@@ -93,14 +118,13 @@ export const linksFrame = (
   view: Readonly<{
     slug: string
     links: readonly StoredLink[]
-    /** The community of each event the links are in; null for none. */
-    communities?: ReadonlyMap<number, EventCommunity | null>
+    /** Where each link is listed, by its id (`linkPlacesOf`). */
+    places?: ReadonlyMap<string, LinkPlace>
     notice: LinkNotice | null
   }>,
   lang: Lang,
 ) => {
   const t = text[lang]
-  const communities = view.communities ?? new Map()
   return html`<section
     class="panel panel-with-help"
     data-deck-frame="links"
@@ -127,7 +151,7 @@ export const linksFrame = (
                             >${siteNameOf(link.href)}</span
                           >`
                     }
-                    ${placeOf(link, communities, lang)}
+                    ${placeOf(view.places?.get(link.id), lang)}
                   </span>
                   <form
                     method="post"

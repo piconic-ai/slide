@@ -19,9 +19,3 @@ export type DeckEvent = NamedEvent &
     url: string
     community: (EventCommunityView & EventCommunity) | null
   }>
-
-/** The community of each event, by the event's number. */
-export const communitiesOf = (
-  events: readonly DeckEvent[],
-): ReadonlyMap<number, EventCommunity | null> =>
-  new Map(events.map((event) => [event.id, event.community]))

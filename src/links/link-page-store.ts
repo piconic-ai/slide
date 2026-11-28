@@ -231,3 +231,38 @@ export async function findShownEventUrl(
   ])
   return event && talk ? event.url : null
 }
+
+/** A related link of a deck whose page of links shows, and the event it is of. */
+export type ShownLink = Readonly<{ linkId: string; eventId: number }>
+
+/**
+ * The related links of a deck whose page of links shows, whoever is looking
+ * (F29-AC29, F29-AC30): for now the links to an event with a public talk,
+ * this deck's or another's. The other links come with their columns.
+ */
+export async function listShownLinks(
+  database: D1Database,
+  deckId: string,
+): Promise<readonly ShownLink[]> {
+  const db = drizzle(database)
+  const own = await db
+    .select({ linkId: relatedLinks.id, eventId: relatedLinkEvents.event_id })
+    .from(relatedLinks)
+    .innerJoin(
+      relatedLinkEvents,
+      eq(relatedLinkEvents.link_id, relatedLinks.id),
+    )
+    .where(eq(relatedLinks.deck_id, deckId))
+    .all()
+  if (own.length === 0) return []
+  const shown = await publicTalks(db, null)
+    .where(
+      inArray(relatedLinkEvents.event_id, [
+        ...new Set(own.map((link) => link.eventId)),
+      ]),
+    )
+    .groupBy(relatedLinkEvents.event_id)
+    .all()
+  const events = new Set(shown.map((row) => row.eventId))
+  return own.filter((link) => events.has(link.eventId))
+}

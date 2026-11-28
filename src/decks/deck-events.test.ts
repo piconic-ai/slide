@@ -3,8 +3,10 @@ import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
 import { applyMigrations } from '../db/test-migrations'
 import { listLinks } from '../links/store'
+import { seedCommunity } from '../communities/test-communities'
 import {
   resetTables,
+  seedDeck,
   seedPublic,
   signIn,
   TEST_ORIGIN,
@@ -42,11 +44,11 @@ const post = (path: string, fields: Record<string, string>, cookie = owner) =>
     }),
     env,
   )
-const page = async (lang = 'ja') =>
+const page = async (lang = 'ja', slug = 'talk') =>
   (
     await (
       await server.fetch(
-        new Request(`${TEST_ORIGIN}/my/slides/talk?lang=${lang}`, {
+        new Request(`${TEST_ORIGIN}/my/slides/${slug}?lang=${lang}`, {
           headers: { Cookie: owner },
         }),
         env,
@@ -130,26 +132,43 @@ test("F27-AC88: Given another author's slide, When kinds are saved on it, Then i
   expect(await kinds()).toEqual(['event'])
 })
 
-test('F29-AC17: Given links of the kind event and of another kind, When the slide page opens, Then only under the event rows one sentence says it is listed as a talk of the event', async () => {
-  await post('/my/slides/talk/links', {
-    url: 'https://kanagawapm.connpass.com/event/1/',
-    title: 'Kanagawa.pm #3',
+test("F29-AC29: Given a link that goes into a community, a link whose page of links shows, a link to an event with no public slide and a link that is no event, When the slide page opens, Then the rows say the community's page, the page of links, and nothing", async () => {
+  await seedCommunity(db, {
+    id: 5,
+    handle: 'kanagawapm',
+    name: 'Kanagawa.pm',
+    links: ['https://kanagawapm.connpass.com/'],
   })
-  await post('/my/slides/talk/links', {
-    url: 'https://youtube.com/watch?v=1',
-    title: 'Video',
-  })
-  const rows = frame(await page(), 'links')
-    .split('<li class="link-row">')
-    .slice(1)
-  expect(rows).toHaveLength(2)
-  expect(rows[0]).toMatch(
-    /<span class="link-row-place"\s*>イベントとして並びます。<\/span/,
-  )
-  expect(rows[1]).not.toContain('link-row-place')
-  expect(frame(await page('en'), 'links')).toContain(
-    'Listed as a talk of the event.',
-  )
+  await seedDeck(db, 'draft')
+  const urls = [
+    'https://kanagawapm.connpass.com/event/1/',
+    'https://luma.com/x1',
+    'https://youtube.com/watch?v=1',
+  ]
+  for (const url of urls) await post('/my/slides/talk/links', { url })
+  // An event on a draft only: its page of links does not show.
+  await post('/my/slides/draft/links', { url: 'https://luma.com/x2' })
+  const places = async (slug: string, lang = 'ja') =>
+    frame(await page(lang, slug), 'links')
+      .split('<li class="link-row">')
+      .slice(1)
+      .map(
+        (row) =>
+          /<span class="link-row-place"\s*>([^<]*)<\/span/.exec(row)?.[1] ??
+          null,
+      )
+  expect(await places('talk')).toEqual([
+    'Kanagawa.pm のページに並びます。',
+    'リンクのページに並びます。',
+    null,
+  ])
+  expect(await places('talk', 'en')).toEqual([
+    'Listed on the page of Kanagawa.pm.',
+    'Listed on the page of this link.',
+    null,
+  ])
+  expect(await places('draft')).toEqual([null])
+  expect(await page()).not.toContain('イベントとして並びます')
 })
 
 test('F29-AC18: Given links to two events, one of them twice, When the slide page opens, Then the events frame lists each event once in the order added, and has no way to choose', async () => {
