@@ -165,11 +165,12 @@ test('F29-AC18: Given links to two events, one of them twice, When the slide pag
   expect(events).toContain('<h2>発表したイベント</h2>')
   expect(
     [
-      ...events.matchAll(
-        /<a class="link-row-title" href="(\/events\/\d+)" >([^<]*)</g,
-      ),
-    ].map(([, , name]) => name),
-  ).toEqual(['Hono Night #5', 'connpass のイベント 410635'])
+      ...events.matchAll(/<a class="link-row-title" href="([^"]*)" >([^<]*)</g),
+    ].map(([, href, name]) => [href, name]),
+  ).toEqual([
+    ['/link/luma.com/x1', 'Hono Night #5'],
+    ['/link/connpass.com/event/410635', 'connpass のイベント 410635'],
+  ])
   expect(events).toContain('関連リンクから決まるので、ここでは選べません。')
   expect(events).not.toMatch(/<form|<select|<input|<button/)
 })

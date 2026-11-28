@@ -57,7 +57,7 @@ export const viewerSameEventFrame = (talks: ViewerTalks, lang: Lang) => {
     'same-event',
     event && {
       heading: t.sameEvent(eventNameOf(event, lang)),
-      href: eventHref(event.id),
+      href: eventHref(event),
       label: t.viewEvent,
     },
     talks.sameEvent,
