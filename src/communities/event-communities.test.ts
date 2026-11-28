@@ -257,7 +257,6 @@ test('F30-AC65: Given links of every kind written before the community was made,
     'upper',
     'video',
   ])
-  // The tab of links still lists the links kept as events only.
   expect(await listCommunityEventIds(db, 5)).toHaveLength(1)
 })
 
@@ -298,7 +297,7 @@ test('F30-AC16: Given a connpass address without a group, kept as an event or as
   expect(checkCommunityLinks(['https://connpass.com/']).ok).toBe(false)
 })
 
-test('F30-AC21: F30-AC68: Given one slide with links to two events of a community and a link that is no event, When the community is read, Then the slide is under both events and once among the slides, with a slide of no event', async () => {
+test('F30-AC21: F30-AC68: Given one slide with links to two events of a community and links that are no event, When the community is read, Then each link is listed as its page gathers it, the newest first, and the slide once among the slides', async () => {
   await seedCommunity(db, {
     id: 77,
     handle: 'kanagawapm',
@@ -309,15 +308,26 @@ test('F30-AC21: F30-AC68: Given one slide with links to two events of a communit
     url: 'https://kanagawapm.connpass.com/event/2/',
   })
   await seedLinked({ article: ['https://example.com/post', 'article'] })
+  // The same address as the other slide's, with a query that is dropped.
   await seedTalkLink(db, {
     deckId: 'talk',
-    url: 'https://example.com/more',
+    url: 'https://example.com/post?utm_source=x',
     kind: 'other',
+    title: 'Later title',
   })
-  const read = await readCommunityTalks(db, 77, null)
-  expect(read.events.map((event) => event.talks.map((t) => t.slug))).toEqual([
-    ['talk'],
-    ['talk'],
+  const listed = async (id: number) =>
+    (await readCommunityTalks(db, id, null)).links.map((link) => [
+      link.url,
+      link.firstTitle,
+      ...link.talks.map((talk) => talk.slug),
+    ])
+  // One author alone is listed (F45-AC4). All went public at one time: the
+  // newer event leads, and the links that are no event follow.
+  expect(await listed(77)).toEqual([
+    ['https://connpass.com/event/2/', null, 'talk'],
+    ['https://connpass.com/event/410635/', 'Kanagawa.pm #3', 'talk'],
+    ['https://example.com/post', 'Later title', 'article', 'talk'],
   ])
+  const read = await readCommunityTalks(db, 77, null)
   expect(read.slides.map((talk) => talk.slug)).toEqual(['article', 'talk'])
 })

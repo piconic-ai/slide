@@ -32,11 +32,15 @@ export type CommunityTalk = Readonly<{
   coverPath: string | null
 }>
 
-/** One of a community's events, with its public talks, newest first. */
-export type CommunityEvent = NamedEvent &
+/**
+ * One of a community's links as its page of links gathers them (F30-AC68),
+ * with its public slides in the community, newest first.
+ */
+export type CommunityLink = NamedEvent &
   Readonly<{
-    id: number
-    /** Its address (`events.url`), which its page of links is found by. */
+    /** The event the link is kept as; null for a link of another kind. */
+    eventId: number | null
+    /** The address its page of links is found by: `events.url`, or the key. */
     url: string
     talks: readonly CommunityTalk[]
   }>

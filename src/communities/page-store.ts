@@ -13,7 +13,8 @@ import {
   relatedLinks,
 } from '../db/schema'
 import { deckSlugSchema } from '../decks/deck-id'
-import { firstPublicTitle } from '../links/link-page-store'
+import { linkTargetOf } from '../links/link-address'
+import { firstGatheredTitle, firstPublicTitle } from '../links/link-page-store'
 import { EVENT_SERVICES } from '../events/event-url'
 import { notBlockedBy } from '../blocks/store'
 import { notMutedBy } from '../mutes/store'
@@ -21,8 +22,8 @@ import { notHidden } from '../publication/takedown-store'
 import { handleSchema } from '../share/handle'
 import { COMMUNITY_COLORS } from '../site/cover-pattern'
 import { storedSites } from './community-input'
-import type { Community, CommunityEvent, CommunityTalk } from './community'
-import { deckInCommunity, inCommunity, listCommunityLinks } from './store'
+import type { Community, CommunityLink, CommunityTalk } from './community'
+import { linkInCommunity, listCommunityLinks } from './store'
 
 const communityRow = z.object({
   id: z.number().int().positive(),
@@ -104,7 +105,10 @@ const slideColumns = {
   deploymentId: z.string(),
   coverPath: z.string().nullable(),
 }
-/** A slide of the community: as a talk of one of its events, or of none. */
+/**
+ * A slide of the community under one of its links in it: an event, or a
+ * link of another kind with the key it is gathered by.
+ */
 const talkRow = z.union([
   z.object({
     eventId: z.number().int(),
@@ -116,19 +120,22 @@ const talkRow = z.union([
     firstTitle: z.string().nullable(),
     ...slideColumns,
   }),
-  z.object({ eventId: z.null(), ...slideColumns }),
+  z.object({
+    eventId: z.null(),
+    gatherKey: z.string().nullable(),
+    firstTitle: z.string().nullable(),
+    ...slideColumns,
+  }),
 ])
 type TalkRow = z.infer<typeof talkRow>
-type EventRow = Extract<TalkRow, { eventId: number }>
 
 /**
  * The community's public slides, in one query (the page's cost counts
- * them): those with a related link of any kind in it (F30-AC65), each once
- * per event of the community it is a talk of, and once with no event when
- * it is a talk of none. Newest first: the decks readers may open from a
- * list, as on the top page (a ready public version, not taken down, by an
- * author with a handle, and not by someone the viewer muted or blocked,
- * F30-AC38).
+ * them): each once per link of its own in the community, of any kind
+ * (F30-AC65, F30-AC68), with the event of a link kept as one and the key of
+ * any other. Newest first: the decks readers may open from a list, as on
+ * the top page (a ready public version, not taken down, by an author with a
+ * handle, and not by someone the viewer muted or blocked, F30-AC38).
  */
 async function listTalkRows(
   database: D1Database,
@@ -143,7 +150,9 @@ async function listTalkRows(
       host: events.host,
       url: events.url,
       name: events.name,
-      firstTitle: firstPublicTitle,
+      gatherKey: relatedLinks.gather_key,
+      firstTitle: sql<string | null>`CASE WHEN ${events.id} IS NULL
+        THEN ${firstGatheredTitle} ELSE ${firstPublicTitle} END`,
       deckId: decks.id,
       handle: accounts.handle,
       slug: decks.slug,
@@ -162,25 +171,18 @@ async function listTalkRows(
         eq(deployments.state, 'ready'),
       ),
     )
-    // The deck's links kept as events of the community; none leaves the
-    // columns of the event null.
-    .leftJoin(
-      relatedLinkEvents,
+    // The deck's links in the community: a slide is in it by any of them.
+    .innerJoin(
+      relatedLinks,
       and(
-        sql`${relatedLinkEvents.link_id} IN (SELECT own_link.id
-          FROM ${relatedLinks} AS own_link WHERE own_link.deck_id = ${decks.id})`,
-        inCommunity(communityId, relatedLinkEvents.event_id),
+        eq(relatedLinks.deck_id, decks.id),
+        linkInCommunity(communityId, relatedLinks.id),
       ),
     )
+    // The event of a link kept as one; none leaves its columns null.
+    .leftJoin(relatedLinkEvents, eq(relatedLinkEvents.link_id, relatedLinks.id))
     .leftJoin(events, eq(events.id, relatedLinkEvents.event_id))
-    .where(
-      and(
-        deckInCommunity(communityId),
-        notHidden,
-        notMutedBy(viewer),
-        notBlockedBy(viewer),
-      ),
-    )
+    .where(and(notHidden, notMutedBy(viewer), notBlockedBy(viewer)))
     .orderBy(sql`published_at DESC`, asc(decks.slug), asc(events.id))
     .all()
   return talkRow.array().parse(rows)
@@ -197,11 +199,35 @@ const talkOf = (row: TalkRow): CommunityTalk => ({
 })
 
 /**
- * The community's events with public talks, the event whose first public
- * talk is newest first (the same time, the newer event first), each with
- * its talks newest first (D-25, F30-AC68); and its slides once each, newest
- * first (F30-AC21). The events are still of the links kept as events; the
- * slides are of links of every kind (F30-AC65).
+ * What a row's link is listed as: its event, or, for another kind, the page
+ * its key leads to. Null for a key no page is found by (kept before keys
+ * were, or one the path of a page does not lead back to).
+ */
+function linkOf(row: TalkRow): Omit<CommunityLink, 'talks'> | null {
+  if (row.eventId !== null) {
+    const { service, ref, host, url, name, firstTitle } = row
+    return { eventId: row.eventId, service, ref, host, url, name, firstTitle }
+  }
+  const url = row.gatherKey
+  if (url === null || linkTargetOf(url).gatherKey !== url) return null
+  return {
+    eventId: null,
+    service: 'web',
+    ref: '',
+    host: new URL(url).host,
+    url,
+    name: null,
+    firstTitle: row.firstTitle,
+  }
+}
+
+/**
+ * The community's links with public slides, as their pages gather them (an
+ * event by its number, any other by its key), the link whose first public
+ * slide is newest first, each with its slides newest first (D-25,
+ * F30-AC68); and its slides once each, newest first (F30-AC21). At the same
+ * time the newer event comes first, then the other links by their address,
+ * so the order never depends on how the rows came.
  */
 export async function readCommunityTalks(
   database: D1Database,
@@ -209,36 +235,39 @@ export async function readCommunityTalks(
   viewer: string | null,
 ): Promise<
   Readonly<{
-    events: readonly CommunityEvent[]
+    links: readonly CommunityLink[]
     slides: readonly CommunityTalk[]
   }>
 > {
   const rows = await listTalkRows(database, communityId, viewer)
-  const byEvent = new Map<number, { event: EventRow; talks: CommunityTalk[] }>()
-  for (const row of rows) {
-    // A slide in by a link that is no event is a talk of no event.
-    if (row.eventId === null) continue
-    const entry = byEvent.get(row.eventId) ?? { event: row, talks: [] }
-    entry.talks.push(talkOf(row))
-    byEvent.set(row.eventId, entry)
+  type Entry = Omit<CommunityLink, 'talks'> & {
+    talks: Map<string, CommunityTalk>
   }
-  const firstAt = (talks: readonly CommunityTalk[]) =>
-    Math.min(...talks.map((talk) => talk.publishedAt))
-  const listed = [...byEvent.values()]
-    .map(({ event, talks }) => ({
-      id: event.eventId,
-      service: event.service,
-      ref: event.ref,
-      host: event.host,
-      url: event.url,
-      name: event.name,
-      firstTitle: event.firstTitle,
-      talks,
-    }))
-    .sort((a, b) => firstAt(b.talks) - firstAt(a.talks) || b.id - a.id)
-  // A slide of several events comes once a row; it is listed once.
+  const byPage = new Map<string, Entry>()
+  for (const row of rows) {
+    const link = linkOf(row)
+    if (!link) continue
+    const page = link.eventId === null ? link.url : `event ${link.eventId}`
+    const entry = byPage.get(page) ?? { ...link, talks: new Map() }
+    // Two links of one slide with one key (`t=30`, `t=60`) list it once.
+    entry.talks.set(row.deckId, talkOf(row))
+    byPage.set(page, entry)
+  }
+  const links = [...byPage.values()].map((entry) => ({
+    ...entry,
+    talks: [...entry.talks.values()],
+  }))
+  const firstAt = (link: CommunityLink) =>
+    Math.min(...link.talks.map((talk) => talk.publishedAt))
+  links.sort(
+    (a, b) =>
+      firstAt(b) - firstAt(a) ||
+      (b.eventId ?? 0) - (a.eventId ?? 0) ||
+      (a.url < b.url ? -1 : 1),
+  )
+  // A slide with several links comes once a row; it is listed once.
   const slides = [
     ...new Map(rows.map((row) => [row.deckId, talkOf(row)])).values(),
   ]
-  return { events: listed, slides }
+  return { links, slides }
 }

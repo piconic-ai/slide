@@ -84,6 +84,23 @@ export const firstPublicTitle = sql<string | null>`(
     AND ${notHiddenOf(titled)}
   ORDER BY le.created_at, le.rowid LIMIT 1)`
 
+/**
+ * For a row of `related_links` that is no event, in a list: the title of
+ * the oldest titled link with its key on a slide anyone may open, as
+ * `readGatheredPage` picks it for the page (F45-AC10).
+ */
+export const firstGatheredTitle = sql<string | null>`(
+  SELECT l.title FROM related_links AS l
+  JOIN decks AS titled_deck ON titled_deck.id = l.deck_id
+  JOIN accounts AS a ON a.user_id = titled_deck.owner_user_id
+  JOIN deployments AS p ON p.id = titled_deck.public_deployment_id
+    AND p.deck_id = titled_deck.id AND p.state = 'ready'
+  WHERE l.gather_key = "related_links"."gather_key" AND l.title IS NOT NULL
+    AND NOT EXISTS (SELECT 1 FROM related_link_events AS le
+      WHERE le.link_id = l.id)
+    AND ${notHiddenOf(titled)}
+  ORDER BY l.created_at, l.rowid LIMIT 1)`
+
 /** A public slide given as a talk of an event. */
 export type EventTalk = Readonly<{
   handle: Handle
