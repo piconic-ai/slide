@@ -22,7 +22,7 @@ import { handleSchema } from '../share/handle'
 import { COMMUNITY_COLORS } from '../site/cover-pattern'
 import { storedSites } from './community-input'
 import type { Community, CommunityEvent, CommunityTalk } from './community'
-import { inCommunity, listCommunityLinks } from './store'
+import { deckInCommunity, inCommunity, listCommunityLinks } from './store'
 
 const communityRow = z.object({
   id: z.number().int().positive(),
@@ -168,6 +168,60 @@ async function listTalkRows(
   return talkRow.array().parse(rows)
 }
 
+/**
+ * The community's public slides, each once, newest first (F30-AC21): those
+ * with a related link of any kind in it (F30-AC65), as readers may open them
+ * from a list, like the talks above.
+ */
+async function listSlides(
+  database: D1Database,
+  communityId: number,
+  viewer: string | null,
+): Promise<readonly CommunityTalk[]> {
+  const rows = await drizzle(database)
+    .select({
+      deckId: decks.id,
+      handle: accounts.handle,
+      slug: decks.slug,
+      title: deployments.title,
+      publishedAt: publishedAt.as('published_at'),
+      deploymentId: deployments.id,
+      coverPath: deployments.cover_path,
+    })
+    .from(decks)
+    .innerJoin(accounts, eq(accounts.user_id, decks.owner_user_id))
+    .innerJoin(
+      deployments,
+      and(
+        eq(deployments.id, decks.public_deployment_id),
+        eq(deployments.deck_id, decks.id),
+        eq(deployments.state, 'ready'),
+      ),
+    )
+    .where(
+      and(
+        deckInCommunity(communityId),
+        notHidden,
+        notMutedBy(viewer),
+        notBlockedBy(viewer),
+      ),
+    )
+    .orderBy(sql`published_at DESC`, asc(decks.slug))
+    .all()
+  return talkRow
+    .pick({
+      deckId: true,
+      handle: true,
+      slug: true,
+      title: true,
+      publishedAt: true,
+      deploymentId: true,
+      coverPath: true,
+    })
+    .array()
+    .parse(rows)
+}
+
 const talkOf = (row: TalkRow): CommunityTalk => ({
   deckId: row.deckId,
   handle: row.handle,
@@ -181,8 +235,9 @@ const talkOf = (row: TalkRow): CommunityTalk => ({
 /**
  * The community's events with public talks, the event whose first public
  * talk is newest first (the same time, the newer event first), each with
- * its talks newest first (D-25, F30-AC68); and its talks once each, newest
- * first (F30-AC21).
+ * its talks newest first (D-25, F30-AC68); and its slides once each, newest
+ * first (F30-AC21). The events are still of the links kept as events; the
+ * slides are of links of every kind (F30-AC65).
  */
 export async function readCommunityTalks(
   database: D1Database,
@@ -194,7 +249,10 @@ export async function readCommunityTalks(
     slides: readonly CommunityTalk[]
   }>
 > {
-  const rows = await listTalkRows(database, communityId, viewer)
+  const [rows, slides] = await Promise.all([
+    listTalkRows(database, communityId, viewer),
+    listSlides(database, communityId, viewer),
+  ])
   const byEvent = new Map<number, { event: TalkRow; talks: CommunityTalk[] }>()
   for (const row of rows) {
     const entry = byEvent.get(row.eventId) ?? { event: row, talks: [] }
@@ -215,8 +273,5 @@ export async function readCommunityTalks(
       talks,
     }))
     .sort((a, b) => firstAt(b.talks) - firstAt(a.talks) || b.id - a.id)
-  const slides = [
-    ...new Map(rows.map((row) => [row.deckId, talkOf(row)])).values(),
-  ]
   return { events: listed, slides }
 }

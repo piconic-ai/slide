@@ -10,13 +10,11 @@ import {
   decks,
   deployments,
   handles,
-  relatedLinkEvents,
-  relatedLinks,
 } from '../db/schema'
 import { notBlockedBy } from '../blocks/store'
 import type { CommunityTalk } from '../communities/community'
 import { countPeopleQuery } from '../follows/store'
-import { inCommunity } from '../communities/store'
+import { deckInCommunity } from '../communities/store'
 import { deckSlugSchema } from '../decks/deck-id'
 import { notMutedBy } from '../mutes/store'
 import { notHidden } from '../publication/takedown-store'
@@ -224,10 +222,7 @@ export async function listRecentCommunityTalks(
           ${publishedAt} AS publishedAt, ${deployments.id} AS deploymentId,
           ${deployments.cover_path} AS coverPath
         FROM ${communities}
-        JOIN ${relatedLinkEvents}
-          ON ${inCommunity(communities.id, relatedLinkEvents.event_id)}
-        JOIN ${relatedLinks} ON ${relatedLinks.id} = ${relatedLinkEvents.link_id}
-        JOIN ${decks} ON ${decks.id} = ${relatedLinks.deck_id}
+        JOIN ${decks} ON ${deckInCommunity(communities.id)}
         JOIN ${accounts} ON ${accounts.user_id} = ${decks.owner_user_id}
         JOIN ${deployments} ON ${deployments.id} = ${decks.public_deployment_id}
           AND ${deployments.deck_id} = ${decks.id}

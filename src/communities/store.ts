@@ -276,7 +276,7 @@ export const onPublicDeck = (linkId: AnyColumn | SQL): SQL =>
  */
 export const inCommunity = (
   communityId: number | AnyColumn,
-  eventId: AnyColumn = events.id,
+  eventId: AnyColumn | SQL = events.id,
 ): SQL =>
   sql`${eventId} IN (
     SELECT matched.event_id FROM ${relatedLinkEvents} AS matched
@@ -288,6 +288,51 @@ export const inCommunity = (
       JOIN ${communityFeedEvents} ON ${communityFeedEvents.event_key} = fed.key
       JOIN ${communityLinks} ON ${communityLinks.id} = ${communityFeedEvents.link_id}
       WHERE ${communityLinks.community_id} = ${communityId})`
+
+/**
+ * The related links in a community, as the rows of a subquery that gives
+ * `column` of each (F30-AC65). A link kept as an event is in when its event
+ * is (`inCommunity`): by any public link to it, or by a calendar's feed. Any
+ * other link is in when the host its address was written with
+ * (`related_links.link_host`) is the host of one of the community's links:
+ * `www.` is another host, and a link kept without its host (added by the
+ * Worker before the column) is in none. Read when asked, so a community's
+ * link added or taken away counts at once (F30-AC66).
+ */
+const linksIn = (
+  communityId: number | AnyColumn,
+  column: 'id' | 'deck_id',
+): SQL =>
+  sql`SELECT ${sql.raw(`in_link.${column}`)} FROM ${relatedLinkEvents} AS in_tie
+      JOIN ${relatedLinks} AS in_link ON in_link.id = in_tie.link_id
+      WHERE ${inCommunity(communityId, sql.raw('in_tie.event_id'))}
+    UNION
+    SELECT ${sql.raw(`in_link.${column}`)} FROM ${communityLinks}
+      JOIN ${relatedLinks} AS in_link ON in_link.link_host = ${communityLinks.host}
+      WHERE ${communityLinks.community_id} = ${communityId}
+        AND NOT EXISTS (SELECT 1 FROM ${relatedLinkEvents} AS in_tie
+          WHERE in_tie.link_id = in_link.id)`
+
+/**
+ * That a related link, of any kind, is in the community: what a notice of
+ * one link just added asks (F20-AC21).
+ */
+export const linkInCommunity = (
+  communityId: number | AnyColumn,
+  linkId: AnyColumn | SQL,
+): SQL => sql`${linkId} IN (${linksIn(communityId, 'id')})`
+
+/**
+ * The slides in a community, as a condition on `decks.id` (F30-AC65): those
+ * with a related link in it, of any kind. The one definition every list of a
+ * community's slides reads: its tab of slides, the follow feeds, the profile
+ * and the notices. Whether readers may open the slide is left to the list.
+ * The viewer's "other talks" is of events only and keeps `inCommunity`.
+ */
+export const deckInCommunity = (
+  communityId: number | AnyColumn,
+  deckId: AnyColumn = decks.id,
+): SQL => sql`${deckId} IN (${linksIn(communityId, 'deck_id')})`
 
 /** The numbers of a community's events, whether or not any talk is public. */
 export async function listCommunityEventIds(

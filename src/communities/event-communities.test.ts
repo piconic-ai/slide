@@ -3,7 +3,7 @@ import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
-import { blocks, communities, events } from '../db/schema'
+import { blocks, communities, events, relatedLinks } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   OWNER_ID,
@@ -14,6 +14,9 @@ import {
   testEnv,
 } from '../publication/test-support'
 import { listEventCommunities } from './event-communities-store'
+import { checkCommunityLinks } from './link-rules'
+import { readCommunityTalks } from './page-store'
+import { listCommunityEventIds, replaceCommunityLinks } from './store'
 import {
   resetCommunities,
   seedCommunity,
@@ -206,4 +209,91 @@ test('Given the group’s address only on a private deck and a public talk witho
   expect(body).toContain('Open talk')
   expect(body).not.toContain('href="/@hono"')
   expect((await listEventCommunities(db, [id])).size).toBe(0)
+})
+
+/** The slugs on the community's tab of slides, as anyone sees it. */
+const slidesOf = async (communityId: number) =>
+  (await readCommunityTalks(db, communityId, null)).slides
+    .map((talk) => talk.slug)
+    .sort()
+/** Public slides, each with one related link of the kind given. */
+async function seedLinked(
+  links: Readonly<Record<string, readonly [url: string, kind: string]>>,
+) {
+  for (const [deckId, [url, kind]] of Object.entries(links)) {
+    await seedPublic(db, deckId, 200, deckId)
+    await seedTalkLink(db, { deckId, url, kind: kind as 'article' })
+  }
+}
+
+test('F30-AC65: Given links of every kind written before the community was made, When a community holds their host, Then the slides whose link was written with that very host are in it: not `www.`, not a subdomain, not a link kept without its host', async () => {
+  await seedLinked({
+    article: ['https://example.com/post', 'article'],
+    video: ['https://example.com/watch?v=1', 'video'],
+    upper: ['https://EXAMPLE.com:8443/Upper', 'other'],
+    dotted: ['https://example.com./dotted', 'other'],
+    www: ['https://www.example.com/post', 'article'],
+    sub: ['https://blog.example.com/post', 'article'],
+    longer: ['https://example.com.evil.test/post', 'other'],
+    hostless: ['https://example.com/hostless', 'other'],
+    meetup: ['https://example.com/meetup', 'event'],
+  })
+  // As a row the Worker before the column added.
+  await orm
+    .update(relatedLinks)
+    .set({ link_host: null })
+    .where(eq(relatedLinks.deck_id, 'hostless'))
+  await seedDeck(db, 'draft')
+  await seedTalkLink(db, { deckId: 'draft', url: 'https://example.com/draft' })
+  await seedCommunity(db, {
+    id: 5,
+    handle: 'example',
+    links: ['https://example.com/'],
+  })
+  expect(await slidesOf(5)).toEqual([
+    'article',
+    'dotted',
+    'meetup',
+    'upper',
+    'video',
+  ])
+  // The tab of links still lists the links kept as events only.
+  expect(await listCommunityEventIds(db, 5)).toHaveLength(1)
+})
+
+test('F30-AC66: Given slides in a community by a link that is no event, When the community lets go of that link, Then they leave it, and come back with the link', async () => {
+  await seedLinked({ article: ['https://example.com/post', 'article'] })
+  await seedCommunity(db, {
+    id: 5,
+    handle: 'example',
+    links: ['https://example.com/'],
+  })
+  const replace = async (urls: readonly string[]) => {
+    const links = checkCommunityLinks(urls)
+    if (!links.ok) throw new Error('bad links')
+    await replaceCommunityLinks(db, {
+      communityId: 5,
+      links: links.links,
+      now: 2000,
+    })
+  }
+  expect(await slidesOf(5)).toEqual(['article'])
+  await replace(['https://other.example/'])
+  expect(await slidesOf(5)).toEqual([])
+  await replace(['https://other.example/', 'https://example.com/'])
+  expect(await slidesOf(5)).toEqual(['article'])
+})
+
+test('F30-AC16: Given a connpass address without a group, kept as an event or as another kind, When a community holds a group, Then neither slide is in it, and no community may hold connpass.com', async () => {
+  await seedLinked({
+    asEvent: ['https://connpass.com/event/5/', 'event'],
+    asOther: ['https://connpass.com/event/6/', 'other'],
+  })
+  await seedCommunity(db, {
+    id: 9,
+    handle: 'hono',
+    links: ['https://hono.connpass.com/'],
+  })
+  expect(await slidesOf(9)).toEqual([])
+  expect(checkCommunityLinks(['https://connpass.com/']).ok).toBe(false)
 })

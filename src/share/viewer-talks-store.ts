@@ -118,6 +118,8 @@ export async function readViewerTalks(
       : listTalks(database, {
           deckId,
           viewer,
+          // Of events only (F24-AC41): the events of the community, not the
+          // slides its other links bring in (`deckInCommunity`).
           where: and(
             inCommunity(event.community.id, relatedLinkEvents.event_id),
             sql`NOT ${talkOf(event.id)}`,

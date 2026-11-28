@@ -8,8 +8,6 @@ import {
   decks,
   deployments,
   handles,
-  relatedLinkEvents,
-  relatedLinks,
 } from '../db/schema'
 import { deckSlugSchema } from '../decks/deck-id'
 import { notBlockedBy } from '../blocks/store'
@@ -19,7 +17,7 @@ import { authorAvatarUrl, authorFaceColumns } from '../profile/face'
 import { notHidden } from '../publication/takedown-store'
 import { handleSchema } from '../share/handle'
 import { COMMUNITY_COLORS, type CommunityColor } from '../site/cover-pattern'
-import { inCommunity } from './store'
+import { deckInCommunity } from './store'
 import type { DeckAfter } from '../site/home-more'
 
 const feedRow = z.object({
@@ -90,10 +88,7 @@ const followedTalkRows = (viewer: string) => {
       JOIN ${communities} ON ${communities.id} = ${communityFollows.community_id}
       JOIN ${handles} ON ${handles.owner_kind} = 'community'
         AND ${handles.owner_id} = CAST(${communities.id} AS TEXT)
-      JOIN ${relatedLinkEvents}
-        ON ${inCommunity(communityFollows.community_id, relatedLinkEvents.event_id)}
-      JOIN ${relatedLinks} ON ${relatedLinks.id} = ${relatedLinkEvents.link_id}
-      JOIN ${decks} ON ${decks.id} = ${relatedLinks.deck_id}
+      JOIN ${decks} ON ${deckInCommunity(communityFollows.community_id)}
       JOIN ${accounts} ON ${accounts.user_id} = ${decks.owner_user_id}
       ${authorFaceJoins}
       JOIN ${deployments} ON ${deployments.id} = ${decks.public_deployment_id}
