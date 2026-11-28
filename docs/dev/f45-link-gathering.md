@@ -254,11 +254,13 @@ SQL は `src/links/url-rules.ts` の規則を写したものである。`gathere
 
 | 場所 | ファイル |
 | --- | --- |
-| コミュニティの「スライド」のタブとその数 | `src/communities/page-store.ts` の `listSlides` |
+| コミュニティの「スライド」のタブとその数 | `src/communities/page-store.ts` の `listTalkRows` |
 | トップの「フォローコミュニティ」の新着(F31-AC3) | `src/communities/feed-store.ts` |
 | トップの「フォロー中」の一覧(F44-AC5) | `src/site/home-timeline-store.ts` |
 | プロフィールのコミュニティのタブの最近のスライド(F31-AC8) | `src/profile/communities-store.ts` |
 | お知らせ | `src/notifications/store.ts` |
+
+コミュニティのページは、D1 の問い合わせの数を増やさないように(`src/cost/per-use.test.ts`、[規模と費用](scale-cost.md))、「リンク」のタブと「スライド」のタブを 1 つの問い合わせ(`listTalkRows`)で読む。`deckInCommunity` でスライドを選び、そのスライドのリンクのうち、コミュニティのイベントのもの(`inCommunity`)を `related_link_events`、`events` への LEFT JOIN で添える。イベントのリンクを持たないスライドは、イベントの列が NULL の 1 行になる。イベントの列のある行からイベントの一覧を、すべての行から重ならないスライドの一覧を作る。
 
 `inCommunity`(イベントの条件)を使い続ける場所は 2 つある。viewer の「(コミュニティ名) のほかのイベントの発表」(`src/share/viewer-talks-store.ts`)は、イベントの形のリンクだけを対象にしたままである(F24-AC41)。コミュニティの「リンク」のタブ(`readCommunityTalks` の `events`)は、link9 でイベントでないリンクを足すまで、イベントだけを並べる。
 

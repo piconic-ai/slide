@@ -95,14 +95,7 @@ export async function isCommunityAdmin(
 // added has the time its public version became ready.
 const publishedAt = sql<number>`coalesce(${decks.first_published_at}, ${deployments.ready_at})`
 
-const talkRow = z.object({
-  eventId: z.number().int(),
-  service: z.enum(EVENT_SERVICES),
-  ref: z.string(),
-  host: z.string(),
-  url: z.string(),
-  name: z.string().nullable(),
-  firstTitle: z.string().nullable(),
+const slideColumns = {
   deckId: z.string(),
   handle: handleSchema,
   slug: deckSlugSchema,
@@ -110,14 +103,32 @@ const talkRow = z.object({
   publishedAt: z.number().int(),
   deploymentId: z.string(),
   coverPath: z.string().nullable(),
-})
+}
+/** A slide of the community: as a talk of one of its events, or of none. */
+const talkRow = z.union([
+  z.object({
+    eventId: z.number().int(),
+    service: z.enum(EVENT_SERVICES),
+    ref: z.string(),
+    host: z.string(),
+    url: z.string(),
+    name: z.string().nullable(),
+    firstTitle: z.string().nullable(),
+    ...slideColumns,
+  }),
+  z.object({ eventId: z.null(), ...slideColumns }),
+])
 type TalkRow = z.infer<typeof talkRow>
+type EventRow = Extract<TalkRow, { eventId: number }>
 
 /**
- * Every public talk of the community's events, once per event and deck,
- * newest first: the decks readers may open from a list, as on the top page
- * (a ready public version, not taken down, by an author with a handle, and
- * not by someone the viewer muted or blocked, F30-AC38).
+ * The community's public slides, in one query (the page's cost counts
+ * them): those with a related link of any kind in it (F30-AC65), each once
+ * per event of the community it is a talk of, and once with no event when
+ * it is a talk of none. Newest first: the decks readers may open from a
+ * list, as on the top page (a ready public version, not taken down, by an
+ * author with a handle, and not by someone the viewer muted or blocked,
+ * F30-AC38).
  */
 async function listTalkRows(
   database: D1Database,
@@ -141,53 +152,6 @@ async function listTalkRows(
       deploymentId: deployments.id,
       coverPath: deployments.cover_path,
     })
-    .from(relatedLinkEvents)
-    .innerJoin(events, eq(events.id, relatedLinkEvents.event_id))
-    .innerJoin(relatedLinks, eq(relatedLinks.id, relatedLinkEvents.link_id))
-    .innerJoin(
-      decks,
-      and(
-        eq(decks.id, relatedLinks.deck_id),
-        notHidden,
-        notMutedBy(viewer),
-        notBlockedBy(viewer),
-      ),
-    )
-    .innerJoin(accounts, eq(accounts.user_id, decks.owner_user_id))
-    .innerJoin(
-      deployments,
-      and(
-        eq(deployments.id, decks.public_deployment_id),
-        eq(deployments.deck_id, decks.id),
-        eq(deployments.state, 'ready'),
-      ),
-    )
-    .where(inCommunity(communityId, relatedLinkEvents.event_id))
-    .orderBy(sql`published_at DESC`, asc(decks.slug), asc(events.id))
-    .all()
-  return talkRow.array().parse(rows)
-}
-
-/**
- * The community's public slides, each once, newest first (F30-AC21): those
- * with a related link of any kind in it (F30-AC65), as readers may open them
- * from a list, like the talks above.
- */
-async function listSlides(
-  database: D1Database,
-  communityId: number,
-  viewer: string | null,
-): Promise<readonly CommunityTalk[]> {
-  const rows = await drizzle(database)
-    .select({
-      deckId: decks.id,
-      handle: accounts.handle,
-      slug: decks.slug,
-      title: deployments.title,
-      publishedAt: publishedAt.as('published_at'),
-      deploymentId: deployments.id,
-      coverPath: deployments.cover_path,
-    })
     .from(decks)
     .innerJoin(accounts, eq(accounts.user_id, decks.owner_user_id))
     .innerJoin(
@@ -198,6 +162,17 @@ async function listSlides(
         eq(deployments.state, 'ready'),
       ),
     )
+    // The deck's links kept as events of the community; none leaves the
+    // columns of the event null.
+    .leftJoin(
+      relatedLinkEvents,
+      and(
+        sql`${relatedLinkEvents.link_id} IN (SELECT own_link.id
+          FROM ${relatedLinks} AS own_link WHERE own_link.deck_id = ${decks.id})`,
+        inCommunity(communityId, relatedLinkEvents.event_id),
+      ),
+    )
+    .leftJoin(events, eq(events.id, relatedLinkEvents.event_id))
     .where(
       and(
         deckInCommunity(communityId),
@@ -206,20 +181,9 @@ async function listSlides(
         notBlockedBy(viewer),
       ),
     )
-    .orderBy(sql`published_at DESC`, asc(decks.slug))
+    .orderBy(sql`published_at DESC`, asc(decks.slug), asc(events.id))
     .all()
-  return talkRow
-    .pick({
-      deckId: true,
-      handle: true,
-      slug: true,
-      title: true,
-      publishedAt: true,
-      deploymentId: true,
-      coverPath: true,
-    })
-    .array()
-    .parse(rows)
+  return talkRow.array().parse(rows)
 }
 
 const talkOf = (row: TalkRow): CommunityTalk => ({
@@ -249,12 +213,11 @@ export async function readCommunityTalks(
     slides: readonly CommunityTalk[]
   }>
 > {
-  const [rows, slides] = await Promise.all([
-    listTalkRows(database, communityId, viewer),
-    listSlides(database, communityId, viewer),
-  ])
-  const byEvent = new Map<number, { event: TalkRow; talks: CommunityTalk[] }>()
+  const rows = await listTalkRows(database, communityId, viewer)
+  const byEvent = new Map<number, { event: EventRow; talks: CommunityTalk[] }>()
   for (const row of rows) {
+    // A slide in by a link that is no event is a talk of no event.
+    if (row.eventId === null) continue
     const entry = byEvent.get(row.eventId) ?? { event: row, talks: [] }
     entry.talks.push(talkOf(row))
     byEvent.set(row.eventId, entry)
@@ -273,5 +236,9 @@ export async function readCommunityTalks(
       talks,
     }))
     .sort((a, b) => firstAt(b.talks) - firstAt(a.talks) || b.id - a.id)
+  // A slide of several events comes once a row; it is listed once.
+  const slides = [
+    ...new Map(rows.map((row) => [row.deckId, talkOf(row)])).values(),
+  ]
   return { events: listed, slides }
 }

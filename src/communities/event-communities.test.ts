@@ -297,3 +297,27 @@ test('F30-AC16: Given a connpass address without a group, kept as an event or as
   expect(await slidesOf(9)).toEqual([])
   expect(checkCommunityLinks(['https://connpass.com/']).ok).toBe(false)
 })
+
+test('F30-AC21: F30-AC68: Given one slide with links to two events of a community and a link that is no event, When the community is read, Then the slide is under both events and once among the slides, with a slide of no event', async () => {
+  await seedCommunity(db, {
+    id: 77,
+    handle: 'kanagawapm',
+    links: ['https://kanagawapm.connpass.com/', 'https://example.com/'],
+  })
+  await seedTalkLink(db, {
+    deckId: 'talk',
+    url: 'https://kanagawapm.connpass.com/event/2/',
+  })
+  await seedLinked({ article: ['https://example.com/post', 'article'] })
+  await seedTalkLink(db, {
+    deckId: 'talk',
+    url: 'https://example.com/more',
+    kind: 'other',
+  })
+  const read = await readCommunityTalks(db, 77, null)
+  expect(read.events.map((event) => event.talks.map((t) => t.slug))).toEqual([
+    ['talk'],
+    ['talk'],
+  ])
+  expect(read.slides.map((talk) => talk.slug)).toEqual(['article', 'talk'])
+})
