@@ -372,9 +372,21 @@ export async function readLinkPage(
 
 /**
  * A related link of a deck whose page of links shows, and the event it is
- * of; null for a link that is no event.
+ * of; null for a link that is no event. Such a link names the community it
+ * is in by the host it was written with (F29-AC29), the one whose link was
+ * added first; an event's community comes with the event.
  */
-export type ShownLink = Readonly<{ linkId: string; eventId: number | null }>
+export type ShownLink = Readonly<{
+  linkId: string
+  eventId: number | null
+  community: string | null
+}>
+
+/** For a row of `related_links`: the name of the community holding its host. */
+const hostCommunityName = sql<string | null>`(
+  SELECT c.name FROM community_links AS cl
+  JOIN communities AS c ON c.id = cl.community_id
+  WHERE cl.host = ${relatedLinks.link_host} ORDER BY cl.id LIMIT 1)`
 
 /**
  * The related links of a deck whose page of links shows, whoever is looking
@@ -393,6 +405,7 @@ export async function listShownLinks(
       linkId: relatedLinks.id,
       eventId: relatedLinkEvents.event_id,
       key: relatedLinks.gather_key,
+      community: hostCommunityName,
     })
     .from(relatedLinks)
     .leftJoin(relatedLinkEvents, eq(relatedLinkEvents.link_id, relatedLinks.id))
@@ -453,5 +466,9 @@ export async function listShownLinks(
     .filter((link) =>
       link.eventId === null ? keys.has(link.key) : events.has(link.eventId),
     )
-    .map(({ linkId, eventId }) => ({ linkId, eventId }))
+    .map(({ linkId, eventId, community }) => ({
+      linkId,
+      eventId,
+      community: eventId === null ? community : null,
+    }))
 }

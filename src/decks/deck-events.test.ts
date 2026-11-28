@@ -223,6 +223,38 @@ test('F29-AC30: Given links to two events with a page, one of them twice and one
   expect(await page()).not.toContain('発表したイベント')
 })
 
+test('F29-AC29: F29-AC30: Given links that are no event, one written with a host a community holds, When the slide page opens, Then its row and the frame name the community, and a link no community holds says nothing', async () => {
+  await seedCommunity(db, {
+    id: 6,
+    handle: 'example',
+    name: 'Example',
+    links: ['https://example.com/'],
+  })
+  await seedDeck(db, 'draft')
+  await post('/my/slides/talk/links', {
+    url: 'https://example.com/post',
+    title: 'Post',
+  })
+  await post('/my/slides/talk/links', { url: 'https://www.example.com/www' })
+  // A draft is on the page a public slide shows, and on none alone.
+  await post('/my/slides/draft/links', { url: 'https://example.com/post' })
+  await post('/my/slides/draft/links', { url: 'https://example.com/draft' })
+  const places = async (slug: string, lang = 'ja') =>
+    [
+      ...frame(await page(lang, slug), 'links').matchAll(
+        /<span class="link-row-place"\s*>([^<]*)<\/span/g,
+      ),
+    ].map(([, place]) => place)
+  expect(await places('talk')).toEqual(['Example のページに並びます。'])
+  expect(await places('talk', 'en')).toEqual(['Listed on the page of Example.'])
+  expect(await places('draft')).toEqual(['Example のページに並びます。'])
+  const pages = frame(await page(), 'placed-pages')
+  expect(pages).toMatch(
+    /<a class="link-row-title" href="\/link\/example\.com\/post" ?>Post<\/a ?> ?<span class="link-row-site" ?>Example</,
+  )
+  expect(pages.match(/<li class="link-row">/g)).toHaveLength(1)
+})
+
 test('F29-AC30: Given no related link with a page, When the slide page opens, Then the frame says in one sentence that the related links decide the pages', async () => {
   await post('/my/slides/talk/links', { url: 'https://youtube.com/watch?v=1' })
   const pages = frame(await page(), 'placed-pages')

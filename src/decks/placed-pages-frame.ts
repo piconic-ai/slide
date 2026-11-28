@@ -31,7 +31,7 @@ export type PlacedPage = Readonly<{
  * The page of a link that is no event, headed by the link's own title: the
  * page itself is headed by the first title saved, which may be another's.
  */
-const pageOfLink = (link: StoredLink): PlacedPage => {
+const pageOfLink = (link: StoredLink, community: string | null): PlacedPage => {
   const href = linkPagePath(link.href)
   const url = new URL(`https://${href.slice('/link/'.length)}`)
   return {
@@ -43,7 +43,7 @@ const pageOfLink = (link: StoredLink): PlacedPage => {
       name: null,
       firstTitle: link.title,
     }),
-    community: null,
+    community,
   }
 }
 
@@ -62,14 +62,16 @@ export const placedPagesOf = (
   events: readonly DeckEvent[],
   shown: readonly ShownLink[],
 ): readonly PlacedPage[] => {
-  const ids = new Set(shown.map((link) => link.linkId))
+  const ids = new Map(shown.map((link) => [link.linkId, link.community]))
   const pages = new Map<string, PlacedPage>()
   for (const link of links.filter((each) => ids.has(each.id))) {
     const event =
       link.kind === 'event'
         ? events.find((each) => each.id === link.eventId)
         : null
-    const page = event ? pageOfEvent(event) : pageOfLink(link)
+    const page = event
+      ? pageOfEvent(event)
+      : pageOfLink(link, ids.get(link.id) ?? null)
     if (event !== undefined && !pages.has(page.href)) pages.set(page.href, page)
   }
   return [...pages.values()]

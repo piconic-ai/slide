@@ -80,7 +80,8 @@ export type LinkPlace = Readonly<{ community: string | null }>
 
 /**
  * The place of each related link, by its id; a link listed nowhere has none.
- * A link goes into the community of its event; a link in no community, an
+ * An event goes into the community of its event, any other link into the
+ * one holding its host while its page shows; a link in no community, an
  * event or not, has a place while its page of links shows.
  */
 export const linkPlacesOf = (
@@ -89,13 +90,13 @@ export const linkPlacesOf = (
   shown: readonly ShownLink[],
 ): ReadonlyMap<string, LinkPlace> => {
   const places = new Map<string, LinkPlace>()
-  const pages = new Set(shown.map((link) => link.linkId))
+  const pages = new Map(shown.map((link) => [link.linkId, link.community]))
   for (const link of links) {
     const community =
       link.kind === 'event'
-        ? (events.find((event) => event.id === link.eventId)?.community ?? null)
-        : null
-    if (community) places.set(link.id, { community: community.name })
+        ? events.find((event) => event.id === link.eventId)?.community?.name
+        : pages.get(link.id)
+    if (community) places.set(link.id, { community })
     else if (pages.has(link.id)) places.set(link.id, { community: null })
   }
   return places
