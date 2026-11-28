@@ -99,6 +99,7 @@ const talkRow = z.object({
   service: z.enum(EVENT_SERVICES),
   ref: z.string(),
   host: z.string(),
+  url: z.string(),
   name: z.string().nullable(),
   deckId: z.string(),
   handle: handleSchema,
@@ -127,6 +128,7 @@ async function listTalkRows(
       service: events.service,
       ref: events.ref,
       host: events.host,
+      url: events.url,
       name: events.name,
       deckId: decks.id,
       handle: accounts.handle,
@@ -204,6 +206,7 @@ export async function readCommunityTalks(
       service: event.service,
       ref: event.ref,
       host: event.host,
+      url: event.url,
       name: event.name,
       talks,
     }))

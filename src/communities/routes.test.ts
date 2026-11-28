@@ -360,7 +360,11 @@ describe("a community's page", () => {
     const one = body.slice(body.indexOf('Kanagawa.pm #1'))
     expect(one.match(/class="deck-card"/g)).toHaveLength(6)
     expect(one).toMatch(
-      /<li class="carousel-more"> ?<a href="\/events\/\d+" ?>ほか 2 本<\/a ?> ?<\/li>/,
+      /<li class="carousel-more"> ?<a href="\/link\/connpass\.com\/event\/1" ?>ほか 2 本<\/a ?> ?<\/li>/,
+    )
+    // The heading leads to the same page of links (F45).
+    expect(body).toMatch(
+      /<h2> ?<a href="\/link\/connpass\.com\/event\/1" ?>Kanagawa\.pm #1<\/a>/,
     )
     expect(one.indexOf('One 7')).toBeLessThan(one.indexOf('One 2'))
     expect(one).not.toContain('One 1<')

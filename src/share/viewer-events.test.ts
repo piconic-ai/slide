@@ -40,7 +40,7 @@ const viewer = async () =>
     .replace(/ >/g, '>')
     .replace(/ </g, '<')
 
-test('F24-AC39: Given a slide whose related link is an event of a community, When its viewer opens, Then under the title stand the logo, the event, “で発表” and the community', async () => {
+test('F24-AC51: Given a slide whose related link is an event of a community, When its viewer opens, Then under the title stand the logo, the event, “で発表” and the community', async () => {
   await seedCommunity(db, {
     id: 77,
     handle: 'kanagawapm',
@@ -60,12 +60,12 @@ test('F24-AC39: Given a slide whose related link is an event of a community, Whe
   const line = page.slice(row, page.indexOf('</ul>', row))
   expect(line).toContain('community-logo-28')
   expect(line).toMatch(
-    /<a class="viewer-event-name" href="\/events\/\d+">Kanagawa\.pm #3<\/a><span>で発表<\/span>/,
+    /<a class="viewer-event-name" href="\/link\/connpass\.com\/event\/\d+">Kanagawa\.pm #3<\/a><span>で発表<\/span>/,
   )
   expect(line).toContain('<a href="/@kanagawapm">Kanagawa.pm</a>')
 })
 
-test('F24-AC39: Given a slide whose event is in no community, When its viewer opens, Then its line has no logo and no community', async () => {
+test('F24-AC51: Given a slide whose event is in no community, When its viewer opens, Then its line has no logo and no community', async () => {
   await seedTalkLink(db, {
     deckId: 'talk',
     url: 'https://connpass.com/event/410635/',
@@ -97,6 +97,6 @@ test('F24-AC40: Given a slide in two events, When its viewer opens, Then their l
   )
 })
 
-test('F24-AC39: Given a slide with no event, When its viewer opens, Then no event line shows', async () => {
+test('F24-AC51: Given a slide with no event, When its viewer opens, Then no event line shows', async () => {
   expect(await viewer()).not.toContain('<ul class="viewer-events"')
 })

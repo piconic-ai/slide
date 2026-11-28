@@ -86,8 +86,13 @@ test('F30-AC47: Given the list of every community, When /communities is opened s
   expect(await flat(response)).toContain('href="/@kanagawapm"')
 })
 
-test('F29-AC5: Given an event with a public talk, When /events/:id is opened, Then the event page answers with the talk', async () => {
-  const response = await open(`/events/${eventId}`)
+const EVENT_PAGE = '/link/connpass.com/event/410635'
+
+test('F45-AC3: F45-AC9: Given an event with a public talk, When /events/:id is opened, Then it moves to the page of links, which answers with the talk', async () => {
+  const moved = await open(`/events/${eventId}`)
+  expect(moved.status).toBe(301)
+  expect(moved.headers.get('location')).toBe(EVENT_PAGE)
+  const response = await open(EVENT_PAGE)
   expect(response.status).toBe(200)
   const body = await flat(response)
   expect(body).toContain('Kanagawa.pm meetup')
@@ -134,7 +139,7 @@ test('F33-AC18: Given the page the feed bot points to, When /help/bot is opened,
 const screens = () => [
   '/communities/new',
   '/communities',
-  `/events/${eventId}`,
+  EVENT_PAGE,
   `/blocks/new?${new URLSearchParams({ handle: 'bob', slide: '/@bob/bob-talk' })}`,
   '/@kanagawapm',
   '/@kanagawapm/slides',
@@ -149,10 +154,20 @@ const screens = () => [
 
 const withLang = (path: string, lang: string) =>
   `${path}${path.includes('?') ? '&' : '?'}lang=${lang}`
+/** A screen in a language. A page of links reads no `?lang=` (F45-AC33). */
+const openIn = (path: string, lang: string) =>
+  path.startsWith('/link/')
+    ? server.fetch(
+        new Request(`${TEST_ORIGIN}${path}`, {
+          headers: { Cookie: alice, 'Accept-Language': lang },
+        }),
+        env,
+      )
+    : open(withLang(path, lang))
 
 test('D-12: Given each screen the third scope added or changed, When it opens in English, Then no Japanese is left but the switcher label', async () => {
   for (const path of screens()) {
-    const response = await open(withLang(path, 'en'))
+    const response = await openIn(path, 'en')
     expect(response.status, path).toBe(200)
     expect(japaneseOutside(await response.text()), path).toEqual([])
   }
@@ -160,7 +175,7 @@ test('D-12: Given each screen the third scope added or changed, When it opens in
 
 test('D-12: Given each screen the third scope added or changed, When it opens in Japanese, Then it says it is Japanese and carries Japanese text', async () => {
   for (const path of screens()) {
-    const response = await open(withLang(path, 'ja'))
+    const response = await openIn(path, 'ja')
     expect(response.status, path).toBe(200)
     const html = await response.text()
     expect(html, path).toContain('<html lang="ja">')

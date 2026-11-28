@@ -2,8 +2,10 @@ import { afterAll, beforeAll, beforeEach, expect, test, vi } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
 import { applyMigrations } from '../db/test-migrations'
-import { listLinks } from '../links/store'
+import { eventRefOf } from '../events/event-url'
+import { listLinks, setLinkKind } from '../links/store'
 import {
+  OWNER_ID,
   resetTables,
   seedPublic,
   signIn,
@@ -165,11 +167,12 @@ test('F29-AC18: Given links to two events, one of them twice, When the slide pag
   expect(events).toContain('<h2>発表したイベント</h2>')
   expect(
     [
-      ...events.matchAll(
-        /<a class="link-row-title" href="(\/events\/\d+)" >([^<]*)</g,
-      ),
-    ].map(([, , name]) => name),
-  ).toEqual(['Hono Night #5', 'connpass のイベント 410635'])
+      ...events.matchAll(/<a class="link-row-title" href="([^"]*)" >([^<]*)</g),
+    ].map(([, href, name]) => [href, name]),
+  ).toEqual([
+    ['/link/luma.com/x1', 'Hono Night #5'],
+    ['/link/connpass.com/event/410635', 'connpass のイベント 410635'],
+  ])
   expect(events).toContain('関連リンクから決まるので、ここでは選べません。')
   expect(events).not.toMatch(/<form|<select|<input|<button/)
 })
@@ -197,3 +200,28 @@ test('F29-AC16: Given fetch watched, When event links are added, their kinds sav
     fetched.mockRestore()
   }
 })
+
+test.each([
+  ['https://loom.com/embed/x', '/link/loom.com/embed/x'],
+  ['https://vimeo.com/123/abc', '/link/vimeo.com/123/abc'],
+  ['https://www.example.com/conf/', '/link/www.example.com/conf'],
+])(
+  'F29-AC18: Given %s made an event by the tool, When the slide page opens, Then the events frame leads to %s, and the slide is listed there',
+  async (url, path) => {
+    await post('/my/slides/talk/links', { url, title: 'Talk night' })
+    const [link] = await listLinks(db, 'talk')
+    await setLinkKind(db, {
+      deckId: 'talk',
+      ownerUserId: OWNER_ID,
+      linkId: link!.id,
+      kinding: { kind: 'event', event: eventRefOf(url)! },
+      now: 1,
+    })
+    expect(frame(await page(), 'events')).toContain(
+      `<a class="link-row-title" href="${path}" >`,
+    )
+    const listed = await server.fetch(new Request(`${TEST_ORIGIN}${path}`), env)
+    expect(listed.status).toBe(200)
+    expect(await listed.text()).toContain('<span class="deck-name">Talk</span>')
+  },
+)

@@ -1,6 +1,6 @@
 # リンクによる集約の実装設計
 
-[同じリンクでスライドが集まる](../features/f45-link-gathering.md)の設計。同じ URL を関連リンクに持つスライドを、`/link/<URL>` の 1 つのページに並べる。実装は 10 本の PR に分ける(計画は [issue #737](https://github.com/piconic-ai/slide/issues/737))。この文書は PR ごとに書き足す。いま実装済みなのは、最初の PR(link1)の純粋な関数だけで、経路、ページ、列は、まだ無い。節ごとに、実装済みか、どの PR で実装するかを書く。
+[同じリンクでスライドが集まる](../features/f45-link-gathering.md)の設計。同じ URL を関連リンクに持つスライドを、`/link/<URL>` の 1 つのページに並べる。実装は 10 本の PR に分ける(計画は [issue #737](https://github.com/piconic-ai/slide/issues/737))。この文書は PR ごとに書き足す。いま実装済みなのは、link1 の純粋な関数、link2 の経路(イベントの形のリンクだけがページになる)、link3 の `/events/:id` の転送とアプリの中のリンク先である。イベントでないリンクのページと列は、まだ無い。ページの見出しと頭は、まだイベントのページのままである(link4 で変える)。節ごとに、実装済みか、どの PR で実装するかを書く。
 
 ## ファイルの分担
 
@@ -9,11 +9,14 @@
 | `src/links/url-rules.ts` | 純粋 | サイトごとの規則。集めるときだけ除くクエリ(`gatheredWithout`) | link1 で実装済み |
 | `src/links/normalize.ts` | 純粋 | 比べる形(`normalizedUrlOf`)。中身は、除く名前を足せる `comparedUrlOf` | link1 で実装済み(出力は変えていない) |
 | `src/links/gather.ts` | 純粋 | 集める鍵(`gatherKeyOf`)、書かれたホスト名(`linkHostOf`) | link1 で実装済み |
-| `src/links/link-address.ts` | 純粋 | `/link/` の後ろの読み方(`parseLinkPath`)、引く鍵と正規の形(`linkTargetOf`)、ページの path(`linkPagePath`、`eventPagePath`) | link1 で実装済み |
-| `src/links/link-page-routes.ts` | routes | `GET /link/*`、`GET /link` | link2 で実装する |
-| `src/links/link-page-store.ts` | store | ページの読み出し、Luma の番号から名前への対応 | link2、link3、link7 で実装する |
-| `src/links/link-page.ts`、`src/links/link-heading.ts` | pages、純粋 | ページ、見出し、ページを出す条件 | link3、link4 で実装する |
-| `src/events/routes.ts` | routes | `GET /events/:id` の 301 | link3 で実装する |
+| `src/links/link-address.ts` | 純粋 | `/link/` の後ろの読み方(`parseLinkPath`)、引く鍵と正規の形(`linkTargetOf`)、ページの path(`linkPagePath`、`eventPagePath`)、イベントを引く鍵(`eventKeysOf`) | link1、link2 で実装済み |
+| `src/links/link-page-routes.ts` | routes | `GET /link/*`、`GET /link` | link2 で実装済み(イベントだけ) |
+| `src/links/link-page-store.ts` | store | 鍵からイベントを引く(`findEventIdsByKey`)、Luma の番号から名前への対応(`findAliasedKey`)、イベントのページの読み出し(`readEventPage`)、番号から転送先を引く(`findShownEventUrl`) | link2、link3 で実装済み。イベントでないリンクは link7 |
+| `src/links/link-missing-page.ts` | pages | 「まだありません」のページ(F45-AC12、F45-AC29) | link2 で実装済み |
+| `public/share.js` | ブラウザー | フッターの言語の切り替えの行き先を、`/link/…` では `/link?to=…` にする | link2 で実装済み |
+| `src/links/link-page.ts`、`src/links/link-heading.ts` | pages、純粋 | ページ、見出し、ページを出す条件 | link4 で実装する(いまは `src/events/event-page.ts`) |
+| `src/events/routes.ts` | routes | `GET /events/:id` の 301 | link3 で実装済み |
+| `src/events/store.ts` | store | 1 本のスライドの入っているイベント(`listDeckEvents`)、名前を直す(`renameEvent`。link4 で消す) | link3 で、ページの読み出しを `src/links/link-page-store.ts` へ移した |
 
 `src/links/link-address.ts` は、イベントの形の判定と鍵に `src/events/event-url.ts` の `isEventAddress`、`eventRefOf` を使う。どちらも純粋なファイルで、`src/links/kind.ts` がすでに同じ向きで読み込んでいる。
 
@@ -56,6 +59,7 @@
 - Luma は、イベントの鍵がパスの大文字小文字を残し、比べる形は小文字にする(F27-AC71、F27-AC72)。`luma.com/AbC` の正規の形は `luma.com/AbC` のまま、`www.luma.com/AbC` は、比べる形を経るので `luma.com/abc` になる。
 - ほかのサイトのイベント(道具で種類を「イベント」にした URL)の鍵は、`www.` を残す。計画は、正規の形から `eventKey` を作っていたので、`www.` 付きや、比べる形が書き換える URL(Loom、Vimeo)のイベントに当たらなかった。2026-11-28 に、レビューの指摘(#738、#741)を受けて、`eventKey` と `eventRest` を、書かれた URL から作る形に直した。
 - 繰り返しは最大 8 回で打ち切っていた。`www.` を 9 個以上並べた入力で、転送が 2 回になるので、変わらなくなるまで進む形に直した(#738)。
+- link2 は、イベントを引くときに、`www.` の無い鍵と有る鍵の両方を候補にしていた(`eventKeysOf`)。`www.` 有りと無しの別々のイベントが 1 つの path に着き、一方のスライドが見えなくなるので(#741)、候補をやめ、書かれたとおりの鍵 1 つだけを引く。
 
 ## 集める鍵
 
@@ -76,9 +80,58 @@
 
 すでにある行は、migration の SQL で `normalized_url` と `url` から埋める。SQL は規則を写すので、`gatherKeyOf`、`linkHostOf` と比べるテストで守る。1 つ前の版のコードが足した行は NULL になり、読む側は「集まらない」と扱う。`normalized_url`、イベントの表(`events`、`related_link_events`)と鍵は変えない。
 
-## 言語(link2 で実装する)
+## 経路(link2 で実装済み)
 
-`/link/…` のクエリは、`lang` を含めて、すべてリンク先の URL のものとして読む(F45-AC33)。言語は cookie と `Accept-Language` で決め、フッターの切り替えは `/link?to=<正規の path>&lang=…` を経由して戻る(F45-AC34)。[画面の言語](i18n.md)にも書いた。
+`GET /link/*`(`src/links/link-page-routes.ts`)は、次の順で答える(F45-AC13 の順)。
+
+1. `new URL(c.req.url)` の `pathname` と `search` から、`/link/` の後ろを取り、`parseLinkPath` で読む。断られたものは、共通の 404 のページ(`errorPage`)で答える。入れられた文字列は、本文にも href にも出さない。フッターの言語の切り替えは `/link?lang=…` を指す。
+2. 届いた書き方が正規の形と違えば、`/link/<正規の形>` へ 301(F45-AC31)。
+3. イベントの形の URL で、`luma_event_aliases` に対応があれば、名前の URL の `/link/…` へ 301(F45-AC26)。
+4. `eventKeysOf` の鍵でイベントを引き、一般公開中のスライドがあれば、イベントのページを 200 で出す(`readEventPage`、`eventPageBody`)。`Link`(hreflang)は付けない。`?lang=` がページを指さないためである。
+5. どれにも当たらなければ、「まだありません」のページを 404 で出す(F45-AC12)。URL は `<p>` の文字で出し、リンクにしない(F45-AC29)。イベントでないリンクは、link7 まで、すべてここになる。
+
+- 404 は、どちらも `screen_error` として数える(F40-AC14。`screen` は `/link/*`、`/link`)。
+- 検索: `isIndexablePath` は `/link/` で始まる path を載せてよいとする(F45-AC36)。`noindexPrivate` は 200 と 304 だけを通すので、404 と 301 には `X-Robots-Tag: noindex, nofollow` が付く。
+- 予約語: `link` を `ROUTE_HANDLES` に足した(F30-AC74)。`events` は、経路が残るので、残している。
+
+## `/events/:id` の転送と、ページを出す条件(link3 で実装済み)
+
+`GET /events/:id`(`src/events/routes.ts`)は、番号からイベントを引き(`findShownEventUrl`)、一般公開中のスライドが 1 本でもあれば、`linkPagePath(events.url)` へ 301 で転送する(F45-AC9)。数字でない番号、無い番号、一般公開中のスライドの無いイベントは、共通の 404。見る人を当てないので、だれが開いても同じ応答になる。クエリ(`?lang=` を含む)は、転送先に持ち越さない。
+
+- `events.url` は、`eventRefOf` が作る `https://` の URL である。`linkPagePath` が正規の形にそろえるので、転送は 1 回で終わる。Luma の番号のイベントで、名前との対応があるものだけ、`/link/…` の側でもう 1 回転送される(F45-AC26)。
+- ほかのサイトのイベントで、`www.` 有りと無しの両方がイベントになっているとき、`www.` 有りのイベントの番号は、`www.` の無い path へ転送され、無いほうに一般公開中のスライドがあれば、そちらのページが出る(上の「計画との違い」と同じ扱い)。
+
+`readEventPage`(`src/links/link-page-store.ts`)は、問い合わせを 2 つに分ける。
+
+| 問い合わせ | 見る人のミュートとブロック | 決めるもの |
+| --- | --- | --- |
+| 一般公開中のスライドのリンク(保存の古い順) | 当てない | ページを出すかどうか、connpass の元のページへのリンクのグループ(最初のリンク)、「コミュニティはまだありません」に使うホスト名の集合 |
+| 一般公開中のスライド(公開の新しい順、同じ時刻は URL の名前の順) | 当てる | 一覧と本数 |
+
+- 1 つめが 0 行なら `null` で、経路は「まだありません」のページを出す。ページが出るかどうかは、見る人によらない(F45-AC15)。ブロックやミュートで一覧が 0 本になっても、ページは 200 で、本数は 0 になる。link2 までは、見る人を当てた一覧が 0 本だと 404 だった。
+- 「一般公開中」は、どちらも `publicTalks` の条件である: 公開の版が `ready`、運営が非表示にしておらず、作者が停止中でない(`notHidden`)、作者の `accounts` の行がある(F45-AC14)。
+- `listListedEvents`(イベントの一覧)は、テストだけが使っていたので消した。F45 に、イベントの一覧は無い。
+
+アプリの中のイベントへのリンクは、`linkPagePath(event.url)` で作る。`DeckEvent`、`ViewerEvent`、`CommunityEvent` に `url`(`events.url`)を足した。
+
+| 場所 | ファイル |
+| --- | --- |
+| viewer のイベントの行(F24-AC51)、「イベントを見る」(F24-AC52) | `src/share/viewer-events-frame.ts` の `eventHref`、`src/share/viewer-recommendations-frame.ts` |
+| 1 本の管理の「発表したイベント」 | `src/decks/events-frame.ts` |
+| コミュニティのイベントのタブの見出しと「ほか n 本」 | `src/communities/community-page.ts` |
+
+`add_related_link` の説明(`src/mcp/tools.ts`)は、イベントの URL を入れると、そのイベントのリンクのページ(`/link/` と、`https://` を除いた URL)にスライドが並ぶ、と書く(F23-AC53)。
+
+## 言語(link2 で実装済み)
+
+`/link/…` のクエリは、`lang` を含めて、すべてリンク先の URL のものとして読む(F45-AC33)。`src/site/lang.ts` は、path が `/link/` で始まるとき、クエリを読まない検出(cookie、`Accept-Language` の順)を使い、cookie を書かない。[画面の言語](i18n.md)にも書いた。
+
+フッターの切り替えは `/link?to=<正規の path>&lang=…` を経由して戻る(F45-AC34)。
+
+- サーバーは、`pageShell` に渡すフッターの URL を `/link?to=…` にする。`langHref` と `siteFooter` は変えていない。
+- `public/share.js` は、フッターの切り替えを押したとき、行き先を「いま開いているページに `lang` を付けたもの」に書き換える。`/link/…` では、これが `lang` をリンク先のクエリに足してしまう(別の URL のページになる)ので、`/link?to=<いまの path とクエリ>&lang=…` に書き換える。
+- `GET /link` は、言語の middleware が `?lang=` を cookie に書いたあと、`to` を `/link/` の後ろとして `parseLinkPath` で読み、その正規の path へ 302 で戻す。`to` が `/link/` で始まらない、または読めなければ、共通の 404。転送先は必ず `/link/<ホスト名>` で始まるので、ほかのサイトへは転送されない(`//evil.example`、`/link/../…`、`\\` は 404 か、このサイトの `/link/evil.example/…` になる)。
+- Hono では `/link/*` が `/link` にも当たるので、`/link` を先に登録している。
 
 ## Hono での届き方(確かめた結果)
 
@@ -97,7 +150,11 @@
 
 - `//`、`%2F`、`%3A`、クエリは、書かれたとおりに届く。`c.req.path` は `%E3%81%82` や `%41` を復号するので、経路は `pathname` と `search` から `rest` を作る。
 - `..` と `#` は、リクエストを作る側(`Request` の URL の解析)が、送る前に畳む。サーバーには届かない。
-- `/link/*` は、後ろの無い `/link` にも当たる(`/link/*` を先に登録すると、`/link` もそのハンドラーに届いた)。link2 では、`GET /link` を先に登録するか、ハンドラーの中で分ける。`/link/` は、空の `rest` として届く。
+- `/link/*` は、後ろの無い `/link` にも当たる(`/link/*` を先に登録すると、`/link` もそのハンドラーに届いた)。link2 では、`GET /link` を先に登録した。`/link/` は、空の `rest` として届く。
+
+### ローカルの workerd とブラウザーでの届き方(link2 で確かめた結果)
+
+2026-11-27 に、`wrangler dev --local`(workerd)へ `curl --path-as-is` で送り、`/link/https://connpass.com/event/410635/?utm_source=x`、`/link/https:/connpass.com/…`、`/link/https%3A%2F%2Fconnpass.com%2F…` の 3 通りが、どれも `Location: /link/connpass.com/event/410635` の 301 になることを確かめた。Chromium は、アドレスに書いた `//` を、そのまま送った(`src/links/link-page.browser.test.ts`)。本番の Cloudflare が `//` をまとめるかは、確かめていない。まとめられても、`https:/` の形として読める。
 
 ## PR の積み方
 
@@ -105,7 +162,8 @@
 | --- | --- |
 | link1 | この文書、`gatheredWithout`、純粋な `gather.ts`、`link-address.ts` |
 | link2 | `/link/*` の経路(イベントだけ)、「まだありません」のページ、言語、検索に載せる条件 |
-| link3、link4 | `/events/:id` の 301、アプリの中のリンク先、見出しと頭、名前を直す経路の撤去 |
+| link3 | `/events/:id` の 301、アプリの中のリンク先、見る人によらない判定、テストの移動(`src/links/link-page.test.ts`) |
+| link4 | 見出しと頭、名前を直す経路の撤去 |
 | link5 | コミュニティのタブ「リンク」、1 本の管理の文と枠 |
 | link6 | 列の追加と埋め戻し(migration) |
 | link7 | イベントでないリンクのページ、viewer の行からのリンク |

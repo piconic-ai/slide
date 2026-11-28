@@ -337,8 +337,7 @@ describe('deleting', () => {
       ),
     ).toBe('available')
     expect(await orm.select().from(relatedLinks)).toHaveLength(1)
-    const [event] = await orm.select().from(events)
-    expect((await open(`/events/${event!.id}`, '')).status).toBe(200)
+    expect((await open('/link/connpass.com/event/410635', '')).status).toBe(200)
     expect((await open('/@owner/talk', '')).status).not.toBe(404)
   })
 })

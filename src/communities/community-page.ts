@@ -1,5 +1,6 @@
 import { html } from 'hono/html'
 import { eventNameOf } from '../events/event-name'
+import { eventPagePath } from '../links/link-address'
 import { websiteLabel } from '../profile/profile-lines'
 import { coverUrl } from '../share/cover'
 import { dayFormats } from '../share/dates'
@@ -175,15 +176,15 @@ const talkCard = (talk: CommunityTalk, contentBase: URL | null, lang: Lang) => {
 }
 
 /**
- * One event of the events tab (F30-AC19, F30-AC20): its name to its page,
- * how many slides, and the slides sent sideways, up to CAROUSEL_TALKS, then
- * "n more" to its page. The buttons that send them stay hidden until the
+ * One event of the events tab (F30-AC19, F30-AC20): its name to its page of
+ * links (F45), how many slides, and the slides sent sideways, up to
+ * CAROUSEL_TALKS, then "n more" to that page. The buttons that send them stay hidden until the
  * page's script finds the row wider than its frame.
  */
 function eventRow(event: CommunityEvent, contentBase: URL | null, lang: Lang) {
   const t = text[lang]
   const name = eventNameOf(event, lang)
-  const href = `/events/${event.id}`
+  const href = eventPagePath(event.url)
   const shown = event.talks.slice(0, CAROUSEL_TALKS)
   const more = event.talks.length - shown.length
   const regionId = `community-event-${event.id}`

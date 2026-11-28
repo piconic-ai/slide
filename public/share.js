@@ -283,7 +283,15 @@ document.addEventListener(
     const link = event.target.closest?.('a[hreflang]')
     if (!link || !link.closest('.site-footer')) return
     const url = new URL(location.href)
-    url.searchParams.set('lang', link.getAttribute('hreflang'))
+    const lang = link.getAttribute('hreflang')
+    // Under /link/ the whole query is the link's own, `lang` included, so
+    // the switch goes through /link, which keeps the choice and comes back.
+    if (url.pathname.startsWith('/link/')) {
+      const to = url.pathname + url.search
+      link.href = `/link?${new URLSearchParams({ to, lang })}`
+      return
+    }
+    url.searchParams.set('lang', lang)
     link.href = url.pathname + url.search
   },
   true,
