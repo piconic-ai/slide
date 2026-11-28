@@ -196,6 +196,30 @@ describe('parseLinkPath and linkTargetOf', () => {
     })
   })
 
+  test('F45-AC35: Given an address of another site with only a tracking query added, When it is read, Then it has the event key it has without it, also where a site rule makes up a query of its own, and a query of the site stays a mark of no event', () => {
+    // Vimeo's rule makes `h` from the path; `utm_source` is the written one
+    // and is dropped.
+    const plain = targetOf('vimeo.com/123/abc')
+    for (const tracking of ['?utm_source=x', '?utm_source=x&utm_medium=y']) {
+      expect(targetOf(`vimeo.com/123/abc${tracking}`)).toEqual(plain)
+    }
+    expect(targetOf('https://www.example.com/conf?utm_source=x')).toMatchObject(
+      {
+        eventKey: 'https://www.example.com/conf',
+        eventRest: 'www.example.com/conf',
+      },
+    )
+    // A query of the site, which the compared form keeps, is no event's.
+    expect(targetOf('example.com/conf?id=7')).toMatchObject({
+      eventKey: null,
+      eventRest: null,
+    })
+    expect(targetOf('example.com/conf?id=7&utm_source=x')).toMatchObject({
+      eventKey: null,
+      eventRest: null,
+    })
+  })
+
   test('F45-AC35: Given addresses of another site with and without www., When they are read, Then each is looked up as its own event and both gather the other links under one key', () => {
     expect(targetOf('https://WWW.Example.com/conf/')).toEqual({
       rest: 'example.com/conf',
