@@ -1,7 +1,7 @@
 import { html } from 'hono/html'
 import { citationCardGrid, type CitationCard } from '../citations/cards'
 import { communityHref } from '../communities/community'
-import { eventNameOf } from '../links/link-heading'
+import { headingOf } from '../links/link-heading'
 import { messages, type Lang } from '../site/i18n'
 import { eventHref } from './viewer-events-frame'
 import type { ViewerTalks } from './viewer-talks'
@@ -56,7 +56,7 @@ export const viewerSameEventFrame = (talks: ViewerTalks, lang: Lang) => {
   return section(
     'same-event',
     event && {
-      heading: t.sameEvent(eventNameOf(event, lang)),
+      heading: t.sameEvent(headingOf(event)),
       href: eventHref(event),
       label: t.viewEvent,
     },

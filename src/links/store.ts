@@ -91,8 +91,9 @@ const LINK_IN = 'EXISTS (SELECT 1 FROM related_links WHERE id = ?1)'
 /**
  * The statements that make the link ?1 a talk of its event, each run only
  * when `guard` holds (its parameters come first, in the same numbers): the
- * event is made when it is new, it takes the link's title as its name while
- * it has none (the first title saved), and the link is tied to it.
+ * event is made when it is new and the link is tied to it. The event is
+ * given no name: its heading is read from the titles of its links on public
+ * slides (F45-AC10).
  */
 function tieToEvent(
   database: D1Database,
@@ -115,7 +116,6 @@ function tieToEvent(
     event.url,
     now,
   ]
-  const title = '(SELECT title FROM related_links WHERE id = ?1)'
   return [
     database
       .prepare(
@@ -125,12 +125,6 @@ function tieToEvent(
         ON CONFLICT (key) DO NOTHING`,
       )
       .bind(...values),
-    database
-      .prepare(
-        `UPDATE events SET name = ${title}
-        WHERE key = ${at(1)} AND name IS NULL AND ${title} IS NOT NULL AND ${guard}`,
-      )
-      .bind(...params, event.key),
     database
       .prepare(
         `INSERT INTO related_link_events (link_id, event_id, host, created_at)

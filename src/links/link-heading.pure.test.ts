@@ -1,49 +1,72 @@
 import { describe, expect, test } from 'vitest'
-import { eventNameOf, serviceNameOf, sourceLinkTextOf } from './link-heading'
+import {
+  headingOf,
+  siteNameOf,
+  sourceLinkTextOf,
+  sourceOf,
+} from './link-heading'
 
-describe('eventNameOf', () => {
+const KANAGAWA = {
+  service: 'connpass',
+  ref: '410635',
+  host: 'connpass.com',
+  url: 'https://connpass.com/event/410635/',
+} as const
+
+describe('headingOf', () => {
   test.each([
+    [KANAGAWA, 'connpass https://connpass.com/event/410635/'],
     [
-      { service: 'connpass', ref: '410635', host: 'kanagawapm.connpass.com' },
-      'connpass のイベント 410635',
-      'connpass event 410635',
+      {
+        service: 'doorkeeper',
+        ref: '12',
+        host: 'a.doorkeeper.jp',
+        url: 'https://a.doorkeeper.jp/events/12',
+      },
+      'Doorkeeper https://a.doorkeeper.jp/events/12',
     ],
     [
-      { service: 'doorkeeper', ref: '12', host: 'a.doorkeeper.jp' },
-      'Doorkeeper のイベント 12',
-      'Doorkeeper event 12',
+      {
+        service: 'luma',
+        ref: 'abcd1234',
+        host: 'luma.com',
+        url: 'https://luma.com/abcd1234',
+      },
+      'Luma https://luma.com/abcd1234',
     ],
     [
-      { service: 'luma', ref: 'abcd1234', host: 'luma.com' },
-      'Luma のイベント abcd1234',
-      'Luma event abcd1234',
-    ],
-    [
-      { service: 'web', ref: 'peatix.com/event/1', host: 'peatix.com' },
-      'peatix.com/event/1 のイベント',
-      'Event at peatix.com/event/1',
+      {
+        service: 'web',
+        ref: 'peatix.com/event/1',
+        host: 'peatix.com',
+        url: 'https://peatix.com/event/1',
+      },
+      'peatix.com https://peatix.com/event/1',
     ],
   ] as const)(
-    'F29-AC9: Given an event %o whose links have no title, When its name is shown, Then it is the service and the event within it',
-    (event, ja, en) => {
-      expect(eventNameOf({ ...event, name: null }, 'ja')).toBe(ja)
-      expect(eventNameOf({ ...event, name: null }, 'en')).toBe(en)
+    'F45-AC10: Given %o with no name and no title on a public slide, When its heading is made, Then it is the site and the address',
+    (link, heading) => {
+      expect(headingOf({ ...link, name: null, firstTitle: null })).toBe(heading)
     },
   )
 
   test.each(['Kanagawa.pm #3', '<b>x</b>', '🎉 Night', ' '])(
-    'F29-AC8: Given an event named %j, When its name is shown, Then it is that name as it is',
-    (name) => {
-      const event = {
-        service: 'connpass',
-        ref: '1',
-        host: 'connpass.com',
-        name,
-      } as const
-      expect(eventNameOf(event, 'ja')).toBe(name)
-      expect(eventNameOf(event, 'en')).toBe(name)
+    'F45-AC10: Given no name and the first title %j, When the heading is made, Then it is that title as it is',
+    (firstTitle) => {
+      expect(headingOf({ ...KANAGAWA, name: null, firstTitle })).toBe(
+        firstTitle,
+      )
     },
   )
+
+  test('F45-AC11: Given a name kept for the event and another first title, When the heading is made, Then it is the name', () => {
+    expect(
+      headingOf({ ...KANAGAWA, name: 'Fixed name', firstTitle: 'A title' }),
+    ).toBe('Fixed name')
+    expect(headingOf({ ...KANAGAWA, name: 'Old', firstTitle: null })).toBe(
+      'Old',
+    )
+  })
 })
 
 describe('sourceLinkTextOf', () => {
@@ -60,16 +83,54 @@ describe('sourceLinkTextOf', () => {
     ],
     [{ service: 'luma', host: 'luma.com' }, 'Luma で見る', 'View on Luma'],
     [
-      { service: 'web', host: 'peatix.com' },
-      'peatix.com で見る',
-      'View on peatix.com',
+      { service: 'web', host: 'example.com' },
+      'example.com で見る',
+      'View on example.com',
     ],
   ] as const)(
-    'F29-AC14: Given an event on %o, When the link to its own page is written, Then it names the site',
-    (event, ja, en) => {
-      expect(sourceLinkTextOf(event, 'ja')).toBe(ja)
-      expect(sourceLinkTextOf(event, 'en')).toBe(en)
-      expect(serviceNameOf(event)).toBe(ja.replace(' で見る', ''))
+    'F45-AC16: Given a link on %o, When the way to its own page is written, Then it names the site',
+    (link, ja, en) => {
+      expect(sourceLinkTextOf(link, 'ja')).toBe(ja)
+      expect(sourceLinkTextOf(link, 'en')).toBe(en)
+      expect(siteNameOf(link)).toBe(ja.replace(' で見る', ''))
     },
   )
+})
+
+describe('sourceOf', () => {
+  const event = (firstLinkHost: string | null) =>
+    ({ kind: 'event', event: KANAGAWA, firstLinkHost }) as const
+
+  test.each([
+    [
+      'kanagawapm.connpass.com',
+      'https://kanagawapm.connpass.com/event/410635/',
+    ],
+    ['connpass.com', KANAGAWA.url],
+    [null, KANAGAWA.url],
+    // A host that is no group of connpass names no group.
+    ['evilconnpass.com', KANAGAWA.url],
+  ])(
+    'F45-AC25: Given a connpass event whose oldest link was written with %j, When its way out is made, Then it is %s',
+    (host, url) => {
+      expect(sourceOf(event(host))).toBe(url)
+    },
+  )
+
+  test('F45-AC25: Given an event elsewhere, When its way out is made, Then it is its own address, whatever host its link had', () => {
+    const luma = {
+      service: 'luma',
+      ref: 'abc',
+      url: 'https://luma.com/abc',
+    } as const
+    expect(
+      sourceOf({ kind: 'event', event: luma, firstLinkHost: 'lu.ma' }),
+    ).toBe(luma.url)
+  })
+
+  test('F45-AC25: Given a link that is no event, When its way out is made, Then it is where its oldest link leads', () => {
+    expect(
+      sourceOf({ kind: 'link', firstLinkUrl: 'https://example.com/a?b=1' }),
+    ).toBe('https://example.com/a?b=1')
+  })
 })

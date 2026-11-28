@@ -75,8 +75,9 @@ test('F33-AC20: Given a talk linking the event by its id alone, When the feed pa
   await seedTalkLink(database, {
     deckId: 'by-id',
     url: ID,
-    title: 'Hono night',
   })
+  // A name kept from when events were named (F45-AC11).
+  await db.update(events).set({ name: 'Hono night' })
   const [before] = await allEvents()
   expect(before).toMatchObject({ key: ID, ref: 'evt-nPHM1FY0GGaiJyh' })
 
@@ -100,8 +101,9 @@ test('F33-AC20: Given talks linking the event by its name and by its id, When th
   await seedTalkLink(database, {
     deckId: 'by-id',
     url: ID,
-    title: 'From the id',
   })
+  // A name kept from when events were named (F45-AC11).
+  await db.update(events).set({ name: 'From the id' }).where(eq(events.key, ID))
 
   await readFeed()
 

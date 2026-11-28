@@ -3,6 +3,7 @@ import { drizzle } from 'drizzle-orm/d1'
 import { events, relatedLinkEvents, relatedLinks } from '../db/schema'
 import { communityHref } from '../communities/community'
 import { listEventCommunities } from '../communities/event-communities-store'
+import { firstPublicTitle } from '../links/link-page-store'
 import type { DeckEvent } from './deck-event'
 
 /**
@@ -21,6 +22,7 @@ export async function listDeckEvents(
       host: events.host,
       url: events.url,
       name: events.name,
+      firstTitle: firstPublicTitle,
       first: min(relatedLinks.position),
     })
     .from(relatedLinks)

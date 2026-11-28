@@ -169,7 +169,10 @@ test('F29-AC18: Given links to two events, one of them twice, When the slide pag
     ].map(([, href, name]) => [href, name]),
   ).toEqual([
     ['/link/luma.com/x1', 'Hono Night #5'],
-    ['/link/connpass.com/event/410635', 'connpass のイベント 410635'],
+    [
+      '/link/connpass.com/event/410635',
+      'connpass https://connpass.com/event/410635/',
+    ],
   ])
   expect(events).toContain('関連リンクから決まるので、ここでは選べません。')
   expect(events).not.toMatch(/<form|<select|<input|<button/)

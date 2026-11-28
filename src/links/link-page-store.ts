@@ -4,6 +4,7 @@
  */
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
+import { alias } from 'drizzle-orm/sqlite-core'
 import { z } from 'zod'
 import { notBlockedBy } from '../blocks/store'
 import {
@@ -16,10 +17,10 @@ import {
   relatedLinks,
 } from '../db/schema'
 import { deckSlugSchema, type DeckSlug } from '../decks/deck-id'
-import { sourceUrlOf, type EventService } from '../events/event-url'
 import { notMutedBy } from '../mutes/store'
-import { notHidden } from '../publication/takedown-store'
+import { notHidden, notHiddenOf } from '../publication/takedown-store'
 import { handleSchema, type Handle } from '../share/handle'
+import { sourceOf, type NamedEvent } from './link-heading'
 
 /**
  * The events kept under the keys, in the order of the keys. The keys are
@@ -56,15 +57,25 @@ export async function findAliasedKey(
 }
 
 /** An event as its page shows it. */
-export type StoredEvent = Readonly<{
-  id: number
-  service: EventService
-  ref: string
-  host: string
-  /** Where its page leads readers (`sourceUrlOf`). */
-  url: string
-  name: string | null
-}>
+export type StoredEvent = NamedEvent & Readonly<{ id: number }>
+
+const titled = alias(decks, 'titled_deck')
+
+/**
+ * For a row of `events` in a list: the title of the oldest titled link to
+ * it on a slide anyone may open (F45-AC10), as `readEventPage` picks it for
+ * the page. Names `events` itself, so it reads right under any join.
+ */
+export const firstPublicTitle = sql<string | null>`(
+  SELECT l.title FROM related_link_events AS le
+  JOIN related_links AS l ON l.id = le.link_id
+  JOIN decks AS titled_deck ON titled_deck.id = l.deck_id
+  JOIN accounts AS a ON a.user_id = titled_deck.owner_user_id
+  JOIN deployments AS p ON p.id = titled_deck.public_deployment_id
+    AND p.deck_id = titled_deck.id AND p.state = 'ready'
+  WHERE le.event_id = "events"."id" AND l.title IS NOT NULL
+    AND ${notHiddenOf(titled)}
+  ORDER BY le.created_at, le.rowid LIMIT 1)`
 
 /** A public slide given as a talk of an event. */
 export type EventTalk = Readonly<{
@@ -108,6 +119,7 @@ const publicTalks = (db: ReturnType<typeof drizzle>, viewer: string | null) =>
       deploymentId: deployments.id,
       coverPath: deployments.cover_path,
       linkHost: relatedLinkEvents.host,
+      linkTitle: relatedLinks.title,
     })
     .from(relatedLinkEvents)
     .innerJoin(relatedLinks, eq(relatedLinks.id, relatedLinkEvents.link_id))
@@ -136,6 +148,8 @@ const ofEvent = (eventId: number) => eq(relatedLinkEvents.event_id, eventId)
  * An event and its public talks, the most recently published first; each
  * deck once, however many of its links name the event. With them, the hosts
  * the links of its public talks were written with (the groups, on connpass).
+ * Its first title and where it leads (`source`) follow the oldest of those
+ * links (F45-AC10, F45-AC25).
  * Null when there is no such event or it has no public talk: that is the
  * same for everyone. The viewer's mutes and blocks only leave talks out of
  * the list, down to none (F45-AC15).
@@ -147,6 +161,8 @@ export async function readEventPage(
   viewer: string | null = null,
 ): Promise<{
   event: StoredEvent
+  /** Where the page leads readers. */
+  source: string
   talks: readonly EventTalk[]
   linkHosts: ReadonlySet<string>
 } | null> {
@@ -166,7 +182,7 @@ export async function readEventPage(
       .get(),
     // The links to the event on public decks, the oldest first, whoever is
     // looking: drafts stay their author's, and mutes and blocks move neither
-    // whether the page shows nor where it leads.
+    // whether the page shows, nor its heading, nor where it leads.
     publicTalks(db, null)
       .where(ofEvent(eventId))
       .orderBy(
@@ -182,8 +198,15 @@ export async function readEventPage(
   if (!event || links.length === 0) return null
   // A deck with two links to the event comes twice; it is listed once.
   const decksOnce = [...new Map(rows.map((row) => [row.deckId, row])).values()]
+  const firstTitle =
+    links.find((link) => link.linkTitle !== null)?.linkTitle ?? null
   return {
-    event: { ...event, url: sourceUrlOf(event, links[0]?.linkHost ?? null) },
+    event: { ...event, firstTitle },
+    source: sourceOf({
+      kind: 'event',
+      event,
+      firstLinkHost: links[0]?.linkHost ?? null,
+    }),
     talks: talkSchema.array().parse(decksOnce),
     linkHosts: new Set(links.map((row) => row.linkHost)),
   }

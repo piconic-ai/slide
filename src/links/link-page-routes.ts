@@ -3,7 +3,6 @@ import { currentOwner } from '../auth/owner-middleware'
 import { communityCoverOf, communityHref } from '../communities/community'
 import { listEventCommunities } from '../communities/event-communities-store'
 import { homePagePolicy, PAGE_POLICY } from '../decks/pages'
-import { defaultEventCover, eventPageBody, eventPageTitle } from './link-page'
 import { recordFrom } from '../metrics/record-routes'
 import { contentBaseOf } from '../preview/config'
 import { ERROR_PAGE_POLICY, errorPage } from '../site/error-pages'
@@ -21,6 +20,7 @@ import {
   linkMissingStyle,
   linkMissingTitle,
 } from './link-missing-page'
+import { linkPageBody, linkPageTitle } from './link-page'
 import {
   findAliasedKey,
   findEventIdsByKey,
@@ -136,17 +136,15 @@ async function shownEvent(
   const lang = langOf(c)
   const contentBase = contentBaseOf(c.env)
   return show(c, target, {
-    title: eventPageTitle(read.event, lang),
-    body: eventPageBody(
+    title: linkPageTitle(read.event),
+    body: linkPageBody(
       {
         ...read,
         community: community && {
           ...community,
           href: communityHref(community.handle),
+          cover: communityCoverOf(community),
         },
-        cover: community
-          ? communityCoverOf(community)
-          : defaultEventCover(eventId),
         contentBase,
       },
       lang,

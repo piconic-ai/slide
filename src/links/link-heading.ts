@@ -1,13 +1,20 @@
+import { sourceUrlOf, type EventService } from '../events/event-url'
 import type { Lang } from '../site/i18n'
-import type { EventService } from '../events/event-url'
 
-/** The parts of an event its name and its way out are made of. */
+/** The parts of an event its heading and its way out are made of. */
 export type NamedEvent = Readonly<{
   service: EventService
   ref: string
   host: string
-  /** The first title its links were saved with, or the operator's; null for none. */
+  /** Its own address (`events.url`). */
+  url: string
+  /** The name it was given while names were kept (F45-AC11); null for none. */
   name: string | null
+  /**
+   * The title of the oldest titled link to it on a public slide (F45-AC10);
+   * null for none. A draft's title is never here.
+   */
+  firstTitle: string | null
 }>
 
 const SERVICE_NAMES: Readonly<Record<Exclude<EventService, 'web'>, string>> = {
@@ -16,30 +23,46 @@ const SERVICE_NAMES: Readonly<Record<Exclude<EventService, 'web'>, string>> = {
   luma: 'Luma',
 }
 
-/** The name of the site an event is on: the service, or the host elsewhere. */
-export const serviceNameOf = (event: Pick<NamedEvent, 'service' | 'host'>) =>
-  event.service === 'web' ? event.host : SERVICE_NAMES[event.service]
+/** The name of the site a link leads to: the service, or the host elsewhere. */
+export const siteNameOf = (link: Pick<NamedEvent, 'service' | 'host'>) =>
+  link.service === 'web' ? link.host : SERVICE_NAMES[link.service]
 
 /**
- * The name an event is shown with: its name, or, while none was given, the
- * service and the event within it ("connpass のイベント 410635"). Elsewhere
- * the event within it is the host and path.
+ * The heading of the page of links of an address: the name kept for it, or
+ * the first title saved on a public slide, or the site and the address
+ * ("connpass https://connpass.com/event/410635/"). The same in every
+ * language.
  */
-export function eventNameOf(event: NamedEvent, lang: Lang): string {
-  if (event.name !== null) return event.name
-  if (event.service === 'web')
-    return lang === 'ja' ? `${event.ref} のイベント` : `Event at ${event.ref}`
-  const service = serviceNameOf(event)
-  return lang === 'ja'
-    ? `${service} のイベント ${event.ref}`
-    : `${service} event ${event.ref}`
-}
+export const headingOf = (
+  link: Pick<NamedEvent, 'service' | 'host' | 'url' | 'name' | 'firstTitle'>,
+): string => link.name ?? link.firstTitle ?? `${siteNameOf(link)} ${link.url}`
 
-/** The words of the link to the event's own page ("connpass で見る"). */
+/** The words of the link to the address's own page ("connpass で見る"). */
 export const sourceLinkTextOf = (
-  event: Pick<NamedEvent, 'service' | 'host'>,
+  link: Pick<NamedEvent, 'service' | 'host'>,
   lang: Lang,
 ) =>
-  lang === 'ja'
-    ? `${serviceNameOf(event)} で見る`
-    : `View on ${serviceNameOf(event)}`
+  lang === 'ja' ? `${siteNameOf(link)} で見る` : `View on ${siteNameOf(link)}`
+
+/**
+ * What is gathered at an address, as far as its way out needs: an event,
+ * with the host its oldest link on a public slide was written with, or any
+ * other link, with the oldest such link's sanitized address.
+ */
+export type Gathered =
+  | Readonly<{
+      kind: 'event'
+      event: Pick<NamedEvent, 'service' | 'ref' | 'url'>
+      firstLinkHost: string | null
+    }>
+  | Readonly<{ kind: 'link'; firstLinkUrl: string }>
+
+/**
+ * Where the page leads readers (F45-AC25): a connpass event under the group
+ * its oldest link named, any other event at its own address, and any other
+ * link where its oldest link leads.
+ */
+export const sourceOf = (gathered: Gathered): string =>
+  gathered.kind === 'event'
+    ? sourceUrlOf(gathered.event, gathered.firstLinkHost)
+    : gathered.firstLinkUrl

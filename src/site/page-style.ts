@@ -1866,10 +1866,10 @@ export const pageStyle = html`<style>
     margin: 0 0 32px;
     border-radius: var(--radius);
   }
-  /* The page of one event. */
-  .event-page > .cover-pattern,
-  .event-page > .cover-image {
-    margin-top: 40px;
+  /* The page of the links to one address: its community's cover, or with
+     none its heading, starts 40px below the site header. */
+  .event-page {
+    padding-top: 40px;
   }
   .event-head {
     margin: 0 0 40px;

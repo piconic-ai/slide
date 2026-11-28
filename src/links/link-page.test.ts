@@ -175,14 +175,39 @@ test('F45-AC24: F45-AC9: Given an event with one talk, When the link is removed,
   expect((await get(`/events/${id}`)).status).toBe(404)
 })
 
-test('F29-AC14: Given an event, When its page opens, Then the way to its own page names the service and is rel="noopener nofollow ugc"', async () => {
+test('F45-AC16: F45-AC30: Given an event, When its page opens, Then the way to its own page names the site, is rel="noopener nofollow ugc" and asks the reader to check the address', async () => {
   await seedPublic(db, 'talk', 100, 'Talk')
   await add('talk', `${KANAGAWA}?utm_source=x#top`)
-  const id = await eventIdOf(KANAGAWA_KEY)
-  expect(await flat(`/events/${id}`)).toContain(
-    `<a href="${KANAGAWA}" rel="noopener nofollow ugc" >connpass で見る</a >`,
+  const body = await flat(KANAGAWA_PAGE)
+  expect(body).toContain(
+    `<a href="${KANAGAWA}" rel="noopener nofollow ugc" data-link-check aria-haspopup="dialog" >connpass で見る</a >`,
   )
-  expect(await flat(`/events/${id}`, EN)).toContain('>View on connpass</a')
+  expect(body).toContain('<template data-link-check-prompt>')
+  expect(await flat(KANAGAWA_PAGE, EN)).toContain('>View on connpass</a')
+})
+
+test('F45-AC16: Given an event of another site, When its page opens, Then the way out names its host', async () => {
+  await seedPublic(db, 'talk', 100, 'Talk')
+  const added = await server.fetch(
+    new Request(`${TEST_ORIGIN}/my/slides/talk/links`, {
+      method: 'POST',
+      headers: {
+        Cookie: owner,
+        Origin: TEST_ORIGIN,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        url: 'https://example.com/conf',
+        kind: 'event',
+      }),
+    }),
+    env,
+  )
+  expect(added.status).toBe(303)
+  const body = await flat('/link/example.com/conf')
+  expect(body).toContain('<h1>example.com https://example.com/conf</h1>')
+  expect(sourceOf(body)).toBe('https://example.com/conf')
+  expect(body).toContain('>example.com で見る</a')
 })
 
 const sourceOf = (body: string) =>
@@ -211,7 +236,7 @@ test.each([
     'https://kanagawapm.connpass.com/event/410635/',
   ],
 ])(
-  'F29-AC14: Given links to one connpass event whose first saved one names %s, When its page opens, Then it leads to the event under that first link’s group, or under none',
+  'F45-AC25: Given links to one connpass event whose first saved one names %s, When its page opens, Then it leads to the event under that first link’s group, or under none',
   async (_, links, source) => {
     await seedPublic(db, 'first', 100, 'First')
     await seedPublic(db, 'second', 200, 'Second', '2')
@@ -222,7 +247,7 @@ test.each([
   },
 )
 
-test('F29-AC14: Given the first saved link of a connpass event is on a draft, When the event page opens, Then it follows the oldest link on a public slide instead', async () => {
+test('F45-AC25: Given the first saved link of a connpass event is on a draft, When the event page opens, Then it follows the oldest link on a public slide instead', async () => {
   await seedDeck(db, 'draft')
   await seedDeployment(db, 'draft')
   await seedPublic(db, 'talk', 100, 'Talk')
@@ -232,7 +257,7 @@ test('F29-AC14: Given the first saved link of a connpass event is on a draft, Wh
   expect(sourceOf(await flat(`/events/${id}`))).toBe(KANAGAWA)
 })
 
-test('F29-AC14: Given three links to one connpass event, When the first saved one is removed and then the next, Then the page follows the oldest link left each time', async () => {
+test('F45-AC25: Given three links to one connpass event, When the first saved one is removed and then the next, Then the page follows the oldest link left each time', async () => {
   // One deck keeps one link to an event (F27-AC44), so each is on its own.
   await seedPublic(db, 'a', 100, 'A')
   await seedPublic(db, 'b', 200, 'B')
@@ -259,7 +284,7 @@ test('F29-AC14: Given three links to one connpass event, When the first saved on
   expect(await page()).toBe(KANAGAWA)
 })
 
-test('F29-AC19: Given an event of no community, When its page opens, Then the head has its name, the way to its page and the count of talks, and no community, date or place', async () => {
+test('F45-AC16: F45-AC17: Given an event of no community, When its page opens, Then the head has its heading, the way to its page and the count of slides, and no cover, community, date or place', async () => {
   await seedPublic(db, 'talk', 100, 'Talk')
   await add('talk', 'https://luma.com/abcd1234', 'Hono Night #5')
   const body = await flat(
@@ -267,21 +292,59 @@ test('F29-AC19: Given an event of no community, When its page opens, Then the he
   )
   expect(body).toContain('<h1>Hono Night #5</h1>')
   expect(body).toContain('>Luma で見る</a')
-  expect(body).toMatch(/発表 <span class="event-talks-count">1 本<\/span>/)
+  expect(body).toMatch(/スライド <span class="event-talks-count">1 本<\/span>/)
   expect(body).not.toContain('class="event-community"')
+  expect(body).not.toMatch(/class="cover-(pattern|image)"/)
   expect(body).not.toContain('<time datetime="2')
   expect(body).toContain('<title>Hono Night #5')
 })
 
-test('F29-AC9: Given an event whose links have no title, When its page opens, Then it is named by the service and number', async () => {
+test('F45-AC10: Given an event whose links have no title, When its page opens, in either language, Then its heading is the site and the address', async () => {
   await seedPublic(db, 'talk', 100, 'Talk')
   await add('talk', KANAGAWA)
-  expect(await flat(`/events/${await eventIdOf(KANAGAWA_KEY)}`)).toContain(
-    '<h1>connpass のイベント 410635</h1>',
-  )
+  for (const headers of [{}, EN])
+    expect(await flat(KANAGAWA_PAGE, headers)).toContain(
+      '<h1>connpass https://connpass.com/event/410635/</h1>',
+    )
 })
 
-test('F29-AC20: Given events of a connpass group, a Doorkeeper group, connpass with no group and Luma, When their pages open, Then only the grouped ones offer to make the community with the group page filled in', async () => {
+test('F45-AC10: Given titled links on a draft, then on two public slides, When the page opens, Then the heading is the first title saved on a public slide; once that link is removed, the next', async () => {
+  await seedDeck(db, 'draft')
+  await seedDeployment(db, 'draft')
+  await seedPublic(db, 'none', 100, 'None')
+  await seedPublic(db, 'first', 200, 'First')
+  await seedPublic(db, 'second', 300, 'Second', '2')
+  await add('draft', KANAGAWA, 'Draft title')
+  await add('none', KANAGAWA)
+  await add('first', KANAGAWA, 'First title')
+  await add('second', KANAGAWA, 'Second title', bob)
+  expect(
+    (await orm.select().from(events).get())?.name,
+    'the event keeps no name',
+  ).toBeNull()
+  const body = await flat(KANAGAWA_PAGE)
+  expect(body).toContain('<h1>First title</h1>')
+  expect(body).toContain('<title>First title')
+  expect(body).not.toContain('Draft title')
+  const [link] = await listLinks(db, 'first')
+  await server.fetch(
+    new Request(`${TEST_ORIGIN}/my/slides/first/links/${link!.id}/delete`, {
+      method: 'POST',
+      headers: { Cookie: owner, Origin: TEST_ORIGIN },
+    }),
+    env,
+  )
+  expect(await flat(KANAGAWA_PAGE)).toContain('<h1>Second title</h1>')
+})
+
+test('F45-AC11: Given an event with a name kept from before, When its page opens, Then the name is the heading, whatever titles its links have', async () => {
+  await seedPublic(db, 'talk', 100, 'Talk')
+  await add('talk', KANAGAWA, 'A title')
+  await orm.update(events).set({ name: 'Kanagawa.pm #3 (fixed)' })
+  expect(await flat(KANAGAWA_PAGE)).toContain('<h1>Kanagawa.pm #3 (fixed)</h1>')
+})
+
+test('F45-AC27: Given events of a connpass group, a Doorkeeper group, connpass with no group and Luma, When their pages open, Then only the grouped ones offer to make the community with the group page filled in', async () => {
   await seedPublic(db, 'talk', 100, 'Talk')
   const cases = [
     [KANAGAWA, KANAGAWA_KEY, 'https://kanagawapm.connpass.com/'],
@@ -305,22 +368,6 @@ test('F29-AC20: Given events of a connpass group, a Doorkeeper group, connpass w
       `href="/communities/new?link=${encodeURIComponent(group)}" >作る</a`,
     )
   }
-})
-
-test('F29-AC21: Given an event of no community, When its page opens twice, Then it has the same default pattern in the color its number picks, as one image named by the event', async () => {
-  await seedPublic(db, 'talk', 100, 'Talk')
-  await add('talk', KANAGAWA, 'Kanagawa.pm #3')
-  const id = (await eventIdOf(KANAGAWA_KEY))!
-  const pattern = (body: string) =>
-    /<div class="cover-pattern"[\s\S]*?<\/div>/.exec(body)?.[0] ?? ''
-  const first = pattern(await flat(`/events/${id}`))
-  const second = pattern(await flat(`/events/${id}`))
-  expect(first).toBe(second)
-  expect(first).toContain('role="img" aria-label="Kanagawa.pm #3 のカバー画像"')
-  const color = ['red', 'orange', 'yellow', 'green', 'navy'][id % 5]
-  const squares = [...first.matchAll(/var\(--community-([a-z]+)/g)]
-  expect(squares).toHaveLength(32)
-  expect(new Set(squares.map(([, name]) => name))).toEqual(new Set([color]))
 })
 
 test('F45-AC19: Given fetch watched, When a page of links opens, in each language and from the number of its event, Then nothing is fetched', async () => {
@@ -364,7 +411,7 @@ test("F19-AC2: Given a viewer who muted one author of an event, When they open i
   ])
 })
 
-test('F29-AC20: Given one connpass number added under two groups, When its page opens, Then it offers no community; with only one group left, it offers that group', async () => {
+test('F45-AC27: Given one connpass number added under two groups, When its page opens, Then it offers no community; with only one group left, it offers that group', async () => {
   await seedPublic(db, 'a', 100, 'A')
   await seedPublic(db, 'b', 200, 'B')
   await add('a', 'https://evil.connpass.com/event/410635/')
@@ -386,7 +433,7 @@ test('F29-AC20: Given one connpass number added under two groups, When its page 
   )
 })
 
-test('F29-AC20: Given a group written only on a draft slide, When the event page opens, Then that group is not offered', async () => {
+test('F45-AC27: Given a group written only on a draft slide, When the event page opens, Then that group is not offered', async () => {
   await seedPublic(db, 'talk', 100, 'Talk')
   await seedDeck(db, 'draft')
   await seedDeployment(db, 'draft')

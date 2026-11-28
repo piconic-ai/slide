@@ -13,6 +13,7 @@ import {
   relatedLinks,
 } from '../db/schema'
 import { deckSlugSchema } from '../decks/deck-id'
+import { firstPublicTitle } from '../links/link-page-store'
 import { EVENT_SERVICES } from '../events/event-url'
 import { notBlockedBy } from '../blocks/store'
 import { notMutedBy } from '../mutes/store'
@@ -101,6 +102,7 @@ const talkRow = z.object({
   host: z.string(),
   url: z.string(),
   name: z.string().nullable(),
+  firstTitle: z.string().nullable(),
   deckId: z.string(),
   handle: handleSchema,
   slug: deckSlugSchema,
@@ -130,6 +132,7 @@ async function listTalkRows(
       host: events.host,
       url: events.url,
       name: events.name,
+      firstTitle: firstPublicTitle,
       deckId: decks.id,
       handle: accounts.handle,
       slug: decks.slug,
@@ -208,6 +211,7 @@ export async function readCommunityTalks(
       host: event.host,
       url: event.url,
       name: event.name,
+      firstTitle: event.firstTitle,
       talks,
     }))
     .sort((a, b) => firstAt(b.talks) - firstAt(a.talks) || b.id - a.id)

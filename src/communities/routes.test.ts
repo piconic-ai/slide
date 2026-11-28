@@ -279,7 +279,7 @@ describe('making a community', () => {
     expect(page).not.toContain('<script>x</script>')
   })
 
-  test('F30-AC40: Given the way from an event page, When the page opens, Then the first link holds the group', async () => {
+  test('F30-AC73: Given the way from a page of links, When the page opens, Then the first link holds the group', async () => {
     const body = await flat(
       await open(
         '/communities/new?link=https%3A%2F%2Fkanagawapm.connpass.com%2F',
