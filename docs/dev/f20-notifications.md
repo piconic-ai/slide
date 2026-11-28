@@ -30,11 +30,11 @@
 
 ## コミュニティに新しいスライドが入ったとき
 
-種類 `community_published`(migration `0060_community_notifications.sql`)。`deck_id` は入ったスライド、`actor_user_id` はその作者、`community_id` は文に添えるコミュニティ(F20-AC15〜AC18)。`notifications` に列 `community_id`(`communities.id` を参照)を足すため、CHECK を変えられない SQLite の事情で、表を消して作り直す(行は引き継がない。利用者が依頼者 1 人の間は、お知らせが空になってよいと、依頼者が了承した。2026-11-26)。第三スコープの「足すだけ」(D-04)の例外で、`src/db/scope3-migrations.test.ts` に名前を挙げて許している。
+種類 `community_published`(migration `0060_community_notifications.sql`)。`deck_id` は入ったスライド、`actor_user_id` はその作者、`community_id` は文に添えるコミュニティ(F20-AC17、F20-AC18、F20-AC20、F20-AC21)。`notifications` に列 `community_id`(`communities.id` を参照)を足すため、CHECK を変えられない SQLite の事情で、表を消して作り直す(行は引き継がない。利用者が依頼者 1 人の間は、お知らせが空になってよいと、依頼者が了承した。2026-11-26)。第三スコープの「足すだけ」(D-04)の例外で、`src/db/scope3-migrations.test.ts` に名前を挙げて許している。
 
 `notifyCommunityPublished`(`src/notifications/store.ts`)は、1 つの INSERT … SELECT で、次を行う。
 
-- 受け手は、`community_follows` の人。コミュニティが「入る」かは、読むときに `inCommunity`(`src/communities/store.ts`。D-35。保存しない)で判断する。
+- 受け手は、`community_follows` の人。スライドがコミュニティに「入る」かは、読むときに `deckInCommunity`(リンクの id を渡されたときは `linkInCommunity`。`src/communities/store.ts`。D-35。保存しない)で判断する。紐づけ用リンクに合う関連リンクなら、種類を問わない([リンクによる集約の実装設計](f45-link-gathering.md)の「コミュニティへの所属」)。
 - 対象は、`deckId` のスライドのうち、準備のできた公開の版があり、削除も非表示もされていないもの。
 - 作者本人は除く(`cf.user_id <> decks.owner_user_id`)。作者がコミュニティを作ると、そのコミュニティを自動でフォローする(F31-AC17)ため、除かないと `notification_other_user` の CHECK で文全体が失敗する。
 - ミュート、ブロック(受け手が作者を、または作者が受け手を)、受け取らない設定の人は除く。ブロックは、コミュニティのフォローを外さない(F31-AC12)ため、作者から受け手へのブロックも、ここで見る。
@@ -46,13 +46,13 @@
 | 契機 | 場所 | 失敗 |
 | --- | --- | --- |
 | 初めての一般公開 | `saveTransition`(`src/publication/store.ts`)の、`followee_published` を配信する分岐の直後 | ログ(`notifications_unrecorded`)だけで、公開は成立する |
-| 一般公開中のスライドへの、イベントの関連リンクの追加と、種類の変更 | `src/decks/routes.ts` の `POST /my/slides/:deck/links` と `/links/kinds`、`src/mcp/article-api.ts` の `add_related_link`(`notifyCommunityPublishedQuietly`) | ログだけで、リンクの追加は成立する |
+| 一般公開中のスライドへの、関連リンクの追加(種類を問わない)と、種類の「イベント」への変更 | `src/decks/routes.ts` の `POST /my/slides/:deck/links` と `/links/kinds`、`src/mcp/article-api.ts` の `add_related_link`(`notifyCommunityPublishedQuietly`) | ログだけで、リンクの追加は成立する |
 
-リンクの追加と種類の変更では、そのイベントのキー(`eventKey`)を渡し、そのイベントでコミュニティに入る場合だけ知らせる。スライドが前から入っているコミュニティに、あとからフォローした人へは、無関係なリンクの追加では届けない。初公開では、スライドのすべてのイベントを見る。
+リンクの追加と種類の変更では、その関連リンクの id(`linkId`)を渡し、そのリンクでコミュニティに入る場合だけ知らせる。スライドが前から入っているコミュニティに、あとからフォローした人へは、無関係なリンクの追加では届けない。初公開(F20-AC20)では `linkId` を渡さず、スライドのすべての関連リンクを見る。
 
-`eventKey` を渡すときは、`COMMUNITY_NOTICE_WINDOW_SECONDS`(7 日。`src/notifications/limits.ts`)以内に初めて公開したスライドだけを対象にする(F20-AC16。初公開は `first_published_at`、無ければ公開の版の準備ができた時刻から数える)。
+`linkId` を渡すときは、`COMMUNITY_NOTICE_WINDOW_SECONDS`(7 日。`src/notifications/limits.ts`)以内に初めて公開したスライドだけを対象にする(F20-AC21。初公開は `first_published_at`、無ければ公開の版の準備ができた時刻から数える)。
 
-コミュニティの管理者の紐づけ用リンクの追加、Luma のカレンダーの取り込みは、呼び出さない(F20-AC18)。版の更新、再開、取り消し後の再公開でも呼び出さない。`inCommunity` の結合は、`related_link_events` の `host` の索引(`related_link_events_host`)を使う(`src/notifications/community-published.test.ts` が EXPLAIN で確かめる)。
+コミュニティの管理者の紐づけ用リンクの追加、Luma のカレンダーの取り込みは、呼び出さない(F20-AC18)。版の更新、再開、取り消し後の再公開でも呼び出さない。イベントのリンクの結合は、`related_link_events` の `host` の索引(`related_link_events_host`)を使う(`src/notifications/community-published.test.ts` が EXPLAIN で確かめる)。
 
 一覧と未読件数では、`community_published` を `followee_published` と同じ条件(スライドが一般公開中で、削除も非表示もされていない)で表示する(F20-AC10)。一覧は、コミュニティの名前とハンドルを左結合で読む。コミュニティを削除すると、そのお知らせも消える(`deleteCommunity`)。退会は、既存の削除(受け手または相手のお知らせ)で足りる。
 

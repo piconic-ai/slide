@@ -50,8 +50,8 @@
 | スライドのページの、引用している・引用されている一覧と「ほか N 件」(`src/citations/store.ts`) | `notBlockedBy(viewer)` | F32-AC3、F32-AC6、F24-AC49 |
 | プロフィールの「引用した」「引用された」の数と一覧、カードの引用の数(`src/citations/pair-store.ts`) | `notBlockedByOf(far, viewer)` | F32-AC7、F24-AC50 |
 | お知らせの挿入と、一覧・未読の数(`src/notifications/store.ts`) | `notBlocking(受け手, 相手)` | F32-AC5、F20-AC13 |
-| イベントのページの発表の一覧と数、イベントの一覧(`src/events/store.ts` の `publicTalks`) | `notBlockedBy(viewer)` | F32-AC4 |
-| コミュニティの一覧と数、フォローしているコミュニティの新着 | `notBlockedByOf(deck, viewer)`。作業 C(コミュニティ)と F(コミュニティのフォロー)が、自分の問い合わせに付ける | F32-AC4 |
+| リンクのページのスライドの一覧と数(`src/links/link-page-store.ts`) | `notBlockedBy(viewer)`。ページを出すかどうかの判定には当てない(0 本になっても、ページは 200 で出る。F45-AC15) | F32-AC22 |
+| コミュニティの一覧と数、フォローしているコミュニティの新着 | `notBlockedByOf(deck, viewer)`。作業 C(コミュニティ)と F(コミュニティのフォロー)が、自分の問い合わせに付ける | F32-AC22 |
 
 どの一覧も、ミュートと同じく、見ている人のブロックだけを効かせる。A が自分のプロフィールを見れば B の引用は外れるが、ほかの人と B が見る一覧と数は、ブロックの前後で変わらない。作者どうしの条件(A のブロックを、だれが見ても効かせる)にすると、スライドのページの一覧には出る引用が、プロフィールとカードの数からだけ消えて食い違い、B がブロックを推測できる(D-72、F32-AC8)。
 

@@ -54,7 +54,7 @@ takeHandle(database, {
 
 D-15 の語を足す(F30-AC3)。
 
-- `communities`、`events`、`blocks` は、経路の先頭の語(`ROUTE_HANDLES`)。`events` は第二スコープから予約してある。経路(`/communities/new`、`/events/:id`、`/blocks/new`)は、どれもできた。`handle-rules.test.ts` が経路のない予約語として許すのは、別のホストで受ける `operator` だけである。
+- `communities`、`events`、`blocks`、`link` は、経路の先頭の語(`ROUTE_HANDLES`)。`events` は第二スコープから予約してある。経路(`/communities/new`、`/events/:id`、`/blocks/new`、`/link/…`)は、どれもできた。`/events/:id` は、リンクのページへの転送だけが残る。`link` は、リンクのページのために足した(F30-AC74)。`handle-rules.test.ts` が経路のない予約語として許すのは、別のホストで受ける `operator` だけである。
 - `communities` は、プロフィールの「コミュニティ」のタブ(`/@handle/communities`)の語でもあるので、ハンドルのあとに来る語(`AFTER_HANDLE_WORDS`)にも入れる。
 - `edit` は、コミュニティの `/@ハンドル/edit` の語。ハンドルのあとに来る語なので、`AFTER_HANDLE_WORDS` とは別の一覧 `COMMUNITY_PAGE_WORDS` に置く。人のスライドの名前としては、使える。
 

@@ -42,7 +42,7 @@
 | 経路 | 受ける場所 | 確かめた応答 |
 | --- | --- | --- |
 | `/communities/new` | `communityForms` | 作るフォーム(`action="/communities/new"`) |
-| `/events/:id` | `eventRoutes` | イベントのページと発表 |
+| `/events/:id` | `eventRoutes` | 点検のときは、イベントのページと発表。2026-11-27 から、リンクのページ `/link/…` への 301 だけ([リンクによる集約の実装設計](f45-link-gathering.md)) |
 | `/blocks/new` | `blockForms`(`/blocks`) | ブロックの確認のページ(`action="/blocks"`) |
 | `/@コミュニティ/edit` | `shareRoutes` → `showCommunity` | 編集のページ(`action="/communities/:id/edit"`) |
 | `/@人/edit` | `shareRoutes` | その人の `edit` という名前のスライド(人のスライドは `edit` を名前にできる) |
@@ -72,10 +72,10 @@
 | 場所 | 呼んでいる場所 | テスト |
 | --- | --- | --- |
 | トップの最近のスライド、フォロー中の人の新着 | `src/share/store.ts` | `src/share/blocks.test.ts`(F32-AC3) |
-| フォローしているコミュニティの新着、「すべて見る」 | `src/communities/feed-store.ts` | `src/communities/feed.test.ts`(F32-AC4) |
-| コミュニティのページの一覧と数 | `src/communities/page-store.ts` | `src/communities/routes.test.ts`(F32-AC4) |
-| イベントのページと一覧 | `src/events/store.ts` | `src/events/event-page.test.ts`、`src/communities/event-communities.test.ts`(F32-AC4) |
-| プロフィールの「コミュニティ」のタブの最近のスライド | `src/profile/communities-store.ts` | `src/profile/communities-tab.test.ts`(F32-AC4) |
+| フォローしているコミュニティの新着、「すべて見る」 | `src/communities/feed-store.ts` | `src/communities/feed.test.ts`(F32-AC22) |
+| コミュニティのページの一覧と数 | `src/communities/page-store.ts` | `src/communities/routes.test.ts`(F32-AC22) |
+| リンクのページ(点検のときは、イベントのページと一覧) | `src/links/link-page-store.ts` | `src/links/link-page.test.ts`、`src/communities/event-communities.test.ts`(F32-AC22) |
+| プロフィールの「コミュニティ」のタブの最近のスライド | `src/profile/communities-store.ts` | `src/profile/communities-tab.test.ts`(F32-AC22) |
 | viewer のおすすめ(同じイベント・同じコミュニティ) | `src/share/viewer-talks-store.ts` | `src/share/viewer-talks.test.ts`(F24-AC45) |
 | viewer の引用の一覧、表紙のカードの数 | `src/citations/store.ts`、`src/citations/pair-store.ts` | `src/share/blocks.test.ts`(F32-AC3、F32-AC6、F32-AC7) |
 | プロフィールの「引用された」の数と一覧 | `src/citations/store.ts` | `src/share/blocks.test.ts`(F32-AC7) |
@@ -86,7 +86,7 @@
 
 ## 文言
 
-第三スコープで足した画面の文言は、どれも `messages()` で日本語と英語を持つ(英語の辞書のキーの欠けは型検査で落ちる)。辞書を使わないのは、`lang` で分ける `src/events/event-name.ts` と、運営の画面(`src/communities/operator-page.ts`、`src/feeds/operator-page.ts`、`src/operator/pages.ts`)である。運営の画面は第二スコープから日本語だけで、それに合わせている。
+第三スコープで足した画面の文言は、どれも `messages()` で日本語と英語を持つ(英語の辞書のキーの欠けは型検査で落ちる)。辞書を使わないのは、`lang` で分ける `src/links/link-heading.ts`(点検のときは `src/events/event-name.ts`)と、運営の画面(`src/communities/operator-page.ts`、`src/feeds/operator-page.ts`、`src/operator/pages.ts`)である。運営の画面は第二スコープから日本語だけで、それに合わせている。
 
 新しい画面と変わった画面(コミュニティを作る・見る・編集する、イベントのページ、ブロックの確認、プロフィールの「コミュニティ」のタブ、イベントの行のある viewer、フォローしているコミュニティの新着、設定、`/help/bot`)を英語で開いて日本語が残らないこと、日本語で開いて日本語で出ることを、`src/app/scope3-routes.test.ts` で確かめる。
 

@@ -1,26 +1,25 @@
 # リンクによる集約の実装設計
 
-[同じリンクでスライドが集まる](../features/f45-link-gathering.md)の設計。同じ URL を関連リンクに持つスライドを、`/link/<URL>` の 1 つのページに並べる。実装は 10 本の PR に分ける(計画は [issue #737](https://github.com/piconic-ai/slide/issues/737))。この文書は PR ごとに書き足す。いま実装済みなのは、link1 の純粋な関数、link2 の経路(イベントの形のリンクだけがページになる)、link3 の `/events/:id` の転送とアプリの中のリンク先、link4 のページの見出しと頭、名前を直す経路の撤去、link5 の画面の言葉(コミュニティの「リンク」のタブ、1 本の管理の文と枠)、link6 の列(`gather_key`、`link_host`)、link7 のイベントでないリンクのページと viewer の行からのリンク、link8 の種類を問わないコミュニティへの所属と、そのお知らせ、フォローの新着である。コミュニティの「リンク」のタブは、まだイベントのリンクだけを並べる(link9)。節ごとに、実装済みか、どの PR で実装するかを書く。
+[同じリンクでスライドが集まる](../features/f45-link-gathering.md)の設計。同じ URL を関連リンクに持つスライドを、`/link/<URL>` の 1 つのページに並べる。実装は 12 本の PR に分けた(下の「PR の積み方」。計画は [issue #737](https://github.com/piconic-ai/slide/issues/737))。どの節も、実装済みのことを書いている。確かめていないこと、仕様に書かれていない扱いは、その節に書いた。
 
 ## ファイルの分担
 
-| ファイル | 層 | 役割 | 状態 |
-| --- | --- | --- | --- |
-| `src/links/url-rules.ts` | 純粋 | サイトごとの規則。集めるときだけ除くクエリ(`gatheredWithout`) | link1 で実装済み |
-| `src/links/normalize.ts` | 純粋 | 比べる形(`normalizedUrlOf`)。中身は、除く名前を足せる `comparedUrlOf` | link1 で実装済み(出力は変えていない) |
-| `src/links/gather.ts` | 純粋 | 集める鍵(`gatherKeyOf`)、書かれたホスト名(`linkHostOf`) | link1 で実装済み |
-| `src/links/link-address.ts` | 純粋 | `/link/` の後ろの読み方(`parseLinkPath`)、引く鍵と正規の形(`linkTargetOf`)、ページの path(`linkPagePath`)、イベントを引く鍵の候補(`eventKeysOf`) | link1、link2 で実装済み |
-| `src/links/link-page-routes.ts` | routes | `GET /link/*`、`GET /link` | link2 で実装済み(イベントだけ) |
-| `src/links/link-page-store.ts` | store | 鍵からイベントを引く(`findEventIdsByKey`)、Luma の番号から名前への対応(`findAliasedKey`)、ページの読み出し(`readLinkPage`。イベントは `readEventPage`、イベントでないリンクは `readGatheredPage`)、番号から転送先を引く(`findShownEventUrl`)、一覧の行に最初の題名を足す SQL(`firstPublicTitle`)、1 本のスライドの関連リンクのうちページの出ているもの(`listShownLinks`) | link2〜link5、link7、link8 で実装済み |
-| `src/links/link-missing-page.ts` | pages | 「まだありません」のページ(F45-AC12、F45-AC29) | link2 で実装済み |
-| `public/share.js` | ブラウザー | フッターの言語の切り替えの行き先を、`/link/…` では `/link?to=…` にする | link2 で実装済み |
-| `src/links/link-page.ts` | pages | ページ(`linkPageBody`、`linkPageTitle`) | link4 で実装済み(`src/events/event-page.ts` を移した) |
-| `src/links/link-heading.ts` | 純粋 | 見出し(`headingOf`)、サイト名(`siteNameOf`)、元のページへのリンクの文と行き先(`sourceLinkTextOf`、`sourceOf`) | link4 で実装済み(`src/events/event-name.ts` を移した)。ページを出す条件(`pageShown`)は link7 で実装済み |
-| `src/events/routes.ts` | routes | `GET /events/:id` の 301 | link3 で実装済み |
-| `src/events/store.ts` | store | 1 本のスライドの入っているイベント(`listDeckEvents`) | link3 で、ページの読み出しを `src/links/link-page-store.ts` へ移した。link4 で `renameEvent` を消した |
-
-| `src/communities/store.ts` | store | コミュニティに入るリンクとスライドの条件(`linkInCommunity`、`deckInCommunity`)。イベントだけの条件(`inCommunity`)も残る | link8 で実装済み |
-| `src/communities/event-communities-store.ts` | store | イベントでないリンクのページに出すコミュニティ(`findHostCommunity`) | link8 で実装済み |
+| ファイル | 層 | 役割 |
+| --- | --- | --- |
+| `src/links/url-rules.ts` | 純粋 | サイトごとの規則。集めるときだけ除くクエリ(`gatheredWithout`) |
+| `src/links/normalize.ts` | 純粋 | 比べる形(`normalizedUrlOf`)。中身は、除く名前を足せる `comparedUrlOf` |
+| `src/links/gather.ts` | 純粋 | 集める鍵(`gatherKeyOf`)、書かれたホスト名(`linkHostOf`) |
+| `src/links/link-address.ts` | 純粋 | `/link/` の後ろの読み方(`parseLinkPath`)、引く鍵と正規の形(`linkTargetOf`)、ページの path(`linkPagePath`)、イベントを引く鍵の候補(`eventKeysOf`) |
+| `src/links/link-page-routes.ts` | routes | `GET /link/*`、`GET /link` |
+| `src/links/link-page-store.ts` | store | 鍵からイベントを引く(`findEventIdsByKey`)、Luma の番号から名前への対応(`findAliasedKey`)、ページの読み出し(`readLinkPage`。イベントは `readEventPage`、イベントでないリンクは `readGatheredPage`)、番号から転送先を引く(`findShownEventUrl`)、一覧の行に最初の題名を足す SQL(`firstPublicTitle`)、1 本のスライドの関連リンクのうちページの出ているもの(`listShownLinks`) |
+| `src/links/link-missing-page.ts` | pages | 「まだありません」のページ(F45-AC12、F45-AC29) |
+| `public/share.js` | ブラウザー | フッターの言語の切り替えの行き先を、`/link/…` では `/link?to=…` にする |
+| `src/links/link-page.ts` | pages | ページ(`linkPageBody`、`linkPageTitle`) |
+| `src/links/link-heading.ts` | 純粋 | 見出し(`headingOf`)、サイト名(`siteNameOf`)、元のページへのリンクの文と行き先(`sourceLinkTextOf`、`sourceOf`)、ページを出す条件(`pageShown`) |
+| `src/events/routes.ts` | routes | `GET /events/:id` の 301 |
+| `src/events/store.ts` | store | 1 本のスライドの入っているイベント(`listDeckEvents`) |
+| `src/communities/store.ts` | store | コミュニティに入るリンクとスライドの条件(`linkInCommunity`、`deckInCommunity`)。イベントだけの条件(`inCommunity`)も残る |
+| `src/communities/event-communities-store.ts` | store | イベントでないリンクのページに出すコミュニティ(`findHostCommunity`) |
 
 `src/links/link-address.ts` は、イベントの形の判定と鍵に `src/events/event-url.ts` の `isEventAddress`、`eventRefOf` を使う。どちらも純粋なファイルで、`src/links/kind.ts` がすでに同じ向きで読み込んでいる。
 
@@ -67,7 +66,7 @@
 
 規則(`src/links/url-rules.ts`)を変えると、すでに保存した鍵と合わなくなる。規則を変える PR は、`gather_key` を作り直す migration を足す。
 
-## データ(link6 で実装済み)
+## データ
 
 migration `0071_related_link_gather_key.sql` が、`related_links` に NULL を許す列を 2 つと、索引を 2 つ足す。`normalized_url`、1 本のスライドの中の重複の判定、イベントの表(`events`、`related_link_events`)と鍵は変えていない。
 
@@ -96,7 +95,7 @@ SQL は `src/links/url-rules.ts` の規則を写したものである。`gathere
 
 読む側は、NULL を「集まらない」と扱う。`gather_key = ?` の条件に NULL の行は当たらないので、そのリンクは、ページにも、ページを出す条件の数にも入らない。NULL の行は、次に `gather_key` を作り直す migration で埋まる。それまでに埋めたいときは、`gather_key IS NULL` の行だけを埋める migration を足す。本番に NULL の行が何行あるかは、確かめていない。
 
-## 経路(link2 で実装済み)
+## 経路
 
 `GET /link/*`(`src/links/link-page-routes.ts`)は、次の順で答える(F45-AC13 の順)。
 
@@ -110,7 +109,7 @@ SQL は `src/links/url-rules.ts` の規則を写したものである。`gathere
 - 検索: `isIndexablePath` は `/link/` で始まる path を載せてよいとする(F45-AC36)。`noindexPrivate` は 200 と 304 だけを通すので、404 と 301 には `X-Robots-Tag: noindex, nofollow` が付く。
 - 予約語: `link` を `ROUTE_HANDLES` に足した(F30-AC74)。`events` は、経路が残るので、残している。
 
-## `/events/:id` の転送と、ページを出す条件(link3 で実装済み)
+## `/events/:id` の転送と、ページを出す条件
 
 `GET /events/:id`(`src/events/routes.ts`)は、番号からイベントを引き(`findShownEventUrl`)、一般公開中のスライドが 1 本でもあれば、`linkPagePath(events.url)` へ 301 で転送する(F45-AC9)。数字でない番号、無い番号、一般公開中のスライドの無いイベントは、共通の 404。見る人を当てないので、だれが開いても同じ応答になる。クエリ(`?lang=` を含む)は、転送先に持ち越さない。
 
@@ -124,21 +123,21 @@ SQL は `src/links/url-rules.ts` の規則を写したものである。`gathere
 | 一般公開中のスライドのリンク(保存の古い順) | 当てない | ページを出すかどうか、connpass の元のページへのリンクのグループ(最初のリンク)、「コミュニティはまだありません」に使うホスト名の集合 |
 | 一般公開中のスライド(公開の新しい順、同じ時刻は URL の名前の順) | 当てる | 一覧と本数 |
 
-- 1 つめが 0 行なら `null` で、経路は「まだありません」のページを出す。ページが出るかどうかは、見る人によらない(F45-AC15)。ブロックやミュートで一覧が 0 本になっても、ページは 200 で、本数は 0 になる。link2 までは、見る人を当てた一覧が 0 本だと 404 だった。
+- 1 つめが 0 行なら `null` で、経路は「まだありません」のページを出す。ページが出るかどうかは、見る人によらない(F45-AC15)。ブロックやミュートで一覧が 0 本になっても、ページは 200 で、本数は 0 になる。
 - 「一般公開中」は、どちらも `publicTalks` の条件である: 公開の版が `ready`、運営が非表示にしておらず、作者が停止中でない(`notHidden`)、作者の `accounts` の行がある(F45-AC14)。
 - `listListedEvents`(イベントの一覧)は、テストだけが使っていたので消した。F45 に、イベントの一覧は無い。
 
-アプリの中のイベントへのリンクは、`linkPagePath(event.url)` で作る。`DeckEvent`、`ViewerEvent`、`CommunityEvent`(link9 から `CommunityLink`)に `url`(`events.url`)を足した。
+アプリの中のイベントへのリンクは、`linkPagePath(event.url)` で作る。`DeckEvent`、`ViewerEvent`、`CommunityLink`に `url`(`events.url`)を足した。
 
 | 場所 | ファイル |
 | --- | --- |
 | viewer のイベントの行(F24-AC51)、「イベントを見る」(F24-AC52) | `src/share/viewer-events-frame.ts` の `eventHref`、`src/share/viewer-recommendations-frame.ts` |
-| 1 本の管理の「このスライドが並ぶページ」(link5 で、「発表したイベント」から改めた) | `src/decks/placed-pages-frame.ts` |
+| 1 本の管理の「このスライドが並ぶページ」(「発表したイベント」から改めた) | `src/decks/placed-pages-frame.ts` |
 | コミュニティのリンクのタブの見出しと「ほか n 本」 | `src/communities/community-page.ts` |
 
 `add_related_link` の説明(`src/mcp/tools.ts`)は、イベントの URL を入れると、そのイベントのリンクのページ(`/link/` と、`https://` を除いた URL)にスライドが並ぶ、と書く(F23-AC53)。
 
-## 見出しと頭(link4 で実装済み)
+## 見出しと頭
 
 見出しは `headingOf`(`src/links/link-heading.ts`)が決める。順に、`events.name`、一般公開中のスライドのリンクのうち最初に保存された題名(`firstTitle`)、サイト名と URL(「connpass https://connpass.com/event/410635/」)である。言語によらない。サイト名は、connpass、Doorkeeper、Luma はサービス名、ほかはホスト名(`siteNameOf`)。URL は `events.url` である。
 
@@ -146,7 +145,7 @@ SQL は `src/links/url-rules.ts` の規則を写したものである。`gathere
 - 最初の題名は、読む場所が 2 つある。ページは、`readEventPage` の 1 つめの問い合わせ(一般公開中のスライドのリンク、保存の古い順。`related_link_events.created_at`、同じ時刻は rowid の順)の行から、題名のある最初のものを取る。一覧(`listDeckEvents`、コミュニティのイベントのタブの `listTalkRows`)は、同じ条件を相関サブクエリにした `firstPublicTitle` を select に足す。2 つは同じ条件を別々に書いているので、`src/links/link-page.test.ts`、`src/share/viewer-events.test.ts` などの画面のテストで、両方の結果を確かめている。
 - `headingOf` を使う場所: リンクのページ、viewer のイベントの行と「(見出し) のほかの発表」、1 本の管理の「このスライドが並ぶページ」、コミュニティのリンクのタブ。題名の無いイベントは、これまでの「connpass のイベント 410635」ではなく、サイト名と URL で出る。
 
-元のページへのリンク先は `sourceOf` が決める(F45-AC25)。イベントは、connpass なら最初のリンクが書いたグループの URL(`sourceUrlOf`)、ほかは `events.url`。イベントでないリンク(`kind: 'link'`)は、最初のリンクの整えた URL で、link7 から使う。リンクには `rel="noopener nofollow ugc"` と `linkCheckTrigger()` を付け、本文の末尾に `linkCheckPrompt(lang)` を置く。確認の画面は、すべてのページが読み込む `/share.js` が開く(F45-AC30)。
+元のページへのリンク先は `sourceOf` が決める(F45-AC25)。イベントは、connpass なら最初のリンクが書いたグループの URL(`sourceUrlOf`)、ほかは `events.url`。イベントでないリンク(`kind: 'link'`)は、最初のリンクの整えた URL である。リンクには `rel="noopener nofollow ugc"` と `linkCheckTrigger()` を付け、本文の末尾に `linkCheckPrompt(lang)` を置く。確認の画面は、すべてのページが読み込む `/share.js` が開く(F45-AC30)。
 
 ページの頭は、コミュニティに入っていれば、カバー画像、ロゴ、名前(コミュニティのページへのリンク)を出す。入っていなければ、どれも出さない(F45-AC17)。番号から色を選ぶ既定の模様(`defaultEventCover`、`colorOfNumber`)は消した。本数の見出しは「スライド n 本」である(F45-AC16)。「このグループのコミュニティはまだありません」と「作る」は、これまでどおり出す(F45-AC27)。
 
@@ -163,20 +162,20 @@ SQL は `src/links/url-rules.ts` の規則を写したものである。`gathere
 
 `events.named_by`、`events.named_at` の列は残る(書く経路は無い)。
 
-## 画面の言葉(link5 で実装済み)
+## 画面の言葉
 
-括りの名前としての「イベント」を、画面から外した。この時点で並ぶのは、イベントの形のリンクだけである。イベントでないリンクは、link7、link9 で足す。関連リンクの種類名「イベント」と、viewer の「発表したイベント」「イベントを見る」は変えていない。
+括りの名前としての「イベント」を、画面から外した。関連リンクの種類名「イベント」と、viewer の「発表したイベント」「イベントを見る」は変えていない。
 
 ### コミュニティのタブ
 
-タブは「リンク n」「スライド n」「フォロワー n」(英語は Links、Slides、Followers。F30-AC67)。リンクのタブが空のときは「まだリンクはありません。」(No links yet.)を出す。1 件ごとの見出し、「スライド n 本」、横に送る枠(6 本までと「ほか n 本」)は、link3、link4 のままである(F30-AC68)。
+タブは「リンク n」「スライド n」「フォロワー n」(英語は Links、Slides、Followers。F30-AC67)。リンクのタブが空のときは「まだリンクはありません。」(No links yet.)を出す。1 件ごとの見出し、「スライド n 本」、横に送る枠(6 本までと「ほか n 本」)が出る(F30-AC68)。
 
 - タブの URL は変えていない。リンクのタブは `/@ハンドル`、ほかは `/@ハンドル/slides`、`/@ハンドル/followers` で、タブをクエリで選ぶ URL は無い。
-- コードの中のタブの名前は `'events'` から `'links'` に替えた(`COMMUNITY_TABS`、`CommunityTabView`)。読み出し(`readCommunityTalks` の `links`)と型(`CommunityLink`)は、link9 で替えた。CSS のクラス(`community-event`)は、イベントの名前のまま残している。
+- コードの中のタブの名前は `'events'` から `'links'` に替えた(`COMMUNITY_TABS`、`CommunityTabView`)。読み出し(`readCommunityTalks` の `links`)と型(`CommunityLink`)も同じである。CSS のクラス(`community-event`)は、イベントの名前のまま残している。
 
 ### 1 本の管理の文と枠
 
-`listShownLinks(db, deckId)`(`src/links/link-page-store.ts`)は、そのスライドの関連リンクのうち、リンクのページが出ているものを、リンクの id とイベントの番号で返す。いまの条件は、イベントのリンクで、そのイベントに一般公開中のスライドが 1 本以上あること(`readEventPage` と同じ `publicTalks`。見る人を当てない)。そのスライド自身が下書きでも、ほかのスライドでページが出ていれば、含まれる。link7 で、イベントでないリンクに広げた(下の「イベントでないリンクのページ」)。
+`listShownLinks(db, deckId)`(`src/links/link-page-store.ts`)は、そのスライドの関連リンクのうち、リンクのページが出ているものを、リンクの id とイベントの番号で返す。イベントのリンクの条件は、そのイベントに一般公開中のスライドが 1 本以上あること(`readEventPage` と同じ `publicTalks`。見る人を当てない)。そのスライド自身が下書きでも、ほかのスライドでページが出ていれば、含まれる。イベントでないリンクの条件は、下の「イベントでないリンクのページ」に書いた。
 
 関連リンクの行の下の文は、`linkPlacesOf`(`src/decks/links-frame.ts`)が決める(F29-AC29)。
 
@@ -188,13 +187,13 @@ SQL は `src/links/url-rules.ts` の規則を写したものである。`gathere
 
 - コミュニティは、これまでどおり `listEventCommunities` が決める。connpass などは、一般公開中のスライドのリンクのホスト名が紐づけ用リンクと合うこと、Luma は、カレンダーの配信にあることである。下書きだけが持つ connpass のリンクは、コミュニティに入らず、ページも出ないので、文が出ない。Luma のカレンダーにあるイベントは、一般公開中のスライドが無くても、コミュニティの文が出る。
 
-「このスライドが並ぶページ」の枠(`src/decks/placed-pages-frame.ts`。`src/decks/events-frame.ts` を移した)は、`listDeckEvents` のイベントのうち、`listShownLinks` に含まれるものを、関連リンクの順に 1 度ずつ並べる(F29-AC30)。link7 で、イベントでないリンクのページも並べるようにした(`placedPagesOf`)。見出し(`headingOf`)はリンクのページへのリンクで、コミュニティに入っていれば、その名前を添える。並ぶページが無いときは「並ぶページは、関連リンクから決まります。いまは、並ぶページがありません。」を出す。枠の名前(`data-deck-frame`、`id`)は `events` から `placed-pages` に替えた。
+「このスライドが並ぶページ」の枠(`src/decks/placed-pages-frame.ts`。`src/decks/events-frame.ts` を移した)は、`listDeckEvents` のイベントのうち、`listShownLinks` に含まれるものを、関連リンクの順に 1 度ずつ並べる(F29-AC30)。イベントでないリンクのページも並べる(`placedPagesOf`)。見出し(`headingOf`)はリンクのページへのリンクで、コミュニティに入っていれば、その名前を添える。並ぶページが無いときは「並ぶページは、関連リンクから決まります。いまは、並ぶページがありません。」を出す。枠の名前(`data-deck-frame`、`id`)は `events` から `placed-pages` に替えた。
 
 幅 375px ではみ出さないこと(F29-AC31)は、`src/links/link-page.browser.test.ts` が、長い名前のリンクを持つスライドの管理のページで確かめる。
 
-ヘルプは、画面の言葉の引用だけを直した(`community/list-event-talks`)。記事の書き直しは link10。
+ヘルプは、記事 `community/link-gathering`(同じリンクを添えたスライドを集めて見る。F45-AC22)を足し、イベントとコミュニティの記事の言葉を、リンクのページに合わせた(F30-AC72)。記事が「」で引く画面の言葉は、`src/help/screen-words.test.ts` がソースと照らす。
 
-## イベントでないリンクのページ(link7 で実装済み)
+## イベントでないリンクのページ
 
 `readLinkPage(db, target, viewer)`(`src/links/link-page-store.ts`)は、F45-AC35 の順で読む。
 
@@ -203,7 +202,7 @@ SQL は `src/links/url-rules.ts` の規則を写したものである。`gathere
 
 ページを出すかは、純粋な `pageShown`(`src/links/link-heading.ts`)が決める。一般公開中のスライドが 1 本以上あり、かつ、イベントとして保存されている、URL がイベントの形である、コミュニティに入っている、作者が 2 人以上、のどれかである。
 
-- `inCommunity` は、link7 では常に false だった。link8 から、そのリンクのどれかがコミュニティに入っているかを渡す(下の「コミュニティへの所属」)。
+- `inCommunity` には、そのリンクのどれかがコミュニティに入っているかを渡す(下の「コミュニティへの所属」)。
 - 本数と作者の数は、見る人を当てない問い合わせの行から数える(スライドの id と `decks.owner_user_id` の種類の数)。同じスライドが同じ鍵のリンクを 2 つ持っても(`t=30` と `t=60`)、1 本である。
 - `pageShown` が false なら `null` で、経路は「まだありません」のページを出す。1 人だけの URL と、だれも入れていない URL は、本文も同じになる(F45-AC2)。
 - 一覧だけに、見る人のミュートとブロックを当てる。0 本になっても、ページは 200 である(F45-AC15)。
@@ -216,7 +215,7 @@ SQL は `src/links/url-rules.ts` の規則を写したものである。`gathere
 | --- | --- |
 | 見出し | 一般公開中のスライドのリンクのうち、最初に保存された題名。無ければ、ホスト名と集める鍵(「example.com https://example.com/post」) |
 | 元のページへのリンク | 一般公開中のスライドのリンクのうち、最初に保存されたものの `sanitized_url`(`sourceOf` の `kind: 'link'`)。`sanitized_url` が NULL の行なら、集める鍵 |
-| コミュニティの頭 | link7 では出さない。link8 から、コミュニティに入っていれば出す(F45-AC17) |
+| コミュニティの頭 | コミュニティに入っていれば出す(F45-AC17) |
 | 「コミュニティはまだありません」と「作る」 | 出さない(ホスト名の集合を空で返す。F45-AC27 は、イベントの形のリンクだけ) |
 
 ### ページの出ているリンク(`listShownLinks`)
@@ -229,13 +228,13 @@ SQL は `src/links/url-rules.ts` の規則を写したものである。`gathere
 
 ### connpass の番号の先頭の 0
 
-種類をイベント以外にした connpass の URL `https://connpass.com/event/007/` は、保存される集める鍵が `https://connpass.com/event/007` で、`/link/` の側は、イベントの鍵にそろえた `connpass.com/event/7` になる。2 つは合わないので、このリンクは集まらない。直すには、保存する鍵の規則(`gatherKeyOf`)を変え、すでにある行を作り直す migration が要る。link7 は migration を足さないので、直していない。`listShownLinks` は、このリンクを「ページが出ている」としない。
+種類をイベント以外にした connpass の URL `https://connpass.com/event/007/` は、保存される集める鍵が `https://connpass.com/event/007` で、`/link/` の側は、イベントの鍵にそろえた `connpass.com/event/7` になる。2 つは合わないので、このリンクは集まらない。直すには、保存する鍵の規則(`gatherKeyOf`)を変え、すでにある行を作り直す migration が要る。この実装では、直していない。`listShownLinks` は、このリンクを「ページが出ている」としない。
 
 ### 仕様との関係で確かめること
 
 - ほかのサイトの URL を、1 人が種類「イベント」で、別の 2 人がほかの種類で入れているとき、`/link/…` はイベントのページになり、ほかの種類の 2 人のスライドは並ばない(F45-AC35 の「まずイベントの鍵で引く」のとおり)。イベントのリンクが無くなると、2 人のページになる。このとき、2 人のスライドの viewer の行には、ページへ進むリンクが付く(行き先は、イベントのページ)。
 
-## コミュニティへの所属(link8 で実装済み)
+## コミュニティへの所属
 
 コミュニティに入るリンクを、イベントの関連リンクから、種類を問わない関連リンクに広げた(F30-AC65)。保存はせず、読むときに照らすので、紐づけ用リンクを足す、外すと、すぐに変わる(F30-AC66)。
 
@@ -260,7 +259,7 @@ SQL は `src/links/url-rules.ts` の規則を写したものである。`gathere
 | プロフィールのコミュニティのタブの最近のスライド(F31-AC8) | `src/profile/communities-store.ts` |
 | お知らせ | `src/notifications/store.ts` |
 
-コミュニティのページは、D1 の問い合わせの数を増やさないように(`src/cost/per-use.test.ts`、[規模と費用](scale-cost.md))、「リンク」のタブと「スライド」のタブを 1 つの問い合わせ(`listTalkRows`)で読む。link8 では、`deckInCommunity` でスライドを選び、イベントのリンクだけを LEFT JOIN で添えていた。link9 で、スライドと、コミュニティに入ったそのスライドのリンクの組を読む形に替えた(下の「コミュニティの「リンク」のタブ」)。
+コミュニティのページは、D1 の問い合わせの数を増やさないように(`src/cost/per-use.test.ts`、[規模と費用](scale-cost.md))、「リンク」のタブと「スライド」のタブを 1 つの問い合わせ(`listTalkRows`)で読む。スライドと、コミュニティに入ったそのスライドのリンクの組を読む(下の「コミュニティの「リンク」のタブ」)。
 
 `inCommunity`(イベントの条件)を使い続けるのは、viewer の「(コミュニティ名) のほかのイベントの発表」(`src/share/viewer-talks-store.ts`)である。イベントの形のリンクだけを対象にしたままである(F24-AC41)。
 
@@ -268,7 +267,7 @@ SQL は `src/links/url-rules.ts` の規則を写したものである。`gathere
 
 `readGatheredPage` は、一般公開中のスライドのリンク(見る人を当てない)の `link_host` の集合を `findHostCommunity` に渡す。そのホスト名のどれかを持つコミュニティのうち、紐づけ用リンクを最初に足したものが返り、あれば `pageShown` の `inCommunity` が true になる。1 人のスライドだけでも、ページが出る(F45-AC4)。ページの頭には、そのコミュニティが出る(F45-AC17)。`LinkPage` に `community` を足し、イベントのページも、`readEventPage` が `listEventCommunities` で引いたものを同じ項目で返す。
 
-`listShownLinks` は、イベントでないリンクの問い合わせ(`gather_key` ごとの集計)に、「その鍵の一般公開中のスライドのリンクのどれかの `link_host` を、コミュニティが持つか」を足した。問い合わせの数は変わらない。1 本の管理の文にコミュニティの名前を出すのは、link9 である(下の「1 本の管理の文と枠のコミュニティ名」)。
+`listShownLinks` は、イベントでないリンクの問い合わせ(`gather_key` ごとの集計)に、「その鍵の一般公開中のスライドのリンクのどれかの `link_host` を、コミュニティが持つか」を足した。問い合わせの数は変わらない。1 本の管理の文にコミュニティの名前を出すことは、下の「1 本の管理の文と枠のコミュニティ名」に書いた。
 
 ### お知らせ
 
@@ -283,7 +282,7 @@ SQL は `src/links/url-rules.ts` の規則を写したものである。`gathere
 - 計画は、イベントでないリンクの条件を「`gather_key` の同じリンクのどれかが一般公開中のスライドにあり、`link_host` が合うこと」としていた。実装は、スライドの所属をリンクごとの `link_host` だけで決め、「どれか」で決めるのは、リンクのページの所属だけにした(`www.` を同じとみなさない、という決定に合わせた)。
 - 種類の変更でお知らせを呼ぶのは、イベントに変えたときだけのままにした(上の理由)。
 
-## コミュニティの「リンク」のタブ(link9 で実装済み)
+## コミュニティの「リンク」のタブ
 
 「リンク」のタブに、イベントでないリンクも並べた(F30-AC68)。1 件は、リンクのページの単位である。
 
@@ -323,7 +322,7 @@ SQL は `src/links/url-rules.ts` の規則を写したものである。`gathere
 
 コミュニティを削除すると、紐づけ用リンクが無くなるので、コミュニティに入ったことだけでページが出ていたリンク(1 人のスライドだけの、イベントでないリンク)は、「まだありません」のページになる。イベントの形のリンクは、1 本でもページが出続ける(F45-AC3)。`src/communities/admins.test.ts` の F30-AC71 のテストが確かめる。
 
-## 言語(link2 で実装済み)
+## 言語
 
 `/link/…` のクエリは、`lang` を含めて、すべてリンク先の URL のものとして読む(F45-AC33)。`src/site/lang.ts` は、path が `/link/` で始まるとき、クエリを読まない検出(cookie、`Accept-Language` の順)を使い、cookie を書かない。[画面の言語](i18n.md)にも書いた。
 
@@ -339,7 +338,7 @@ SQL は `src/links/url-rules.ts` の規則を写したものである。`gathere
 2026-11-27 に、Hono 4 の `app.request()` で `/link/*` の経路を作り、`c.req.path` と、`new URL(c.req.url)` の `pathname`、`search` を見た(Node.js 22。workerd と本番の Cloudflare では、この PR では確かめていない)。
 
 | 送った path | `pathname` | `search` | `c.req.path` |
-| --- | --- | --- | --- |
+| --- | --- | --- |
 | `/link/https://example.com/a?b=1&lang=en` | `/link/https://example.com/a` | `?b=1&lang=en` | `pathname` と同じ |
 | `/link/example.com//a` | `/link/example.com//a` | 空 | `pathname` と同じ |
 | `/link/https%3A%2F%2Fexample.com%2Fa%3Fb%3D1` | 送ったとおり | 空 | `pathname` と同じ |
@@ -351,23 +350,27 @@ SQL は `src/links/url-rules.ts` の規則を写したものである。`gathere
 
 - `//`、`%2F`、`%3A`、クエリは、書かれたとおりに届く。`c.req.path` は `%E3%81%82` や `%41` を復号するので、経路は `pathname` と `search` から `rest` を作る。
 - `..` と `#` は、リクエストを作る側(`Request` の URL の解析)が、送る前に畳む。サーバーには届かない。
-- `/link/*` は、後ろの無い `/link` にも当たる(`/link/*` を先に登録すると、`/link` もそのハンドラーに届いた)。link2 では、`GET /link` を先に登録した。`/link/` は、空の `rest` として届く。
+- `/link/*` は、後ろの無い `/link` にも当たる(`/link/*` を先に登録すると、`/link` もそのハンドラーに届いた)。そのため、`GET /link` を先に登録した。`/link/` は、空の `rest` として届く。
 
-### ローカルの workerd とブラウザーでの届き方(link2 で確かめた結果)
+### ローカルの workerd とブラウザーでの届き方
 
 2026-11-27 に、`wrangler dev --local`(workerd)へ `curl --path-as-is` で送り、`/link/https://connpass.com/event/410635/?utm_source=x`、`/link/https:/connpass.com/…`、`/link/https%3A%2F%2Fconnpass.com%2F…` の 3 通りが、どれも `Location: /link/connpass.com/event/410635` の 301 になることを確かめた。Chromium は、アドレスに書いた `//` を、そのまま送った(`src/links/link-page.browser.test.ts`)。本番の Cloudflare が `//` をまとめるかは、確かめていない。まとめられても、`https:/` の形として読める。
 
 ## PR の積み方
 
+12 本を、前の PR のブランチを base にして積んだ。計画の 10 本のうち、link2 と link7 を 2 本に分けた。
+
 | PR | 中身 |
 | --- | --- |
-| link1 | この文書、`gatheredWithout`、純粋な `gather.ts`、`link-address.ts` |
-| link2 | `/link/*` の経路(イベントだけ)、「まだありません」のページ、言語、検索に載せる条件 |
-| link3 | `/events/:id` の 301、アプリの中のリンク先、見る人によらない判定、テストの移動(`src/links/link-page.test.ts`) |
-| link4 | 見出しと頭、元のページへのリンクの確認の画面、名前を直す経路の撤去、幅 375px のテスト(`src/links/link-page.browser.test.ts`) |
-| link5 | コミュニティのタブ「リンク」、1 本の管理の文と枠 |
-| link6 | 列の追加と埋め戻し(migration 0071)、`addLink` が 2 つの列を書く |
-| link7 | イベントでないリンクのページ、viewer の行からのリンク |
-| link8 | コミュニティへの所属を種類を問わないリンクに広げる、お知らせ、フォローの新着、イベントでないリンクのページの頭 |
-| link9 | コミュニティの「リンク」のタブにイベントでないリンクを並べる、1 本の管理の文と枠にコミュニティ名を出す |
-| link10 | ヘルプの記事、ほかの設計の文書の書き直し |
+| link1 #738 | この文書、`gatheredWithout`、純粋な `gather.ts`、`link-address.ts` |
+| link2 #739 | `/link/` のクエリを読まない言語の検出、`GET /link`、検索に載せる条件、イベントを引く鍵の候補 |
+| link2b #740 | `/link/*` の経路(イベントだけ)、「まだありません」のページ、フッターの言語の切り替え |
+| link3 #741 | `/events/:id` の 301、アプリの中のリンク先、見る人によらない判定、テストの移動(`src/links/link-page.test.ts`) |
+| link4 #742 | 見出しと頭、元のページへのリンクの確認の画面、名前を直す経路の撤去、幅 375px のテスト(`src/links/link-page.browser.test.ts`) |
+| link5 #743 | コミュニティのタブ「リンク」、1 本の管理の文と枠 |
+| link6 #744 | 列の追加と埋め戻し(migration 0071)、`addLink` が 2 つの列を書く |
+| link7 #745 | ページを出す条件(`pageShown`)、イベントでないリンクのページ |
+| link7b #746 | viewer の行からのリンク、1 本の管理の文と枠をイベントでないリンクに広げる |
+| link8 #751 | コミュニティへの所属を種類を問わないリンクに広げる、お知らせ、フォローの新着、イベントでないリンクのページの頭 |
+| link9 #752 | コミュニティの「リンク」のタブにイベントでないリンクを並べる、1 本の管理の文と枠にコミュニティ名を出す |
+| link10 | ヘルプの記事、テスト名の条件の ID の付け替え、ほかの設計の文書の書き直し |
