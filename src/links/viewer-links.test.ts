@@ -336,3 +336,55 @@ test('F27-AC59: Given a stored link without a sanitized address whose url the pa
     'https://[broken?x=1',
   ])
 })
+
+test('F45-AC18: F27-AC89: F29-AC29: F29-AC30: Given links only this slide has, a link another author added too and an event, When the viewer and the slide page open, Then only the links whose page shows lead to it, by the one path of the page, and the slide page lists those pages', async () => {
+  await seedPublic(db, 'talk', 100, 'Talk')
+  await seedPublic(db, 'reply', 200, 'Reply', '2')
+  const added = 'https://www.example.com/a/?utm_source=x&b=1#Top'
+  await add({ kind: 'other', url: added, title: '' })
+  await add({ kind: 'article', url: 'https://example.com/solo' })
+  await add({ kind: 'other', url: 'https://connpass.com/event/008/' })
+  await add({ kind: 'event', url: 'https://luma.com/abc', title: 'Meetup' })
+  for (const url of [
+    'https://example.com/a?b=1',
+    'https://connpass.com/event/008',
+  ])
+    await add({ kind: 'other', url }, other, 'reply')
+  const PAGE = '/link/example.com/a?b=1'
+  expect(await viewerHrefs()).toEqual([
+    'https://www.example.com/a/?b=1#Top',
+    PAGE,
+    'https://example.com/solo',
+    // Its key leads to no page: the path drops the zeros of the number.
+    'https://connpass.com/event/008/',
+    'https://luma.com/abc',
+    '/link/luma.com/abc',
+  ])
+  expect((await viewerLinks()).replace(/\s+/g, ' ')).toContain(
+    `<a class="related-link-page" href="${PAGE}" >このリンクを添えたスライド</a`,
+  )
+  expect(await viewerLinks('', '/@owner/talk?lang=en')).toContain(
+    '>Slides with this link</a',
+  )
+  expect((await get(PAGE)).status).toBe(200)
+  const viewer = await (await get('/@owner/talk')).text()
+  expect(viewer).not.toContain('utm_source')
+  expect(viewer).not.toContain('https://example.com/a?b=1')
+
+  const manage = await text(get('/my/slides/talk', owner))
+  expect(manage.split('リンクのページに並びます。')).toHaveLength(3)
+  const frame = /data-deck-frame="placed-pages"[\s\S]*?<\/section>/.exec(manage)
+  expect(
+    [...frame![0].matchAll(/href="([^"]*)" >([^<]*)</g)].map((m) => [
+      m[1],
+      m[2],
+    ]),
+  ).toEqual([
+    [PAGE, 'example.com https://example.com/a?b=1'],
+    ['/link/luma.com/abc', 'Meetup'],
+  ])
+
+  const [link] = await listLinks(db, 'reply')
+  await form(`/my/slides/reply/links/${link?.id}/delete`, other, {})
+  expect(await viewerHrefs()).not.toContain(PAGE)
+})

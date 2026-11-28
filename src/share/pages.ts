@@ -10,8 +10,8 @@ import { viewerActions } from './viewer-actions'
 import { viewerAuthor } from './viewer-author'
 import type { ViewerArticle } from '../articles/viewer-article'
 import { viewerArticleFrame } from './viewer-article-frame'
-import type { StoredLink } from '../links/store'
 import { viewerLinksFrame } from './viewer-links-frame'
+import type { ViewerLink } from './viewer-parts-store'
 import { viewerEventsFrame, type ViewerEvent } from './viewer-events-frame'
 import {
   viewerSameCommunityFrame,
@@ -301,7 +301,7 @@ export function viewerPage(
     author: Readonly<{ name: string | null; avatarUrl: string | null }>
     citations: ViewerCitations
     /** The deck's related links, in the order they were added. */
-    links: readonly StoredLink[]
+    links: readonly ViewerLink[]
     /** The events the slides were presented at, in the order they were added. */
     events: readonly ViewerEvent[]
     /** The other talks of the first event and of its community. */
