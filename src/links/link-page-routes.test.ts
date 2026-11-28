@@ -113,7 +113,7 @@ test('F45-AC36: Given an event with a public slide, When its /link/ page opens, 
   )
 })
 
-test('F45-AC12: Given an event whose only slide is a draft, and an address no one wrote, When their /link/ pages open, Then both answer 404 with the same guidance', async () => {
+test('F45-AC40: Given an event whose only slide is a draft, and an address no one wrote, When their /link/ pages open, Then both answer 404 with the same guidance', async () => {
   await seedDeck(db, 'draft')
   await seedDeployment(db, 'draft')
   await add('draft', 'https://connpass.com/event/410635/')
@@ -283,7 +283,7 @@ test('F45-AC35: Given no event kept with www., When the www. path opens, Then it
   expect((await open('/link/example.com/conf')).status).toBe(200)
 })
 
-test('F45-AC12: Given an event of another site kept with www. whose only slide is a draft, When the www. path opens, Then it moves like an address no one wrote', async () => {
+test('F45-AC40: Given an event of another site kept with www. whose only slide is a draft, When the www. path opens, Then it moves like an address no one wrote', async () => {
   await seedDeck(db, 'draft')
   await seedDeployment(db, 'draft')
   await add('draft', 'https://www.example.com/conf')

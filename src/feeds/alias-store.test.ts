@@ -114,7 +114,7 @@ test('F33-AC20: Given talks linking the event by its name and by its id, When th
   expect(named?.name).toBe('From the id')
   expect(await listCommunityEventIds(database, 7)).toEqual([named!.id])
   // The id's event is left with no talk and out of the community, so it
-  // shows nowhere (F45-AC12, F45-AC14).
+  // shows nowhere (F45-AC40, F45-AC14).
   const [left] = (await allEvents()).filter((event) => event.key === ID)
   expect(
     await db

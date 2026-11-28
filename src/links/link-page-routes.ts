@@ -160,7 +160,7 @@ function shownPage(c: C, target: LinkTarget, read: LinkPage) {
   })
 }
 
-/** The page of an address no slides are gathered at (F45-AC12). */
+/** The page of an address no slides are gathered at (F45-AC40). */
 function missing(c: C, target: LinkTarget) {
   countNotFound(c)
   const lang = langOf(c)
@@ -199,7 +199,7 @@ linkPageRoutes.get('/link', (c) => {
 
 /**
  * The page of the links to one address; an address nothing is gathered at
- * answers the page of F45-AC12. The order is F45-AC13's: refuse, move, then
+ * answers the page of F45-AC40. The order is F45-AC13's: refuse, move, then
  * the page: of the event the address stands for, or of the links gathered
  * by its key (F45-AC35). An event of another site is looked up by the
  * address as written before the move to the canonical path, which would

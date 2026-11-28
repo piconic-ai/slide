@@ -12,7 +12,7 @@
 | `src/links/link-address.ts` | 純粋 | `/link/` の後ろの読み方(`parseLinkPath`)、引く鍵と正規の形(`linkTargetOf`)、ページの path(`linkPagePath`、`eventPagePath`)、イベントを引く鍵(`eventKeysOf`) |
 | `src/links/link-page-routes.ts` | routes | `GET /link/*`、`GET /link` |
 | `src/links/link-page-store.ts` | store | 鍵からイベントを引く(`findEventIdsByKey`)、Luma の番号から名前への対応(`findAliasedKey`)、ページの読み出し(`readLinkPage`。イベントは `readEventPage`、イベントでないリンクは `readGatheredPage`)、番号から転送先を引く(`findShownEventUrl`)、一覧の行に最初の題名を足す SQL(`firstPublicTitle`)、1 本のスライドの関連リンクのうちページの出ているもの(`listShownLinks`) |
-| `src/links/link-missing-page.ts` | pages | 「まだありません」のページ(F45-AC12、F45-AC29) |
+| `src/links/link-missing-page.ts` | pages | 「まだありません」のページ(F45-AC40、F45-AC29) |
 | `public/share.js` | ブラウザー | フッターの言語の切り替えの行き先を、`/link/…` では `/link?to=…` にする |
 | `src/links/link-page.ts` | pages | ページ(`linkPageBody`、`linkPageTitle`) |
 | `src/links/link-heading.ts` | 純粋 | 見出し(`headingOf`)、サイト名(`siteNameOf`)、元のページへのリンクの文と行き先(`sourceLinkTextOf`、`sourceOf`) |
@@ -111,7 +111,7 @@ SQL は `src/links/url-rules.ts` の規則を写したものである。`gathere
 4. イベントの形の URL で、`luma_event_aliases` に対応があれば、名前の URL の `/link/…` へ 301(F45-AC26)。
 5. イベントの形の URL は、`eventKeysOf` の鍵でイベントを引き、一般公開中のスライドがあれば、イベントのページを 200 で出す(`readEventPageOf`、`linkPageBody`)。`Link`(hreflang)は付けない。`?lang=` がページを指さないためである。
 6. 集める鍵で、イベントでないリンクのページを引く(`readGatheredPage`。link7)。
-7. どれにも当たらなければ、「まだありません」のページを 404 で出す(F45-AC12)。URL は `<p>` の文字で出し、リンクにしない(F45-AC29)。
+7. どれにも当たらなければ、「まだありません」のページを 404 で出す(F45-AC40)。URL は `<p>` の文字で出し、リンクにしない(F45-AC29)。
 
 - イベントのページのフッターの言語の切り替えは、`/link?to=/link/<eventRest>` を指す。`GET /link` は、`to` が `eventRest` の書き方ならそこへ、ほかは正規の形へ戻す。
 - 404 は、どちらも `screen_error` として数える(F40-AC14。`screen` は `/link/*`、`/link`)。
@@ -154,7 +154,7 @@ SQL は `src/links/url-rules.ts` の規則を写したものである。`gathere
 - 最初の題名は、読む場所が 2 つある。ページは、`readEventPage` の 1 つめの問い合わせ(一般公開中のスライドのリンク、保存の古い順。`related_link_events.created_at`、同じ時刻は rowid の順)の行から、題名のある最初のものを取る。一覧(`listDeckEvents`、コミュニティのイベントのタブの `listTalkRows`)は、同じ条件を相関サブクエリにした `firstPublicTitle` を select に足す。2 つは同じ条件を別々に書いているので、`src/links/link-page.test.ts`、`src/share/viewer-events.test.ts` などの画面のテストで、両方の結果を確かめている。
 - `headingOf` を使う場所: リンクのページ、viewer のイベントの行と「(見出し) のほかの発表」、1 本の管理の「このスライドが並ぶページ」、コミュニティのリンクのタブ。題名の無いイベントは、これまでの「connpass のイベント 410635」ではなく、サイト名と URL で出る。
 
-元のページへのリンク先は `sourceOf` が決める(F45-AC25)。イベントは、connpass なら最初のリンクが書いたグループの URL(`sourceUrlOf`)、ほかは `events.url`。イベントでないリンク(`kind: 'link'`)は、最初のリンクの整えた URL である。リンクには `rel="noopener nofollow ugc"` と `linkCheckTrigger()` を付け、本文の末尾に `linkCheckPrompt(lang)` を置く。確認の画面は、すべてのページが読み込む `/share.js` が開く(F45-AC30)。
+元のページへのリンク先は `sourceOf` が決める(F45-AC42)。イベントは、connpass なら最初のリンクが書いたグループの URL(`sourceUrlOf`)、ほかは `events.url`。イベントでないリンク(`kind: 'link'`)は、最初のリンクの整えた URL である。リンクには `rel="noopener nofollow ugc"` と `linkCheckTrigger()` を付け、本文の末尾に `linkCheckPrompt(lang)` を置く。確認の画面は、すべてのページが読み込む `/share.js` が開く(F45-AC30)。
 
 ページの頭は、コミュニティに入っていれば、カバー画像、ロゴ、名前(コミュニティのページへのリンク)を出す。入っていなければ、どれも出さない(F45-AC17)。番号から色を選ぶ既定の模様(`defaultEventCover`、`colorOfNumber`)は消した。本数の見出しは「スライド n 本」である(F45-AC16)。「このグループのコミュニティはまだありません」と「作る」は、これまでどおり出す(F45-AC27)。
 

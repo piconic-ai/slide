@@ -112,13 +112,13 @@ describe('sourceOf', () => {
     // A host that is no group of connpass names no group.
     ['evilconnpass.com', KANAGAWA.url],
   ])(
-    'F45-AC25: Given a connpass event whose oldest link was written with %j, When its way out is made, Then it is %s',
+    'F45-AC42: Given a connpass event whose oldest link was written with %j, When its way out is made, Then it is %s',
     (host, url) => {
       expect(sourceOf(event(host))).toBe(url)
     },
   )
 
-  test('F45-AC25: Given an event elsewhere, When its way out is made, Then it is its own address, whatever host its link had', () => {
+  test('F45-AC42: Given an event elsewhere, When its way out is made, Then it is its own address, whatever host its link had', () => {
     const luma = {
       service: 'luma',
       ref: 'abc',
@@ -129,7 +129,7 @@ describe('sourceOf', () => {
     ).toBe(luma.url)
   })
 
-  test('F45-AC25: Given a link that is no event, When its way out is made, Then it is where its oldest link leads', () => {
+  test('F45-AC42: Given a link that is no event, When its way out is made, Then it is where its oldest link leads', () => {
     expect(
       sourceOf({ kind: 'link', firstLinkUrl: 'https://example.com/a?b=1' }),
     ).toBe('https://example.com/a?b=1')

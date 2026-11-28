@@ -58,7 +58,7 @@ export type Gathered =
   | Readonly<{ kind: 'link'; firstLinkUrl: string }>
 
 /**
- * Where the page leads readers (F45-AC25): a connpass event under the group
+ * Where the page leads readers (F45-AC42): a connpass event under the group
  * its oldest link named, any other event at its own address, and any other
  * link where its oldest link leads.
  */
