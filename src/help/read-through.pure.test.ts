@@ -210,6 +210,26 @@ describe('the article on slides gathered by a related link', () => {
       expect(bodyHtml).toContain('href="/contact"')
     },
   )
+
+  test('F45-AC22: Given the articles on related links and on event talks, When they are read in each language, Then each leads to the article on link gathering', async () => {
+    for (const key of ['articles/related-links', 'community/list-event-talks'])
+      for (const lang of LANGS)
+        expect((await render(key, lang)).bodyHtml).toContain(
+          'href="/help/community/link-gathering"',
+        )
+  })
+
+  test('F45-AC22, F30-AC72: Given every article in each language, When it is read, Then none speaks of the service’s event pages, its tab of events, or fixing an event’s name', async () => {
+    const GONE =
+      /イベントのページに並|発表したイベント|イベントのタブ|イベント名の修正|イベント名を直す|listed on the event’s page|Events tab|event’s name/u
+    for (const entry of HELP_CATALOG)
+      for (const lang of LANGS) {
+        const { lead, body } = await render(entry.key, lang)
+        expect(`${entry.article[lang].title}\n${lead}\n${body}`).not.toMatch(
+          GONE,
+        )
+      }
+  })
 })
 
 describe('the wording of the articles that was read through', () => {

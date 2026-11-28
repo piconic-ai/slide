@@ -43,6 +43,12 @@ export default defineArticle({
             ${n.linkTitleChars} 文字までで、入れなくてもかまいません。
           </li>
           <li>
+            同じ URL を入れた作者が 2 人以上になると、<a
+              href="/help/community/link-gathering"
+              >その URL のリンクのページにスライドが並びます</a
+            >。
+          </li>
+          <li>
             題名を入れなかったときは、サイト名(URL のホスト名。例:
             <code>zenn.dev</code>)だけを出します。リンク先は、${SERVICE_NAME}
             が取りに行きません(題名も取りません)。動画は埋め込まず、リンクだけです。
@@ -88,6 +94,12 @@ export default defineArticle({
           <li>
             The URL must start with <code>https://</code>. The title is
             optional, up to ${n.linkTitleChars} characters.
+          </li>
+          <li>
+            Once two or more authors have entered the same URL,
+            <a href="/help/community/link-gathering"
+              >the slides are listed on that URL’s page of links</a
+            >.
           </li>
           <li>
             Without a title, only the site name (the host name of the URL, e.g.

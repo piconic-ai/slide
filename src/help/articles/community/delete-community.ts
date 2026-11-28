@@ -13,7 +13,7 @@ export default defineArticle({
       html`<p>
         コミュニティのページ、フォロー、紐づけ用リンクがなくなり、ハンドルは
         ${n.handleHoldDays}
-        日の間、だれも使えません。スライド、関連リンク、イベントのページは残ります。元に戻せません。
+        日の間、だれも使えません。スライドと関連リンクは残ります。コミュニティに入っていたことだけで出ていたリンクのページは、出なくなります。元に戻せません。
       </p>`,
   },
   en: {
@@ -24,8 +24,9 @@ export default defineArticle({
     body: (n) =>
       html`<p>
         The community’s page, its follows and its links go away, and no one can
-        take the handle for ${n.handleHoldDays} days. Slides, related links and
-        event pages stay. This cannot be undone.
+        take the handle for ${n.handleHoldDays} days. Slides and related links
+        stay. A page of links that showed only because the community held the
+        link stops showing. This cannot be undone.
       </p>`,
   },
 })
