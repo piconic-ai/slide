@@ -250,18 +250,92 @@ test.each([
   },
 )
 
-test('F45-AC35: Given an event of another site kept with www., When /link/ opens without it, Then the event is found; with a query it is not, and the www. path moves to the one without', async () => {
-  await seedEventOfAnotherSite('conf', 'https://www.example.com/conf/')
+test('F45-AC35: Given events of another site kept with and without www., When their /link/ pages open, Then each has its own page at the address as written, and other ways of writing move there', async () => {
+  await seedEventOfAnotherSite('with-www', 'https://www.example.com/conf/')
+  await seedEventOfAnotherSite('without', 'https://example.com/conf')
   await seedEventOfAnotherSite('meet', 'https://example.org/Meet')
-  const found = await open('/link/example.com/conf')
-  expect(found.status).toBe(200)
-  expect(await flat(found)).toContain('<span class="deck-name">conf</span>')
+  const withWww = await open('/link/www.example.com/conf')
+  expect(withWww.status).toBe(200)
+  const withBody = await flat(withWww)
+  expect(withBody).toContain('<span class="deck-name">with-www</span>')
+  expect(withBody).not.toContain('<span class="deck-name">without</span>')
+  // The language switch comes back to this page, not to the other event's.
+  expect(withBody).toContain(
+    `/link?to=${encodeURIComponent('/link/www.example.com/conf')}`,
+  )
+  const without = await flat(await open('/link/example.com/conf'))
+  expect(without).toContain('<span class="deck-name">without</span>')
+  expect(without).not.toContain('<span class="deck-name">with-www</span>')
+  const written = await open('/link/https://WWW.example.com/conf/?utm_source=x')
+  expect(written.status).toBe(301)
+  expect(written.headers.get('Location')).toBe('/link/www.example.com/conf')
   expect((await open('/link/example.org/Meet')).status).toBe(200)
   expect((await open('/link/example.org/meet')).status).toBe(404)
   expect((await open('/link/example.com/conf?day=1')).status).toBe(404)
   expect((await open('/link/example.com/conf/2026')).status).toBe(404)
+})
+
+test('F45-AC35: Given no event kept with www., When the www. path opens, Then it moves to the one path, and the event kept without www. is there', async () => {
+  await seedEventOfAnotherSite('without', 'https://example.com/conf')
   const written = await open('/link/www.example.com/conf')
+  expect(written.status).toBe(301)
   expect(written.headers.get('Location')).toBe('/link/example.com/conf')
+  expect((await open('/link/example.com/conf')).status).toBe(200)
+})
+
+test('F45-AC12: Given an event of another site kept with www. whose only slide is a draft, When the www. path opens, Then it moves like an address no one wrote', async () => {
+  await seedDeck(db, 'draft')
+  await seedDeployment(db, 'draft')
+  await add('draft', 'https://www.example.com/conf')
+  const [link] = await listLinks(db, 'draft')
+  await setLinkKind(db, {
+    deckId: 'draft',
+    ownerUserId: OWNER_ID,
+    linkId: link!.id,
+    kinding: {
+      kind: 'event',
+      event: eventRefOf('https://www.example.com/conf')!,
+    },
+    now: 1,
+  })
+  const drafted = await open('/link/www.example.com/conf')
+  const unknown = await open('/link/www.example.net/conf')
+  expect(drafted.status).toBe(unknown.status)
+  expect(drafted.headers.get('Location')).toBe('/link/example.com/conf')
+  expect(unknown.headers.get('Location')).toBe('/link/example.net/conf')
+})
+
+test.each([
+  [
+    'https://loom.com/embed/x',
+    '/link/loom.com/embed/x',
+    '/link/loom.com/share/x',
+  ],
+  [
+    'https://vimeo.com/123/abc',
+    '/link/vimeo.com/123/abc',
+    '/link/vimeo.com/123?h=abc',
+  ],
+])(
+  'F45-AC35: Given %s made an event by the tool, When %s opens, Then its page is there, other ways of writing it move there, and the compared form %s is another address',
+  async (url, path, compared) => {
+    await seedEventOfAnotherSite('talk', url)
+    const page = await open(path)
+    expect(page.status).toBe(200)
+    expect(await flat(page)).toContain('<span class="deck-name">talk</span>')
+    const written = await open(`/link/${url}/`)
+    expect(written.status).toBe(301)
+    expect(written.headers.get('Location')).toBe(path)
+    expect((await open(compared)).status).toBe(404)
+  },
+)
+
+test('F45-AC34: Given the switch of the page of an event of another site, When followed, Then the reader comes back to the address as written', async () => {
+  const response = await open(
+    `/link?to=${encodeURIComponent('/link/www.example.com/conf')}&lang=en`,
+  )
+  expect(response.status).toBe(302)
+  expect(response.headers.get('Location')).toBe('/link/www.example.com/conf')
 })
 
 test('F45-AC9: Given an event of another site kept with www., When /events/:id opens, Then it moves for good to the path without it, where the event is found', async () => {
