@@ -151,7 +151,8 @@ test.each([
   [
     'the kind event and an address of another site',
     { kind: 'event', url: 'https://www.conf.example/2027/' },
-    'conf.example/2027',
+    // The page of an event of another site is at its address as written.
+    'www.conf.example/2027',
   ],
 ])(
   'F23-AC52: Given a public slide, When add_related_link adds %s to it, Then the slide is listed on the page of links of the event',
