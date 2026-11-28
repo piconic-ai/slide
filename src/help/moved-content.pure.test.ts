@@ -126,6 +126,7 @@ export const ADDED_ARTICLES = [
   'account/reupload-zip',
   'agent/export-with-agent',
   'agent/reconnect',
+  'community/link-gathering',
   'safety/appeal',
   'safety/data-we-keep',
   'safety/hidden-slide',

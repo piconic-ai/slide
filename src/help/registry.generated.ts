@@ -27,6 +27,7 @@ import article_community_create_community from './articles/community/create-comm
 import article_community_delete_community from './articles/community/delete-community'
 import article_community_follow_community from './articles/community/follow-community'
 import article_community_follow_people from './articles/community/follow-people'
+import article_community_link_gathering from './articles/community/link-gathering'
 import article_community_link_rules from './articles/community/link-rules'
 import article_community_list_event_talks from './articles/community/list-event-talks'
 import article_community_remove_event_talk from './articles/community/remove-event-talk'
@@ -87,6 +88,7 @@ export const HELP_REGISTRY: readonly RegisteredArticle[] = [
   ['community/delete-community', article_community_delete_community],
   ['community/follow-community', article_community_follow_community],
   ['community/follow-people', article_community_follow_people],
+  ['community/link-gathering', article_community_link_gathering],
   ['community/link-rules', article_community_link_rules],
   ['community/list-event-talks', article_community_list_event_talks],
   ['community/remove-event-talk', article_community_remove_event_talk],
