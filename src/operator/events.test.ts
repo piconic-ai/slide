@@ -74,7 +74,10 @@ const eventPage = async (lang = 'ja') =>
   (
     await (
       await server.fetch(
-        new Request(`${TEST_ORIGIN}/events/${eventId}?lang=${lang}`),
+        // The page of the event (F45-AC9), which reads no `?lang=`.
+        new Request(`${TEST_ORIGIN}/link/connpass.com/event/410635`, {
+          headers: { 'Accept-Language': lang },
+        }),
         env,
       )
     ).text()

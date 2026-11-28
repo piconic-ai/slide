@@ -2,9 +2,24 @@
  * What the page of links of an address reads from D1 (F45). For now only
  * the event an address stands for; the other links come with their columns.
  */
-import { eq, inArray } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
-import { events, lumaEventAliases } from '../db/schema'
+import { z } from 'zod'
+import { notBlockedBy } from '../blocks/store'
+import {
+  accounts,
+  decks,
+  deployments,
+  events,
+  lumaEventAliases,
+  relatedLinkEvents,
+  relatedLinks,
+} from '../db/schema'
+import { deckSlugSchema, type DeckSlug } from '../decks/deck-id'
+import { sourceUrlOf, type EventService } from '../events/event-url'
+import { notMutedBy } from '../mutes/store'
+import { notHidden } from '../publication/takedown-store'
+import { handleSchema, type Handle } from '../share/handle'
 
 /**
  * The events kept under the keys, in the order of the keys. The keys are
@@ -38,4 +53,158 @@ export async function findAliasedKey(
     .where(eq(lumaEventAliases.alias_key, key))
     .get()
   return row?.key ?? null
+}
+
+/** An event as its page shows it. */
+export type StoredEvent = Readonly<{
+  id: number
+  service: EventService
+  ref: string
+  host: string
+  /** Where its page leads readers (`sourceUrlOf`). */
+  url: string
+  name: string | null
+}>
+
+/** A public slide given as a talk of an event. */
+export type EventTalk = Readonly<{
+  handle: Handle
+  slug: DeckSlug
+  title: string | null
+  /** When the slide was first published, in seconds. */
+  publishedAt: number
+  deploymentId: string
+  coverPath: string | null
+}>
+
+const talkSchema = z.object({
+  handle: handleSchema,
+  slug: deckSlugSchema,
+  title: z.string().nullable(),
+  publishedAt: z.number().int(),
+  deploymentId: z.string(),
+  coverPath: z.string().nullable(),
+})
+
+// When a deck was first published; a deck published before the column was
+// added has the time its public version became ready.
+const publishedAt = sql<number>`coalesce(${decks.first_published_at}, ${deployments.ready_at})`
+
+/**
+ * The decks readers may open from a list, as on the top page: a public
+ * version that is ready, not taken down, by an author with a handle
+ * (F45-AC14), and not by someone the viewer muted or blocked. With no
+ * viewer they are the decks anyone may open.
+ */
+const publicTalks = (db: ReturnType<typeof drizzle>, viewer: string | null) =>
+  db
+    .select({
+      eventId: relatedLinkEvents.event_id,
+      deckId: decks.id,
+      handle: accounts.handle,
+      slug: decks.slug,
+      title: deployments.title,
+      publishedAt: publishedAt.as('published_at'),
+      deploymentId: deployments.id,
+      coverPath: deployments.cover_path,
+      linkHost: relatedLinkEvents.host,
+    })
+    .from(relatedLinkEvents)
+    .innerJoin(relatedLinks, eq(relatedLinks.id, relatedLinkEvents.link_id))
+    .innerJoin(
+      decks,
+      and(
+        eq(decks.id, relatedLinks.deck_id),
+        notHidden,
+        notMutedBy(viewer),
+        notBlockedBy(viewer),
+      ),
+    )
+    .innerJoin(accounts, eq(accounts.user_id, decks.owner_user_id))
+    .innerJoin(
+      deployments,
+      and(
+        eq(deployments.id, decks.public_deployment_id),
+        eq(deployments.deck_id, decks.id),
+        eq(deployments.state, 'ready'),
+      ),
+    )
+
+const ofEvent = (eventId: number) => eq(relatedLinkEvents.event_id, eventId)
+
+/**
+ * An event and its public talks, the most recently published first; each
+ * deck once, however many of its links name the event. With them, the hosts
+ * the links of its public talks were written with (the groups, on connpass).
+ * Null when there is no such event or it has no public talk: that is the
+ * same for everyone. The viewer's mutes and blocks only leave talks out of
+ * the list, down to none (F45-AC15).
+ */
+export async function readEventPage(
+  database: D1Database,
+  eventId: number,
+  /** Who is looking. Null for a reader not signed in. */
+  viewer: string | null = null,
+): Promise<{
+  event: StoredEvent
+  talks: readonly EventTalk[]
+  linkHosts: ReadonlySet<string>
+} | null> {
+  const db = drizzle(database)
+  const [event, links, rows] = await Promise.all([
+    db
+      .select({
+        id: events.id,
+        service: events.service,
+        ref: events.ref,
+        host: events.host,
+        url: events.url,
+        name: events.name,
+      })
+      .from(events)
+      .where(eq(events.id, eventId))
+      .get(),
+    // The links to the event on public decks, the oldest first, whoever is
+    // looking: drafts stay their author's, and mutes and blocks move neither
+    // whether the page shows nor where it leads.
+    publicTalks(db, null)
+      .where(ofEvent(eventId))
+      .orderBy(
+        asc(relatedLinkEvents.created_at),
+        sql`${relatedLinkEvents}.rowid`,
+      )
+      .all(),
+    publicTalks(db, viewer)
+      .where(ofEvent(eventId))
+      .orderBy(desc(publishedAt), asc(decks.slug))
+      .all(),
+  ])
+  if (!event || links.length === 0) return null
+  // A deck with two links to the event comes twice; it is listed once.
+  const decksOnce = [...new Map(rows.map((row) => [row.deckId, row])).values()]
+  return {
+    event: { ...event, url: sourceUrlOf(event, links[0]?.linkHost ?? null) },
+    talks: talkSchema.array().parse(decksOnce),
+    linkHosts: new Set(links.map((row) => row.linkHost)),
+  }
+}
+
+/**
+ * The address of an event with a public talk, whoever is looking; null for
+ * no such event and for one without a public talk (F45-AC9).
+ */
+export async function findShownEventUrl(
+  database: D1Database,
+  eventId: number,
+): Promise<string | null> {
+  const db = drizzle(database)
+  const [event, talk] = await Promise.all([
+    db
+      .select({ url: events.url })
+      .from(events)
+      .where(eq(events.id, eventId))
+      .get(),
+    publicTalks(db, null).where(ofEvent(eventId)).limit(1).get(),
+  ])
+  return event && talk ? event.url : null
 }

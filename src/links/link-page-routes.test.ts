@@ -2,7 +2,7 @@ import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
-import { lumaEventAliases } from '../db/schema'
+import { events, lumaEventAliases } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import { eventRefOf } from '../events/event-url'
 import { resetFeeds } from '../feeds/test-feeds'
@@ -262,6 +262,15 @@ test('F45-AC35: Given an event of another site kept with www., When /link/ opens
   expect((await open('/link/example.com/conf/2026')).status).toBe(404)
   const written = await open('/link/www.example.com/conf')
   expect(written.headers.get('Location')).toBe('/link/example.com/conf')
+})
+
+test('F45-AC9: Given an event of another site kept with www., When /events/:id opens, Then it moves for good to the path without it, where the event is found', async () => {
+  await seedEventOfAnotherSite('conf', 'https://www.example.com/conf/')
+  const [event] = await drizzle(db).select().from(events)
+  const moved = await open(`/events/${event!.id}`)
+  expect(moved.status).toBe(301)
+  expect(moved.headers.get('Location')).toBe('/link/example.com/conf')
+  expect(moved.headers.get('X-Robots-Tag')).toBe(NOINDEX)
 })
 
 test('F30-AC74: Given /@link, When opened, Then no profile answers there', async () => {

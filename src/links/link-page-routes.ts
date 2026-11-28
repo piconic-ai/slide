@@ -8,7 +8,6 @@ import {
   eventPageBody,
   eventPageTitle,
 } from '../events/event-page'
-import { readEventPage } from '../events/store'
 import { recordFrom } from '../metrics/record-routes'
 import { contentBaseOf } from '../preview/config'
 import { ERROR_PAGE_POLICY, errorPage } from '../site/error-pages'
@@ -26,7 +25,11 @@ import {
   linkMissingStyle,
   linkMissingTitle,
 } from './link-missing-page'
-import { findAliasedKey, findEventIdsByKey } from './link-page-store'
+import {
+  findAliasedKey,
+  findEventIdsByKey,
+  readEventPage,
+} from './link-page-store'
 
 type C = Context<{ Bindings: Env }>
 
@@ -113,9 +116,9 @@ function show(c: C, target: LinkTarget, page: Shown) {
 }
 
 /**
- * The page of the event the address stands for, as `/events/:id` shows it,
- * or null when there is no event or it has no public talk. Of the events an
- * address of another site may be kept as, the first with a public talk.
+ * The page of the event the address stands for, or null when there is no
+ * event or it has no public talk. Of the events an address of another site
+ * may be kept as, the first with a public talk.
  */
 async function eventPage(c: C, target: LinkTarget) {
   const viewer = (await currentOwner(c))?.userId ?? null

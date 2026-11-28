@@ -3,9 +3,8 @@ import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test, vi } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
-import { blocks, decks, events, mutes } from '../db/schema'
+import { blocks, decks, events, mutes, suspensions } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
-import { listLinks } from '../links/store'
 import {
   resetTables,
   seedDeck,
@@ -15,7 +14,7 @@ import {
   TEST_ORIGIN,
   testEnv,
 } from '../publication/test-support'
-import { listListedEvents } from './store'
+import { listLinks } from './store'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
@@ -48,26 +47,34 @@ const add = (deck: string, url: string, title = '', cookie = owner) =>
     }),
     env,
   )
-const open = (path: string) =>
-  server.fetch(new Request(`${TEST_ORIGIN}${path}`), env)
-const flat = async (path: string) =>
-  (await (await open(path)).text()).replace(/\s+/g, ' ')
+type Headers = Record<string, string>
+const get = (path: string, headers: Headers = {}) =>
+  server.fetch(new Request(`${TEST_ORIGIN}${path}`, { headers }), env)
+/** Opens a page; `/events/:id` is followed to the page it moved to. */
+const open = async (path: string, headers: Headers = {}) => {
+  const response = await get(path, headers)
+  const moved = response.status === 301 && response.headers.get('location')
+  return moved ? get(moved, headers) : response
+}
+const flat = async (path: string, headers: Headers = {}) =>
+  (await (await open(path, headers)).text()).replace(/\s+/g, ' ')
+const EN = { 'Accept-Language': 'en' }
 const eventIdOf = async (key: string) =>
   (await orm.select().from(events).where(eq(events.key, key)).get())?.id
 const KANAGAWA = 'https://kanagawapm.connpass.com/event/410635/'
 const KANAGAWA_KEY = 'https://connpass.com/event/410635'
+const KANAGAWA_PAGE = '/link/connpass.com/event/410635'
 const talkNames = (body: string) =>
   [...body.matchAll(/<span class="deck-name">([^<]*)<\/span>/g)].map(
     ([, name]) => name,
   )
 
-test('F29-AC5: Given public slides of two authors with links to one event, When its page opens, Then both are listed as talks', async () => {
+test('F45-AC3: F45-AC6: Given public slides of two authors with links to one event, written differently, When its page of links opens, Then both are listed', async () => {
   await seedPublic(db, 'talk', 100, 'Owner talk')
   await seedPublic(db, 'reply', 200, 'Bob talk', '2')
   await add('talk', KANAGAWA, 'Kanagawa.pm #3')
   await add('reply', `${KANAGAWA}?utm_source=x`, '', bob)
-  const id = await eventIdOf(KANAGAWA_KEY)
-  const response = await open(`/events/${id}`)
+  const response = await get(KANAGAWA_PAGE)
   expect(response.status).toBe(200)
   const body = (await response.text()).replace(/\s+/g, ' ')
   expect(talkNames(body)).toEqual(['Bob talk', 'Owner talk'])
@@ -76,34 +83,25 @@ test('F29-AC5: Given public slides of two authors with links to one event, When 
   expect(await orm.select().from(events).all()).toHaveLength(1)
 })
 
-test('F29-AC10: Given talks published at different times, When the event page opens, Then they come newest first, and events come by their first public talk, newest first', async () => {
+test('F45-AC1: F45-AC14: Given slides of two authors published at different times, When the page of links opens, Then they come newest first', async () => {
   await seedPublic(db, 'old', 100, 'Old')
   await seedPublic(db, 'new', 300, 'New')
-  await seedPublic(db, 'mid', 200, 'Mid')
-  for (const deck of ['old', 'new', 'mid']) await add(deck, KANAGAWA)
-  await add('mid', 'https://luma.com/second')
-  await add('new', 'https://luma.com/third')
-  const id = await eventIdOf(KANAGAWA_KEY)
-  expect(talkNames(await flat(`/events/${id}`))).toEqual(['New', 'Mid', 'Old'])
-  // First public talks: KANAGAWA 100, second 200, third 300.
-  expect(await listListedEvents(db, { limit: 10 })).toEqual([
-    await eventIdOf('https://luma.com/third'),
-    await eventIdOf('https://luma.com/second'),
-    id,
-  ])
-  expect(await listListedEvents(db, { limit: 10, within: [id!] })).toEqual([id])
+  await seedPublic(db, 'mid', 200, 'Mid', '2')
+  for (const deck of ['old', 'new']) await add(deck, KANAGAWA)
+  await add('mid', KANAGAWA, '', bob)
+  expect(talkNames(await flat(KANAGAWA_PAGE))).toEqual(['New', 'Mid', 'Old'])
 })
 
-test('F29-AC10: Given one deck with two links to the same event, When the page opens, Then it is listed once and counted once', async () => {
+test('F45-AC14: Given one deck with two links to the same event, When the page opens, Then it is listed once and counted once', async () => {
   await seedPublic(db, 'talk', 100, 'Talk')
   await add('talk', KANAGAWA)
   await add('talk', 'https://connpass.com/event/410635/')
-  const body = await flat(`/events/${await eventIdOf(KANAGAWA_KEY)}`)
+  const body = await flat(KANAGAWA_PAGE)
   expect(talkNames(body)).toEqual(['Talk'])
   expect(body).toContain('<span class="event-talks-count">1 本</span>')
 })
 
-test('F29-AC12: Given a draft, a paused and a taken-down slide in an event, When its page opens, Then it is not found; once one is public, only that one is listed', async () => {
+test('F45-AC14: F45-AC9: Given a draft, a paused and a taken-down slide in an event, When its page of links and its number open, Then both are not found; once one is public, only that one is listed', async () => {
   await seedDeck(db, 'draft')
   await seedDeployment(db, 'draft')
   await seedPublic(db, 'paused', 100, 'Paused')
@@ -118,11 +116,31 @@ test('F29-AC12: Given a draft, a paused and a taken-down slide in an event, When
     .set({ hidden_at: 5, hidden_reason: 'x', hidden_by: 'op@example.com' })
     .where(eq(decks.id, 'hidden'))
   const id = await eventIdOf(KANAGAWA_KEY)
-  expect((await open(`/events/${id}`)).status).toBe(404)
-  expect(await listListedEvents(db, { limit: 10 })).toEqual([])
+  expect((await get(KANAGAWA_PAGE)).status).toBe(404)
+  expect((await get(`/events/${id}`)).status).toBe(404)
   await seedPublic(db, 'public', 100, 'Public')
   await add('public', KANAGAWA)
-  expect(talkNames(await flat(`/events/${id}`))).toEqual(['Public'])
+  const body = await flat(KANAGAWA_PAGE)
+  expect(talkNames(body)).toEqual(['Public'])
+  expect(body).toContain('<span class="event-talks-count">1 本</span>')
+})
+
+test('F45-AC14: Given an event with slides of a suspended author and another, When its page opens, Then the suspended author’s is neither listed nor counted; with that author alone, there is no page', async () => {
+  await seedPublic(db, 'talk', 100, 'Owner talk')
+  await seedPublic(db, 'reply', 200, 'Bob talk', '2')
+  await add('talk', KANAGAWA)
+  await add('reply', KANAGAWA, '', bob)
+  await add('reply', 'https://luma.com/alone', '', bob)
+  await orm.insert(suspensions).values({
+    user_id: '2',
+    reason: 'test',
+    suspended_at: 1,
+    suspended_by: 'operator',
+  })
+  const body = await flat(KANAGAWA_PAGE)
+  expect(talkNames(body)).toEqual(['Owner talk'])
+  expect(body).toContain('<span class="event-talks-count">1 本</span>')
+  expect((await get('/link/luma.com/alone')).status).toBe(404)
 })
 
 test.each([
@@ -132,17 +150,17 @@ test.each([
   '/events/1e3',
   '/events/-1',
 ])(
-  'F29-AC12: Given %s, which names no event, When it opens, Then it is not found',
+  'F45-AC9: Given %s, which names no event, When it opens, Then it is not found',
   async (path) => {
-    expect((await open(path)).status).toBe(404)
+    expect((await get(path)).status).toBe(404)
   },
 )
 
-test('F29-AC11: Given an event with one talk, When the link is removed, Then the page is not found', async () => {
+test('F45-AC24: F45-AC9: Given an event with one talk, When the link is removed, Then its page of links is the page of no gathering and its number is not found', async () => {
   await seedPublic(db, 'talk', 100, 'Talk')
   await add('talk', KANAGAWA)
   const id = await eventIdOf(KANAGAWA_KEY)
-  expect((await open(`/events/${id}`)).status).toBe(200)
+  expect((await get(KANAGAWA_PAGE)).status).toBe(200)
   const [link] = await listLinks(db, 'talk')
   await server.fetch(
     new Request(`${TEST_ORIGIN}/my/slides/talk/links/${link!.id}/delete`, {
@@ -151,7 +169,10 @@ test('F29-AC11: Given an event with one talk, When the link is removed, Then the
     }),
     env,
   )
-  expect((await open(`/events/${id}`)).status).toBe(404)
+  const gone = await get(KANAGAWA_PAGE)
+  expect(gone.status).toBe(404)
+  expect(await gone.text()).toContain('この URL の集まりは、まだありません')
+  expect((await get(`/events/${id}`)).status).toBe(404)
 })
 
 test('F29-AC14: Given an event, When its page opens, Then the way to its own page names the service and is rel="noopener nofollow ugc"', async () => {
@@ -161,7 +182,7 @@ test('F29-AC14: Given an event, When its page opens, Then the way to its own pag
   expect(await flat(`/events/${id}`)).toContain(
     `<a href="${KANAGAWA}" rel="noopener nofollow ugc" >connpass で見る</a >`,
   )
-  expect(await flat(`/events/${id}?lang=en`)).toContain('>View on connpass</a')
+  expect(await flat(`/events/${id}`, EN)).toContain('>View on connpass</a')
 })
 
 const sourceOf = (body: string) =>
@@ -302,21 +323,22 @@ test('F29-AC21: Given an event of no community, When its page opens twice, Then 
   expect(new Set(squares.map(([, name]) => name))).toEqual(new Set([color]))
 })
 
-test('F29-AC16: Given fetch watched, When an event page opens, Then nothing is fetched', async () => {
+test('F45-AC19: Given fetch watched, When a page of links opens, in each language and from the number of its event, Then nothing is fetched', async () => {
   await seedPublic(db, 'talk', 100, 'Talk')
   await add('talk', KANAGAWA)
   const id = await eventIdOf(KANAGAWA_KEY)
   const fetched = vi.spyOn(globalThis, 'fetch')
   try {
-    expect((await open(`/events/${id}`)).status).toBe(200)
-    expect((await open(`/events/${id}?lang=en`)).status).toBe(200)
+    expect((await get(KANAGAWA_PAGE)).status).toBe(200)
+    expect((await get(KANAGAWA_PAGE, EN)).status).toBe(200)
+    expect((await get(`/events/${id}`)).status).toBe(301)
     expect(fetched).not.toHaveBeenCalled()
   } finally {
     fetched.mockRestore()
   }
 })
 
-test('F29-AC5: Given an event title with HTML, When its page opens, Then it is escaped', async () => {
+test('F45-AC3: Given an event title with HTML, When its page opens, Then it is escaped', async () => {
   await seedPublic(db, 'talk', 100, 'Talk')
   await add('talk', KANAGAWA, '<script>alert(1)</script>')
   const body = await flat(`/events/${await eventIdOf(KANAGAWA_KEY)}`)
@@ -333,24 +355,12 @@ test("F19-AC2: Given a viewer who muted one author of an event, When they open i
     .insert(mutes)
     .values({ muter_user_id: '722500', muted_user_id: '2', created_at: 1 })
   const id = await eventIdOf(KANAGAWA_KEY)
-  const asOwner = (
-    await (
-      await server.fetch(
-        new Request(`${TEST_ORIGIN}/events/${id}`, {
-          headers: { Cookie: owner },
-        }),
-        env,
-      )
-    ).text()
-  ).replace(/\s+/g, ' ')
+  const asOwner = await flat(`/events/${id}`, { Cookie: owner })
   expect(talkNames(asOwner)).toEqual(['Owner talk'])
   expect(asOwner).toContain('<span class="event-talks-count">1 本</span>')
   expect(talkNames(await flat(`/events/${id}`))).toEqual([
     'Bob talk',
     'Owner talk',
-  ])
-  expect(await listListedEvents(db, { limit: 10, viewer: '722500' })).toEqual([
-    id,
   ])
 })
 
@@ -387,40 +397,60 @@ test('F29-AC20: Given a group written only on a draft slide, When the event page
   expect(body).not.toContain('kanagawapm')
 })
 
-test("F32-AC4: Given a viewer who blocked one author, When they open an event's page and the list of events, Then that author's talks are left out and not counted, an event of that author alone is not listed, and others still see both", async () => {
+test("F32-AC22: F45-AC15: Given a viewer who blocked one author, When they open pages of links, Then that author's slides are left out and not counted, a page of that author alone still answers 200 with none, and others see them all", async () => {
   await seedPublic(db, 'talk', 100, 'Owner talk')
   await seedPublic(db, 'reply', 200, 'Bob talk', '2')
   await seedPublic(db, 'solo', 300, 'Bob solo', '2')
   await add('talk', KANAGAWA)
   await add('reply', KANAGAWA, '', bob)
   await add('solo', 'https://perl.connpass.com/event/999/', '', bob)
-  const id = await eventIdOf(KANAGAWA_KEY)
-  const solo = await eventIdOf('https://connpass.com/event/999')
+  const SOLO_PAGE = '/link/connpass.com/event/999'
   await orm
     .insert(blocks)
     .values({ blocker_user_id: '722500', blocked_user_id: '2', created_at: 1 })
 
-  const asOwner = (
-    await (
-      await server.fetch(
-        new Request(`${TEST_ORIGIN}/events/${id}`, {
-          headers: { Cookie: owner },
-        }),
-        env,
-      )
-    ).text()
-  ).replace(/\s+/g, ' ')
+  const asOwner = await flat(KANAGAWA_PAGE, { Cookie: owner })
   expect(talkNames(asOwner)).toEqual(['Owner talk'])
   expect(asOwner).toContain('<span class="event-talks-count">1 本</span>')
-  expect(await listListedEvents(db, { limit: 10, viewer: '722500' })).toEqual([
-    id,
+  const alone = await get(SOLO_PAGE, { Cookie: owner })
+  expect(alone.status).toBe(200)
+  const none = (await alone.text()).replace(/\s+/g, ' ')
+  expect(talkNames(none)).toEqual([])
+  expect(none).toContain('<span class="event-talks-count">0 本</span>')
+  // The number of the event leads there for the blocker as for anyone.
+  const solo = await eventIdOf('https://connpass.com/event/999')
+  const moved = await get(`/events/${solo}`, { Cookie: owner })
+  expect([moved.status, moved.headers.get('location')]).toEqual([
+    301,
+    SOLO_PAGE,
   ])
-  expect(talkNames(await flat(`/events/${id}`))).toEqual([
+
+  expect(talkNames(await flat(KANAGAWA_PAGE))).toEqual([
     'Bob talk',
     'Owner talk',
   ])
-  expect(await listListedEvents(db, { limit: 10, viewer: '2' })).toEqual([
-    solo,
-    id,
+  expect(talkNames(await flat(SOLO_PAGE, { Cookie: bob }))).toEqual([
+    'Bob solo',
   ])
 })
+
+test.each([
+  ['a connpass event', KANAGAWA, KANAGAWA_KEY, KANAGAWA_PAGE],
+  [
+    'a Luma event written with lu.ma and capitals',
+    'https://lu.ma/AbCd1234?utm_source=x',
+    'https://luma.com/AbCd1234',
+    '/link/luma.com/AbCd1234',
+  ],
+])(
+  'F45-AC9: Given %s with a public slide, When /events/:id opens, Then it moves for good to the page of links of the event, which lists the slide',
+  async (_, url, key, page) => {
+    await seedPublic(db, 'talk', 100, 'Talk')
+    await add('talk', url)
+    expect((await orm.select().from(events).get())?.url).toMatch(/^https:/u)
+    const moved = await get(`/events/${await eventIdOf(key)}?lang=en`)
+    expect(moved.status).toBe(301)
+    expect(moved.headers.get('location')).toBe(page)
+    expect(talkNames(await flat(page))).toEqual(['Talk'])
+  },
+)

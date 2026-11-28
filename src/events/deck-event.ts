@@ -15,6 +15,8 @@ export type EventCommunity = Readonly<{ name: string; href: string }>
 export type DeckEvent = NamedEvent &
   Readonly<{
     id: number
+    /** Its address (`events.url`), which its page of links is found by. */
+    url: string
     community: (EventCommunityView & EventCommunity) | null
   }>
 

@@ -10,7 +10,7 @@ import { messages, type Lang } from '../site/i18n'
 import type { EventCommunity } from './deck-event'
 import { eventNameOf, sourceLinkTextOf } from './event-name'
 import { groupPageOfHosts } from './event-url'
-import type { EventTalk, StoredEvent } from './store'
+import type { EventTalk, StoredEvent } from '../links/link-page-store'
 
 const text = messages({
   ja: {
