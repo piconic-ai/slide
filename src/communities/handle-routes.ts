@@ -38,7 +38,7 @@ import {
 export type HandlePath = Exclude<SharePath, { kind: 'redirect' | 'invalid' }>
 
 /**
- * The part of a community's page a path under its handle opens: the events
+ * The part of a community's page a path under its handle opens: the links
  * at `/@handle`, the slides at `/@handle/slides`, the followers at
  * `/@handle/followers`; `edit` is the editing page. Any other path is not
  * a community's.
@@ -48,7 +48,7 @@ export type CommunityPath =
   | Readonly<{ kind: 'edit' }>
 
 export function communityPathOf(path: HandlePath): CommunityPath | null {
-  if (path.kind === 'profile') return { kind: 'tab', tab: 'events' }
+  if (path.kind === 'profile') return { kind: 'tab', tab: 'links' }
   if (path.kind === 'people' && path.list === 'followers')
     return { kind: 'tab', tab: 'followers' }
   if (path.kind === 'deck' && path.slug === 'slides')
@@ -104,8 +104,8 @@ export async function showCommunity<E extends { Bindings: Env }>(
   ])
   const lang = langOf(c)
   const view: CommunityTabView =
-    at.tab === 'events'
-      ? { kind: 'events', events: talks.events }
+    at.tab === 'links'
+      ? { kind: 'links', links: talks.events }
       : at.tab === 'slides'
         ? { kind: 'slides', slides: talks.slides }
         : {
@@ -142,7 +142,7 @@ export async function showCommunity<E extends { Bindings: Env }>(
           ),
         },
         counts: {
-          events: talks.events.length,
+          links: talks.events.length,
           slides: talks.slides.length,
           followers,
         },

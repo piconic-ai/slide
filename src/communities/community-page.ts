@@ -19,10 +19,10 @@ import { communityStyle } from './community-style'
 import { logoOf } from './logo'
 
 /** The parts of a community's page, each its own tab. */
-export const COMMUNITY_TABS = ['events', 'slides', 'followers'] as const
+export const COMMUNITY_TABS = ['links', 'slides', 'followers'] as const
 export type CommunityTab = (typeof COMMUNITY_TABS)[number]
 
-/** How many slides one event's row shows before "n more" (F30-AC19). */
+/** How many slides one link's row shows before "n more" (F30-AC68). */
 export const CAROUSEL_TALKS = 6
 
 const text = messages({
@@ -30,7 +30,7 @@ const text = messages({
     cover: (name: string) => `${name} のカバー画像`,
     edit: 'コミュニティを編集',
     tabs: 'コミュニティの一覧',
-    events: 'イベント',
+    links: 'リンク',
     slides: 'スライド',
     followers: 'フォロワー',
     talks: (count: number) => `スライド ${count} 本`,
@@ -38,7 +38,7 @@ const text = messages({
     region: (name: string) => `${name} のスライド`,
     previous: '前のスライド',
     next: '次のスライド',
-    noEvents: 'まだイベントの発表はありません。',
+    noLinks: 'まだリンクはありません。',
     noSlides: 'まだスライドはありません。',
     luma: 'Luma のカレンダー',
   },
@@ -46,7 +46,7 @@ const text = messages({
     cover: (name: string) => `Cover image of ${name}`,
     edit: 'Edit community',
     tabs: 'Community lists',
-    events: 'Events',
+    links: 'Links',
     slides: 'Slides',
     followers: 'Followers',
     talks: (count: number) => `${count} ${count === 1 ? 'slide' : 'slides'}`,
@@ -54,7 +54,7 @@ const text = messages({
     region: (name: string) => `Slides of ${name}`,
     previous: 'Previous slides',
     next: 'Next slides',
-    noEvents: 'No talks at its events yet.',
+    noLinks: 'No links yet.',
     noSlides: 'No slides yet.',
     luma: 'Luma calendar',
   },
@@ -62,7 +62,7 @@ const text = messages({
 
 /** The path of a tab of a community's page. */
 export const communityTabPath = (handle: Handle, tab: CommunityTab) =>
-  tab === 'events' ? profilePath(handle) : `${profilePath(handle)}/${tab}`
+  tab === 'links' ? profilePath(handle) : `${profilePath(handle)}/${tab}`
 
 /** The path of a community's editing page. */
 export const communityEditPath = (handle: Handle) =>
@@ -97,7 +97,7 @@ export type CommunityReader = Readonly<{
 }>
 
 /**
- * The head of a community's page (F30-AC18): its logo, name, description
+ * The head of a community's page (F30-AC67): its logo, name, description
  * (plain text, its addresses not made links), handle and links, then "edit"
  * for its admins and the place of "follow". No count stands here.
  */
@@ -176,12 +176,13 @@ const talkCard = (talk: CommunityTalk, contentBase: URL | null, lang: Lang) => {
 }
 
 /**
- * One event of the events tab (F30-AC19, F30-AC20): its name to its page of
+ * One link of the links tab (F30-AC68, F30-AC20): its heading to its page of
  * links (F45), how many slides, and the slides sent sideways, up to
- * CAROUSEL_TALKS, then "n more" to that page. The buttons that send them stay hidden until the
- * page's script finds the row wider than its frame.
+ * CAROUSEL_TALKS, then "n more" to that page. The buttons that send them
+ * stay hidden until the page's script finds the row wider than its frame.
+ * For now every link is an event; the other links come with their columns.
  */
-function eventRow(event: CommunityEvent, contentBase: URL | null, lang: Lang) {
+function linkRow(event: CommunityEvent, contentBase: URL | null, lang: Lang) {
   const t = text[lang]
   const name = headingOf(event)
   const href = linkPagePath(event.url)
@@ -237,7 +238,7 @@ function eventRow(event: CommunityEvent, contentBase: URL | null, lang: Lang) {
 
 /** What the open tab of a community's page lists. */
 export type CommunityTabView =
-  | Readonly<{ kind: 'events'; events: readonly CommunityEvent[] }>
+  | Readonly<{ kind: 'links'; links: readonly CommunityEvent[] }>
   | Readonly<{ kind: 'slides'; slides: readonly CommunityTalk[] }>
   /** The followers, which the work on following lists. */
   | Readonly<{ kind: 'followers'; list: ReturnType<typeof html> | string }>
@@ -245,10 +246,10 @@ export type CommunityTabView =
 function tabBody(view: CommunityTabView, contentBase: URL | null, lang: Lang) {
   const t = text[lang]
   switch (view.kind) {
-    case 'events':
-      return view.events.length === 0
-        ? html`<p class="empty">${t.noEvents}</p>`
-        : html`${view.events.map((event) => eventRow(event, contentBase, lang))}`
+    case 'links':
+      return view.links.length === 0
+        ? html`<p class="empty">${t.noLinks}</p>`
+        : html`${view.links.map((link) => linkRow(link, contentBase, lang))}`
     case 'slides':
       return view.slides.length === 0
         ? html`<p class="empty">${t.noSlides}</p>`
@@ -264,7 +265,7 @@ function tabBody(view: CommunityTabView, contentBase: URL | null, lang: Lang) {
 export const communityPageTitle = (community: Community) => community.name
 
 /**
- * A community's page (F30-AC18): its cover, its head, its tabs, and the
+ * A community's page (F30-AC67): its cover, its head, its tabs, and the
  * open tab's list.
  */
 export function communityPageBody(

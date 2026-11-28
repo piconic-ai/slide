@@ -181,7 +181,7 @@ const talkOf = (row: TalkRow): CommunityTalk => ({
 /**
  * The community's events with public talks, the event whose first public
  * talk is newest first (the same time, the newer event first), each with
- * its talks newest first (D-25, F30-AC19); and its talks once each, newest
+ * its talks newest first (D-25, F30-AC68); and its talks once each, newest
  * first (F30-AC21).
  */
 export async function readCommunityTalks(
