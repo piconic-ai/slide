@@ -68,6 +68,12 @@ export const viewerStyle = html`<style>
   .related-link .link-icon {
     flex: none;
   }
+  /* The way to the page of the slides that carry the same link. */
+  .related-link-page {
+    display: block;
+    margin: 4px 16px 0;
+    font-size: 13px;
+  }
   /* What the author is told above slides readers cannot see. */
   ${raw(viewerNoticeCss)} .viewer-notice form {
     margin: 0;

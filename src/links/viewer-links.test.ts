@@ -14,7 +14,8 @@ import {
   TEST_ORIGIN,
   testEnv,
 } from '../publication/test-support'
-import { listLinks } from './store'
+import { eventRefOf } from '../events/event-url'
+import { listLinks, setLinkKind } from './store'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
@@ -258,6 +259,8 @@ test('F27-AC60: Given a Luma invitation and links with every tracking part, When
   await add({ url: 'https://example.com/b?tk=kept' })
   expect(await viewerHrefs()).toEqual([
     'https://lu.ma/abc?x=1',
+    // A Luma address is an event whatever kind it was added with: its page.
+    '/link/luma.com/abc',
     'https://example.com/a?z=2&amp;a=1',
     'https://example.com/b?tk=kept',
   ])
@@ -335,4 +338,122 @@ test('F27-AC59: Given a stored link without a sanitized address whose url the pa
     'https://example.com/a',
     'https://[broken?x=1',
   ])
+})
+
+test('F45-AC18: F27-AC89: F29-AC29: F29-AC30: Given links only this slide has, a link another author added too and an event, When the viewer and the slide page open, Then only the links whose page shows lead to it, by the one path of the page, and the slide page lists those pages', async () => {
+  await seedPublic(db, 'talk', 100, 'Talk')
+  await seedPublic(db, 'reply', 200, 'Reply', '2')
+  const added = 'https://www.example.com/a/?utm_source=x&b=1#Top'
+  await add({ kind: 'other', url: added, title: '' })
+  await add({ kind: 'article', url: 'https://example.com/solo' })
+  await add({ kind: 'other', url: 'https://connpass.com/event/008/' })
+  await add({ kind: 'event', url: 'https://luma.com/abc', title: 'Meetup' })
+  for (const url of [
+    'https://example.com/a?b=1',
+    'https://connpass.com/event/008',
+  ])
+    await add({ kind: 'other', url }, other, 'reply')
+  const PAGE = '/link/example.com/a?b=1'
+  expect(await viewerHrefs()).toEqual([
+    'https://www.example.com/a/?b=1#Top',
+    PAGE,
+    'https://example.com/solo',
+    // Shaped like an event, it is one whatever kind was chosen (F45-AC37).
+    'https://connpass.com/event/008/',
+    '/link/connpass.com/event/8',
+    'https://luma.com/abc',
+    '/link/luma.com/abc',
+  ])
+  expect((await viewerLinks()).replace(/\s+/g, ' ')).toContain(
+    `<a class="related-link-page" href="${PAGE}" >このリンクを添えたスライド</a`,
+  )
+  expect(await viewerLinks('', '/@owner/talk?lang=en')).toContain(
+    '>Slides with this link</a',
+  )
+  expect((await get(PAGE)).status).toBe(200)
+  const viewer = await (await get('/@owner/talk')).text()
+  expect(viewer).not.toContain('utm_source')
+  expect(viewer).not.toContain('https://example.com/a?b=1')
+
+  const manage = await text(get('/my/slides/talk', owner))
+  expect(manage.split('リンクのページに並びます。')).toHaveLength(4)
+  const frame = /data-deck-frame="placed-pages"[\s\S]*?<\/section>/.exec(manage)
+  expect(
+    [...frame![0].matchAll(/href="([^"]*)" >([^<]*)</g)].map((m) => [
+      m[1],
+      m[2],
+    ]),
+  ).toEqual([
+    [PAGE, 'example.com https://example.com/a?b=1'],
+    ['/link/connpass.com/event/8', 'The recording'],
+    ['/link/luma.com/abc', 'Meetup'],
+  ])
+
+  const [link] = await listLinks(db, 'reply')
+  await form(`/my/slides/reply/links/${link?.id}/delete`, other, {})
+  expect(await viewerHrefs()).not.toContain(PAGE)
+})
+
+test.each([
+  [
+    'written the same',
+    'https://peatix.com/event/123',
+    '/link/peatix.com/event/123',
+  ],
+  [
+    'written with www.',
+    'https://www.peatix.com/event/123',
+    '/link/www.peatix.com/event/123',
+  ],
+])(
+  'F45-AC38: F45-AC18: F29-AC30: Given an address one author made an event (%s) and this slide carries under another kind, When the viewer and the slide page open, Then both lead to the page of the event, and this slide is listed there',
+  async (_, eventUrl, page) => {
+    await seedPublic(db, 'talk', 100, 'Talk')
+    await seedPublic(db, 'event', 200, 'As event', '2')
+    await add({ kind: 'event', url: eventUrl, title: '' }, other, 'event')
+    await add({
+      kind: 'article',
+      url: 'https://peatix.com/event/123?utm_source=x',
+      title: 'My notes',
+    })
+    // One author's link that is no event has no page of its own (F45-AC2).
+    expect((await get('/link/peatix.com/event/124')).status).toBe(404)
+    expect(await viewerHrefs()).toEqual(['https://peatix.com/event/123', page])
+    const manage = await text(get('/my/slides/talk', owner))
+    expect(manage.split('リンクのページに並びます。')).toHaveLength(2)
+    const frame = /data-deck-frame="placed-pages"[\s\S]*?<\/section>/.exec(
+      manage,
+    )
+    expect(
+      [...frame![0].matchAll(/href="([^"]*)" >([^<]*)</g)].map((m) => [
+        m[1],
+        m[2],
+      ]),
+    ).toEqual([[page, 'My notes']])
+    const listed = await text(get(page))
+    expect(listed).toContain('<span class="deck-name">Talk</span>')
+    expect(listed).toContain('<span class="deck-name">As event</span>')
+    // Once the event's link is gone, so is the page this slide was on.
+    const [link] = await listLinks(db, 'event')
+    await form(`/my/slides/event/links/${link?.id}/delete`, other, {})
+    expect(await viewerHrefs()).toEqual(['https://peatix.com/event/123'])
+  },
+)
+
+test('F45-AC38: F29-AC30: Given a slide with one address as an event and, written with a query its site drops, under another kind, When the slide page opens, Then the page is listed once', async () => {
+  await seedPublic(db, 'talk', 100, 'Talk')
+  await add({ kind: 'other', url: 'https://loom.com/embed/x', title: 'Demo' })
+  const [link] = await listLinks(db, 'talk')
+  await setLinkKind(db, {
+    deckId: 'talk',
+    ownerUserId: '722500',
+    linkId: link!.id,
+    kinding: { kind: 'event', event: eventRefOf('https://loom.com/embed/x')! },
+    now: 1,
+  })
+  expect(await viewerHrefs()).toEqual([
+    'https://loom.com/embed/x',
+    '/link/loom.com/embed/x',
+  ])
+  expect((await get('/link/loom.com/embed/x')).status).toBe(200)
 })

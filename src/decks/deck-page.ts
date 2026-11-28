@@ -5,7 +5,7 @@ import type { Handle } from '../share/handle'
 import type { DeckSlug } from './deck-id'
 import { articleFrame, type ArticleSummary } from './article-frame'
 import { linkPlacesOf, linksFrame } from './links-frame'
-import { placedPagesFrame } from './placed-pages-frame'
+import { placedPagesFrame, placedPagesOf } from './placed-pages-frame'
 import type { LinkNotice } from '../links/link'
 import type { ShownLink } from '../links/link-page-store'
 import type { StoredLink } from '../links/store'
@@ -95,9 +95,7 @@ export const deckPageBody = (view: DeckPageView, lang: Lang) =>
       lang,
     )}
     ${placedPagesFrame(
-      view.events.filter((event) =>
-        view.shown.some((link) => link.eventId === event.id),
-      ),
+      placedPagesOf(view.links.list, view.events, view.shown),
       lang,
     )}
     ${downloadFrame(view.downloads ?? [], lang)}

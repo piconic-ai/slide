@@ -1,6 +1,6 @@
 # リンクによる集約の実装設計
 
-[同じリンクでスライドが集まる](../features/f45-link-gathering.md)の設計。同じ URL を関連リンクに持つスライドを、`/link/<URL>` の 1 つのページに並べる。実装は 10 本の PR に分ける(計画は [issue #737](https://github.com/piconic-ai/slide/issues/737))。この文書は PR ごとに書き足す。いま実装済みなのは、link1 の純粋な関数、link2 の経路(イベントの形のリンクだけがページになる)、link3 の `/events/:id` の転送とアプリの中のリンク先、link4 のページの見出しと頭、名前を直す経路の撤去、link5 の画面の言葉(コミュニティの「リンク」のタブ、1 本の管理の文と枠)、link6 の列(`gather_key`、`link_host`)である。イベントでないリンクのページは、まだ無い。列は、保存するだけで、まだ読んでいない。節ごとに、実装済みか、どの PR で実装するかを書く。
+[同じリンクでスライドが集まる](../features/f45-link-gathering.md)の設計。同じ URL を関連リンクに持つスライドを、`/link/<URL>` の 1 つのページに並べる。実装は 10 本の PR に分ける(計画は [issue #737](https://github.com/piconic-ai/slide/issues/737))。この文書は PR ごとに書き足す。いま実装済みなのは、link1 の純粋な関数、link2 の経路(イベントの形のリンクだけがページになる)、link3 の `/events/:id` の転送とアプリの中のリンク先、link4 のページの見出しと頭、名前を直す経路の撤去、link5 の画面の言葉(コミュニティの「リンク」のタブ、1 本の管理の文と枠)、link6 の列(`gather_key`、`link_host`)、link7 のイベントでないリンクのページと viewer の行からのリンクである。コミュニティへの所属は、まだイベントのリンクだけで、`link_host` は、保存するだけで、まだ読んでいない。節ごとに、実装済みか、どの PR で実装するかを書く。
 
 ## ファイルの分担
 
@@ -11,11 +11,11 @@
 | `src/links/gather.ts` | 純粋 | 集める鍵(`gatherKeyOf`)、書かれたホスト名(`linkHostOf`) | link1 で実装済み |
 | `src/links/link-address.ts` | 純粋 | `/link/` の後ろの読み方(`parseLinkPath`)、引く鍵と正規の形(`linkTargetOf`)、ページの path(`linkPagePath`、`eventPagePath`)、イベントを引く鍵(`eventKeysOf`) | link1、link2 で実装済み |
 | `src/links/link-page-routes.ts` | routes | `GET /link/*`、`GET /link` | link2 で実装済み(イベントだけ) |
-| `src/links/link-page-store.ts` | store | 鍵からイベントを引く(`findEventIdsByKey`)、Luma の番号から名前への対応(`findAliasedKey`)、イベントのページの読み出し(`readEventPage`)、番号から転送先を引く(`findShownEventUrl`)、一覧の行に最初の題名を足す SQL(`firstPublicTitle`)、1 本のスライドの関連リンクのうちページの出ているもの(`listShownLinks`) | link2〜link5 で実装済み。イベントでないリンクは link7 |
+| `src/links/link-page-store.ts` | store | 鍵からイベントを引く(`findEventIdsByKey`)、Luma の番号から名前への対応(`findAliasedKey`)、ページの読み出し(`readLinkPage`。イベントは `readEventPage`、イベントでないリンクは `readGatheredPage`)、番号から転送先を引く(`findShownEventUrl`)、一覧の行に最初の題名を足す SQL(`firstPublicTitle`)、1 本のスライドの関連リンクのうちページの出ているもの(`listShownLinks`) | link2〜link5、link7 で実装済み |
 | `src/links/link-missing-page.ts` | pages | 「まだありません」のページ(F45-AC12、F45-AC29) | link2 で実装済み |
 | `public/share.js` | ブラウザー | フッターの言語の切り替えの行き先を、`/link/…` では `/link?to=…` にする | link2 で実装済み |
 | `src/links/link-page.ts` | pages | ページ(`linkPageBody`、`linkPageTitle`) | link4 で実装済み(`src/events/event-page.ts` を移した) |
-| `src/links/link-heading.ts` | 純粋 | 見出し(`headingOf`)、サイト名(`siteNameOf`)、元のページへのリンクの文と行き先(`sourceLinkTextOf`、`sourceOf`) | link4 で実装済み(`src/events/event-name.ts` を移した)。ページを出す条件(`pageShown`)は link7 |
+| `src/links/link-heading.ts` | 純粋 | 見出し(`headingOf`)、サイト名(`siteNameOf`)、元のページへのリンクの文と行き先(`sourceLinkTextOf`、`sourceOf`) | link4 で実装済み(`src/events/event-name.ts` を移した)。ページを出す条件(`pageShown`)は link7 で実装済み |
 | `src/events/routes.ts` | routes | `GET /events/:id` の 301 | link3 で実装済み |
 | `src/events/store.ts` | store | 1 本のスライドの入っているイベント(`listDeckEvents`) | link3 で、ページの読み出しを `src/links/link-page-store.ts` へ移した。link4 で `renameEvent` を消した |
 
@@ -97,7 +97,7 @@ SQL は `src/links/url-rules.ts` の規則を写したものである。`gathere
 | 0071 を適用してから新しい Worker が動くまでの間(と、Worker を 1 つ前の版に戻している間)に足された行 | NULL | NULL |
 | `normalized_url` が NULL の行(0051 より前の Worker が足した行) | NULL | 値が入る |
 
-読む側(link7 から)は、NULL を「集まらない」と扱う。`gather_key = ?` の条件に NULL の行は当たらないので、そのリンクは、ページにも、ページを出す条件の数にも入らない。NULL の行は、次に `gather_key` を作り直す migration で埋まる。それまでに埋めたいときは、`gather_key IS NULL` の行だけを埋める migration を足す。本番に NULL の行が何行あるかは、確かめていない。
+読む側は、NULL を「集まらない」と扱う。`gather_key = ?` の条件に NULL の行は当たらないので、そのリンクは、ページにも、ページを出す条件の数にも入らない。NULL の行は、次に `gather_key` を作り直す migration で埋まる。それまでに埋めたいときは、`gather_key IS NULL` の行だけを埋める migration を足す。本番に NULL の行が何行あるかは、確かめていない。
 
 ## 経路(link2 で実装済み)
 
@@ -204,7 +204,7 @@ Pullfrog のレビューの指摘(#738、#741、#745、#746、#751、#752)を受
 
 ### 1 本の管理の文と枠
 
-`listShownLinks(db, deckId)`(`src/links/link-page-store.ts`)は、そのスライドの関連リンクのうち、リンクのページが出ているものを、リンクの id とイベントの番号で返す。いまの条件は、イベントのリンクで、そのイベントに一般公開中のスライドが 1 本以上あること(`readEventPage` と同じ `publicTalks`。見る人を当てない)。そのスライド自身が下書きでも、ほかのスライドでページが出ていれば、含まれる。link7 で、イベントでないリンクに広げる。
+`listShownLinks(db, deckId)`(`src/links/link-page-store.ts`)は、そのスライドの関連リンクのうち、リンクのページが出ているものを、リンクの id とイベントの番号で返す。いまの条件は、イベントのリンクで、そのイベントに一般公開中のスライドが 1 本以上あること(`readEventPage` と同じ `publicTalks`。見る人を当てない)。そのスライド自身が下書きでも、ほかのスライドでページが出ていれば、含まれる。link7 で、イベントでないリンクに広げた(下の「イベントでないリンクのページ」)。
 
 関連リンクの行の下の文は、`linkPlacesOf`(`src/decks/links-frame.ts`)が決める(F29-AC29)。
 
@@ -212,15 +212,60 @@ Pullfrog のレビューの指摘(#738、#741、#745、#746、#751、#752)を受
 | --- | --- |
 | イベントがコミュニティに入っている(`listDeckEvents` の `community`) | 「(コミュニティ名) のページに並びます。」 |
 | コミュニティに入らず、`listShownLinks` に含まれる | 「リンクのページに並びます。」 |
-| どちらでもない(イベントでないリンク、一般公開中のスライドの無いイベント) | 出さない |
+| どちらでもない(ページの出ていないリンク、一般公開中のスライドの無いイベント) | 出さない |
 
 - コミュニティは、これまでどおり `listEventCommunities` が決める。connpass などは、一般公開中のスライドのリンクのホスト名が紐づけ用リンクと合うこと、Luma は、カレンダーの配信にあることである。下書きだけが持つ connpass のリンクは、コミュニティに入らず、ページも出ないので、文が出ない。Luma のカレンダーにあるイベントは、一般公開中のスライドが無くても、コミュニティの文が出る。
 
-「このスライドが並ぶページ」の枠(`src/decks/placed-pages-frame.ts`。`src/decks/events-frame.ts` を移した)は、`listDeckEvents` のイベントのうち、`listShownLinks` に含まれるものを、関連リンクの順に 1 度ずつ並べる(F29-AC30)。見出し(`headingOf`)はリンクのページへのリンクで、コミュニティに入っていれば、その名前を添える。並ぶページが無いときは「並ぶページは、関連リンクから決まります。いまは、並ぶページがありません。」を出す。枠の名前(`data-deck-frame`、`id`)は `events` から `placed-pages` に替えた。
+「このスライドが並ぶページ」の枠(`src/decks/placed-pages-frame.ts`。`src/decks/events-frame.ts` を移した)は、`listDeckEvents` のイベントのうち、`listShownLinks` に含まれるものを、関連リンクの順に 1 度ずつ並べる(F29-AC30)。link7 で、イベントでないリンクのページも並べるようにした(`placedPagesOf`)。見出し(`headingOf`)はリンクのページへのリンクで、コミュニティに入っていれば、その名前を添える。並ぶページが無いときは「並ぶページは、関連リンクから決まります。いまは、並ぶページがありません。」を出す。枠の名前(`data-deck-frame`、`id`)は `events` から `placed-pages` に替えた。
 
 幅 375px ではみ出さないこと(F29-AC31)は、`src/links/link-page.browser.test.ts` が、長い名前のリンクを持つスライドの管理のページで確かめる。
 
 ヘルプは、画面の言葉の引用だけを直した(`community/list-event-talks`)。記事の書き直しは link10。
+
+## イベントでないリンクのページ(link7 で実装済み)
+
+経路(`src/links/link-page-routes.ts`)は、F45-AC35 の順で読む(順は上の「経路」)。
+
+1. `readEventPageOf(db, target, viewer)`: `eventKeysOf(target)` の鍵のイベントに、一般公開中のスライドがあれば、そのイベントのページ(`readEventPage`)。同じ URL をイベント以外の種類で添えたスライドも並ぶ(F45-AC38。上の「レビューを受けて決めた規則」)。
+2. 無ければ、`readGatheredPage(db, target, viewer)`: `related_links.gather_key = target.gatherKey` で、`related_link_events` に行の無いリンクを引く。
+
+ページを出すかは、純粋な `pageShown`(`src/links/link-heading.ts`)が決める。一般公開中のスライドが 1 本以上あり、かつ、イベントとして保存されている、URL がイベントの形である、コミュニティに入っている、作者が 2 人以上、のどれかである。
+
+- この PR では、`inCommunity` は常に false を渡す。種類を問わない所属は link8。
+- 本数と作者の数は、見る人を当てない問い合わせの行から数える(スライドの id と `decks.owner_user_id` の種類の数)。同じスライドが同じ鍵のリンクを 2 つ持っても(`t=30` と `t=60`)、1 本である。
+- `pageShown` が false なら `null` で、経路は「まだありません」のページを出す。1 人だけの URL と、だれも入れていない URL は、本文も同じになる(F45-AC2)。
+- 一覧だけに、見る人のミュートとブロックを当てる。0 本になっても、ページは 200 である(F45-AC15)。
+- 「一般公開中」の条件は、イベントと同じ結合(`openDeck`、`readyVersion`)を使う(F45-AC14)。
+- connpass などの URL は、種類にかかわらずイベントに結びつくので(F45-AC37)、この枝に来るのは、規則の前に保存された、`related_link_events` に行の無いリンクだけである。URL がイベントの形なので、1 人でもページが出る(F45-AC3)。
+
+ページの中身は、イベントと同じ `linkPageBody` で作る。
+
+| 項目 | イベントでないリンク |
+| --- | --- |
+| 見出し | 一般公開中のスライドのリンクのうち、最初に保存された題名。無ければ、ホスト名と集める鍵(「example.com https://example.com/post」) |
+| 元のページへのリンク | 一般公開中のスライドのリンクのうち、最初に保存されたものの `sanitized_url`(`sourceOf` の `kind: 'link'`)。`sanitized_url` が NULL の行なら、集める鍵 |
+| コミュニティの頭 | 出さない(この PR では、所属が無い) |
+| 「コミュニティはまだありません」と「作る」 | 出さない(ホスト名の集合を空で返す。F45-AC27 は、イベントの形のリンクだけ) |
+
+### ページの出ているリンク(`listShownLinks`)
+
+`listShownLinks(db, deckId)` は、そのスライドの関連リンクのうち、スライドがどこかのリンクのページに並ぶものを、そのページの path(`path`)と一緒に返す。
+
+| リンク | 並ぶページ(`path`) | 条件 |
+| --- | --- | --- |
+| イベントのリンク | `eventPagePath(events.url)` | そのイベントに、一般公開中のスライドのリンクがある |
+| イベントでないリンクで、`gather_key` の同じイベントのリンクが一般公開中のスライドにある | そのイベントのページ(2 つあれば、番号の小さいほう) | 上と同じ。`readEventPage` が、このリンクのスライドも並べる(F45-AC38) |
+| そのほかのイベントでないリンク | `/link/<正規の形>` | その `gather_key` で `pageShown` が true |
+
+- 問い合わせは、そのスライドのリンクの読み出しのほかに、イベントの分が 1 回、イベントでないリンクの分が 1 回で、リンクの数によらない(スライドを開くときの問い合わせの数は変わらない。`src/cost/per-use.test.ts`)。イベントでないリンクの分は、`gather_key IN (…)` を、鍵とイベントで `GROUP BY` し、イベントの行(イベントの番号と URL)と、イベントでないリンクの行(本数と作者の数)を、1 回で取る。
+- 保存された鍵のうち、`linkTargetOf(鍵).gatherKey` が鍵と同じでないものは、鍵のページには数えない。`/link/…` の path から、その鍵に戻れないからである。ページへ進むリンクが 404 を指さないようにしている。
+- 「ページあり」と、そのページに自分のスライドが載ることは、一致する。これまでは、同じ URL をほかの人が種類「イベント」にしていると、イベントでないリンクは、スライドの並ばないイベントのページへ案内されていた(#746)。
+- viewer(`readViewerParts`、`src/share/viewer-parts-store.ts`)は、この結果の `path` を `pagePath` に付ける。`viewerLinksFrame` は、その行に、外へのリンクとは別の `<a class="related-link-page">`「このリンクを添えたスライド」(Slides with this link)を添える(F45-AC18)。イベントのリンクにも付く。正規の形が HTML に出るのは、この href だけである(F27-AC89)。
+- 1 本の管理の行の下の文(`linkPlacesOf`)は、イベントでないリンクにも「リンクのページに並びます。」を出す。「このスライドが並ぶページ」の枠は、`placedPagesOf`(`src/decks/placed-pages-frame.ts`)が、関連リンクの順に、`path` ごとに 1 度ずつ並べる。イベントでないリンクの見出しは、そのスライド自身のリンクの題名、無ければホスト名と鍵である。ページの見出し(イベント名、または最初に保存された題名)とは、違うことがある。
+
+### connpass の番号の先頭の 0
+
+種類をイベント以外にした connpass の URL `https://connpass.com/event/007/` は、保存される集める鍵が `https://connpass.com/event/007` で、`/link/` の側は、イベントの鍵にそろえた `connpass.com/event/7` になる。2 つは合わないので、集める鍵では集まらなかった(#745 と同じ原因)。2026-11-28 から、イベントの形の URL は、種類にかかわらずイベントの鍵で集めるので(F45-AC37)、新しく足すリンクでは起きない。規則の前に保存された行は、種類を選び直すまで、集まらないままである(同じ書き方 `event/007` のイベントのリンクが、一般公開中のスライドにあるときだけ、そのイベントのページに並ぶ)。
 
 ## 言語(link2 で実装済み)
 
