@@ -1,6 +1,7 @@
 import { describe, expect, it, test } from 'vitest'
 import {
   eventKeysOf,
+  eventPagePath,
   linkPagePath,
   linkTargetOf,
   parseLinkPath,
@@ -128,6 +129,7 @@ describe('parseLinkPath and linkTargetOf', () => {
       rest: 'connpass.com/event/410635',
       eventShaped: true,
       eventKey: 'https://connpass.com/event/410635',
+      eventRest: 'connpass.com/event/410635',
       gatherKey: 'https://connpass.com/event/410635',
     })
     expect(targetOf('group.doorkeeper.jp/events/5?x=1').eventKey).toBe(
@@ -145,6 +147,7 @@ describe('parseLinkPath and linkTargetOf', () => {
       rest: 'example.com/conf/2026',
       eventShaped: false,
       eventKey: 'https://example.com/conf/2026',
+      eventRest: 'example.com/conf/2026',
       gatherKey: 'https://example.com/conf/2026',
     })
     expect(targetOf('example.com/')).toMatchObject({
@@ -162,20 +165,103 @@ describe('parseLinkPath and linkTargetOf', () => {
     )
   })
 
-  test('F45-AC31: Given an address written to need many steps, When it is read, Then reading ends', () => {
-    const rest = canonical(`${'www.'.repeat(40)}example.com/a`)
-    expect(rest.endsWith('example.com/a')).toBe(true)
+  test.each([40, 60, 400])(
+    'F45-AC31: Given an address with www. written %i times, When it is read, Then no www. is left and reading it again changes nothing',
+    (times) => {
+      const rest = canonical(`${'www.'.repeat(times)}example.com/a`)
+      expect(rest).toBe('example.com/a')
+      expect(canonical(rest)).toBe(rest)
+    },
+  )
+
+  test('F45-AC35: Given an address of another site whose compared form differs from it, When it is read, Then an event is looked up by the address as written and the other links by the compared form', () => {
+    // The compared form of a Loom embed is its share page.
+    expect(targetOf('loom.com/embed/x')).toEqual({
+      rest: 'loom.com/share/x',
+      eventShaped: false,
+      eventKey: 'https://loom.com/embed/x',
+      eventRest: 'loom.com/embed/x',
+      gatherKey: 'https://loom.com/share/x',
+    })
+    // The compared form of an unlisted Vimeo video carries a query the
+    // written address does not have.
+    expect(targetOf('vimeo.com/123/abc')).toMatchObject({
+      rest: 'vimeo.com/123?h=abc',
+      eventKey: 'https://vimeo.com/123/abc',
+      eventRest: 'vimeo.com/123/abc',
+    })
+    expect(targetOf('www.youtube.com/watch?v=ID')).toMatchObject({
+      eventKey: null,
+      eventRest: null,
+      gatherKey: 'https://youtube.com/watch?v=ID',
+    })
   })
+
+  test('F45-AC35: Given addresses of another site with and without www., When they are read, Then each is looked up as its own event and both gather the other links under one key', () => {
+    expect(targetOf('https://WWW.Example.com/conf/')).toEqual({
+      rest: 'example.com/conf',
+      eventShaped: false,
+      eventKey: 'https://www.example.com/conf',
+      eventRest: 'www.example.com/conf',
+      gatherKey: 'https://example.com/conf',
+    })
+    expect(targetOf('example.com/conf')).toMatchObject({
+      eventKey: 'https://example.com/conf',
+      eventRest: 'example.com/conf',
+      gatherKey: 'https://example.com/conf',
+    })
+  })
+
+  test('F45-AC9: Given the address of an event, When the path of its page is made, Then connpass, Doorkeeper and Luma have the canonical path and another site its address as written', () => {
+    expect(eventPagePath('https://connpass.com/event/7/')).toBe(
+      '/link/connpass.com/event/7',
+    )
+    expect(eventPagePath('https://group.doorkeeper.jp/events/5')).toBe(
+      '/link/group.doorkeeper.jp/events/5',
+    )
+    expect(eventPagePath('https://luma.com/AbC')).toBe('/link/luma.com/AbC')
+    expect(eventPagePath('https://www.example.com/conf/')).toBe(
+      '/link/www.example.com/conf',
+    )
+    expect(eventPagePath('https://example.com/conf')).toBe(
+      '/link/example.com/conf',
+    )
+    expect(eventPagePath('https://loom.com/embed/x')).toBe(
+      '/link/loom.com/embed/x',
+    )
+    expect(eventPagePath('https://vimeo.com/123/abc')).toBe(
+      '/link/vimeo.com/123/abc',
+    )
+    expect(eventPagePath('https://example.com/')).toBe('/link/example.com')
+  })
+
+  test.each([
+    'https://www.example.com/conf/',
+    'https://loom.com/embed/x',
+    'https://vimeo.com/123/abc',
+    'https://connpass.com/event/7/',
+    'https://example.com/',
+  ])(
+    'F45-AC31: Given the path of the page of the event %s, When it is read again, Then it names the same event and the same path',
+    (eventUrl) => {
+      const path = eventPagePath(eventUrl)
+      const again = targetOf(path.slice('/link/'.length))
+      expect(again.eventKey).toBe(linkTargetOf(eventUrl).eventKey)
+      expect(`/link/${again.eventRest}`).toBe(path)
+    },
+  )
 })
 
-test('F45-AC35: Given the keys an event may be kept under, When they are told, Then an event of connpass has one, an event of another site both ways of writing www., and an address with a query none', () => {
+test('F45-AC35: Given the keys an event may be kept under, When they are told, Then an event of connpass has one, an event of another site the one written with its www. or without, and an address with a query none', () => {
   const keys = (url: string) => eventKeysOf(linkTargetOf(url))
   expect(keys('https://kanagawapm.connpass.com/event/410635/?a=1')).toEqual([
     'https://connpass.com/event/410635',
   ])
   expect(keys('https://www.example.com/conf/')).toEqual([
-    'https://example.com/conf',
     'https://www.example.com/conf',
+  ])
+  expect(keys('https://example.com/conf/')).toEqual([
+    'https://example.com/conf',
   ])
   expect(keys('https://example.com/conf?day=1')).toEqual([])
 })
