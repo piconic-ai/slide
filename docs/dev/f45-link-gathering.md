@@ -9,7 +9,7 @@
 | `src/links/url-rules.ts` | 純粋 | サイトごとの規則。集めるときだけ除くクエリ(`gatheredWithout`) | link1 で実装済み |
 | `src/links/normalize.ts` | 純粋 | 比べる形(`normalizedUrlOf`)。中身は、除く名前を足せる `comparedUrlOf` | link1 で実装済み(出力は変えていない) |
 | `src/links/gather.ts` | 純粋 | 集める鍵(`gatherKeyOf`)、書かれたホスト名(`linkHostOf`) | link1 で実装済み |
-| `src/links/link-address.ts` | 純粋 | `/link/` の後ろの読み方(`parseLinkPath`)、引く鍵と正規の形(`linkTargetOf`)、ページの path(`linkPagePath`)、イベントを引く鍵の候補(`eventKeysOf`) | link1、link2 で実装済み |
+| `src/links/link-address.ts` | 純粋 | `/link/` の後ろの読み方(`parseLinkPath`)、引く鍵と正規の形(`linkTargetOf`)、ページの path(`linkPagePath`、`eventPagePath`)、イベントを引く鍵(`eventKeysOf`) | link1、link2 で実装済み |
 | `src/links/link-page-routes.ts` | routes | `GET /link/*`、`GET /link` | link2 で実装済み(イベントだけ) |
 | `src/links/link-page-store.ts` | store | 鍵からイベントを引く(`findEventIdsByKey`)、Luma の番号から名前への対応(`findAliasedKey`)、イベントのページの読み出し(`readEventPage`)、番号から転送先を引く(`findShownEventUrl`)、一覧の行に最初の題名を足す SQL(`firstPublicTitle`) | link2〜link4 で実装済み。イベントでないリンクは link7 |
 | `src/links/link-missing-page.ts` | pages | 「まだありません」のページ(F45-AC12、F45-AC29) | link2 で実装済み |
@@ -33,17 +33,21 @@
 
 断るときは理由を返さない。入れられた文字列を、画面にも転送先にも出さないためである。
 
-`linkTargetOf(url)` は、読めた URL から次の 4 つを返す。
+`linkTargetOf(url)` は、読めた URL から次の 5 つを返す。
 
 | 項目 | 内容 |
 | --- | --- |
 | `rest` | 正規の形の、`/link/` の後ろ。鍵から `https://` を除いたもの |
 | `eventShaped` | connpass、Doorkeeper、Luma のイベントの形か |
 | `eventKey` | 先にイベントを引く鍵。引かないときは `null` |
+| `eventRest` | そのイベントのページの、`/link/` の後ろ。`eventKey` が `null` なら `null` |
 | `gatherKey` | イベントに当たらなかったときに引く、集める鍵 |
 
-- 鍵は、イベントの形の URL ではイベントの鍵(`eventRefOf` の `key`)、ほかは集める鍵である。1 度そろえた結果が別の形になることがあるので、変わらなくなるまで繰り返す(最大 8 回)。たとえば `a.b.connpass.com/event/007` は、比べる形にすると `connpass.com/event/007` になり、これはイベントの形なので `connpass.com/event/7` になる。`www.` は、1 度に 1 つしか外れない。繰り返すので、正規の形をもう 1 度読んでも同じ形になり、転送は 1 回で終わる。
-- `eventKey` は F45-AC35 のとおりに決める。イベントの形なら、クエリを除いたイベントの鍵。ほかのサイトは、クエリが無いときだけ、そのホスト名とパスのイベントの鍵(`https://example.com/conf`)。クエリがあれば `null` で、集める鍵だけで引く。追跡用のクエリは、鍵を作る前に除かれるので、クエリに数えない。
+- 鍵は、イベントの形の URL ではイベントの鍵(`eventRefOf` の `key`)、ほかは集める鍵である。1 度そろえた結果が別の形になることがあるので、変わらなくなるまで繰り返す。たとえば `a.b.connpass.com/event/007` は、比べる形にすると `connpass.com/event/007` になり、これはイベントの形なので `connpass.com/event/7` になる。`www.` は、1 度に 1 つしか外れない。変わらなくなるまで繰り返すので、正規の形をもう 1 度読んでも同じ形になり、転送は 1 回で終わる。繰り返しの上限は、読む URL の長さの上限(2000 文字)から決まる回数(`www.` 1 つが 4 文字なので 500 回と、余りの 12 回)で、必ず終わる。
+- `eventKey` は F45-AC35 のとおりに決める。イベントの形なら、クエリを除いたイベントの鍵で、`eventRest` は `rest` と同じである。ほかのサイトは、**書かれた URL**(比べる形にする前のもの)のホスト名とパスのイベントの鍵で、`www.` を残す(`https://www.example.com/conf`)。`eventRest` は、その鍵から `https://` を除いたものである。比べる形がクエリを残す URL(`example.com/conf?day=1`、`www.youtube.com/watch?v=ID`)は `null` で、集める鍵だけで引く。追跡用のクエリは、比べる形が除くので、クエリに数えない。
+- 比べる形の規則を、イベントの識別に混ぜない。`https://loom.com/embed/x` の正規の形は `loom.com/share/x`、`https://vimeo.com/123/abc` は `vimeo.com/123?h=abc` だが、道具で種類を「イベント」にしたときの鍵は、書かれたとおりの `https://loom.com/embed/x`、`https://vimeo.com/123/abc` である。`www.example.com/conf` と `example.com/conf` は、別のイベントで、別のページになる。
+- `eventPagePath(eventUrl)` は、イベント自身の URL(`events.url`)から、そのページの path(`/link/<eventRest>`)を作る。アプリがイベントへのリンクを作るときに使う。`linkPagePath(url)` は、イベントでないリンクのページの path(`/link/<rest>`)である。
+- 経路(link2b)は、転送の前に `eventKey` でイベントを引く。見つかれば、開かれた経路が `eventRest` と違うときだけ `/link/<eventRest>` へ 301 し、同じならそのまま出す。見つからなければ、`rest` へ転送し、集める鍵で引く。
 - `#` から後ろは、`new URL` が分け、鍵に入らない(F45-AC32)。ブラウザーは送らないが、全体をエンコードした書き方の中の `%23` は `#` として読まれ、同じく除かれる。path の中の `%23` は、path の一部のまま残る。
 - `%41` と `A`、`%2F` と `/` は、別の URL として扱う(復号しない)。IDN は punycode、日本語の path とクエリは `%` の形になる(`new URL` の書き方)。
 - `rest` は必ずホスト名で始まる。転送先の `/link/<rest>` が `//` で始まる外への転送にならない。
@@ -54,7 +58,9 @@
 
 - 計画は「イベントの形ならイベントの鍵、ほかは集める鍵」の 1 度で正規の形を決めていた。上の 2 つの例で、正規の形を読み直すと別の形になるので、繰り返す形にした。
 - Luma は、イベントの鍵がパスの大文字小文字を残し、比べる形は小文字にする(F27-AC71、F27-AC72)。`luma.com/AbC` の正規の形は `luma.com/AbC` のまま、`www.luma.com/AbC` は、比べる形を経るので `luma.com/abc` になる。
-- ほかのサイトのイベント(道具で種類を「イベント」にした URL)の鍵は、`www.` を残す。正規の形は `www.` を除くので、イベントを引くときは、`www.` の無い鍵と有る鍵の両方を候補にする(`eventKeysOf`)。`https://www.example.com/conf` をイベントにしたものは、`/link/example.com/conf` で当たる。`www.` 有りと無しの両方がイベントになっているときは、無いほうを先に見て、一般公開中のスライドのあるほうのページが出る(2 つは 1 つのページにまとまらない)。この扱いは仕様に書かれていない(F45-AC35 は「ホスト名とパスが一致するとき」)ので、依頼者に確かめる。
+- ほかのサイトのイベント(道具で種類を「イベント」にした URL)の鍵は、`www.` を残す。計画は、正規の形から `eventKey` を作っていたので、`www.` 付きや、比べる形が書き換える URL(Loom、Vimeo)のイベントに当たらなかった。2026-11-28 に、レビューの指摘(#738、#741)を受けて、`eventKey` と `eventRest` を、書かれた URL から作る形に直した。
+- 繰り返しは最大 8 回で打ち切っていた。`www.` を 9 個以上並べた入力で、転送が 2 回になるので、変わらなくなるまで進む形に直した(#738)。
+- link2 は、イベントを引くときに、`www.` の無い鍵と有る鍵の両方を候補にしていた(`eventKeysOf`)。`www.` 有りと無しの別々のイベントが 1 つの path に着き、一方のスライドが見えなくなるので(#741)、候補をやめ、書かれたとおりの鍵 1 つだけを引く。
 
 ## 集める鍵
 

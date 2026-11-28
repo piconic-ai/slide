@@ -113,14 +113,23 @@ function show(c: C, target: LinkTarget, page: Shown) {
 
 /**
  * The page of the event the address stands for, or null when there is no
- * event or it has no public talk. Of the events an address of another site
- * may be kept as, the first with a public talk.
+ * event or it has no public talk. The page of an event has one path
+ * (`eventRest`): asked at another, the answer moves there.
  */
-async function eventPage(c: C, target: LinkTarget) {
+async function eventPage(c: C, sent: string, target: LinkTarget) {
   const viewer = (await currentOwner(c))?.userId ?? null
   for (const id of await findEventIdsByKey(c.env.DB, eventKeysOf(target))) {
     const read = await readEventPage(c.env.DB, id, viewer)
-    if (read) return shownEvent(c, target, read)
+    if (!read) continue
+    return target.eventRest !== null && sent !== target.eventRest
+      ? c.redirect(PREFIX + target.eventRest, 301)
+      : // The language switch comes back to the path of the event, not to
+        // the canonical path of the other links.
+        shownEvent(
+          c,
+          { ...target, rest: target.eventRest ?? target.rest },
+          read,
+        )
   }
   return null
 }
@@ -185,19 +194,30 @@ linkPageRoutes.get('/link', (c) => {
     ? parseLinkPath(to.slice(PREFIX.length))
     : null
   if (!read || read.kind === 'refused') return refused(c)
-  return c.redirect(linkPagePath(read.url), 302)
+  // The page of an event of another site has the address as written as its
+  // path: a `to` written that way goes back there, any other to the one path.
+  const target = linkTargetOf(read.url)
+  const asWritten = to.slice(PREFIX.length) === target.eventRest
+  return c.redirect(PREFIX + (asWritten ? target.eventRest : target.rest), 302)
 })
 
 /**
  * The page of the links to one address. For now only an event has one; any
  * other address answers the page of F45-AC12. The order is F45-AC13's:
- * refuse, move, then the page.
+ * refuse, move, then the page. An event of another site is looked up by the
+ * address as written before the move to the canonical path, which would
+ * compare away what tells it from another event (its `www.`, the form its
+ * site's rule rewrites).
  */
 linkPageRoutes.get('/link/*', async (c) => {
-  const read = parseLinkPath(sentRestOf(c))
+  const sent = sentRestOf(c)
+  const read = parseLinkPath(sent)
   if (read.kind === 'refused') return refused(c)
   const target = linkTargetOf(read.url)
-  const moved = await movedTo(c.env.DB, sentRestOf(c), target)
+  const written = target.eventShaped ? null : await eventPage(c, sent, target)
+  if (written !== null) return written
+  const moved = await movedTo(c.env.DB, sent, target)
   if (moved !== null) return c.redirect(moved, 301)
-  return (await eventPage(c, target)) ?? missing(c, target)
+  const page = target.eventShaped ? await eventPage(c, sent, target) : null
+  return page ?? missing(c, target)
 })
