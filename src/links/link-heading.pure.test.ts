@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import {
   headingOf,
+  pageShown,
   siteNameOf,
   sourceLinkTextOf,
   sourceOf,
@@ -133,4 +134,41 @@ describe('sourceOf', () => {
       sourceOf({ kind: 'link', firstLinkUrl: 'https://example.com/a?b=1' }),
     ).toBe('https://example.com/a?b=1')
   })
+})
+
+describe('pageShown', () => {
+  const link = {
+    publicDecks: 2,
+    authors: 2,
+    kind: 'link',
+    eventShaped: false,
+    inCommunity: false,
+  } as const
+  test.each([
+    ['two slides of two authors', link, true],
+    ['two slides of one author', { ...link, authors: 1 }, false],
+    ['one slide', { ...link, publicDecks: 1, authors: 1 }, false],
+    ['no public slide', { ...link, publicDecks: 0, authors: 0 }, false],
+    ['one slide of an event', { ...link, authors: 1, kind: 'event' }, true],
+    [
+      'one slide, event-shaped',
+      { ...link, authors: 1, eventShaped: true },
+      true,
+    ],
+    [
+      'one slide, in a community',
+      { ...link, authors: 1, inCommunity: true },
+      true,
+    ],
+    [
+      'an event with no public slide',
+      { ...link, publicDecks: 0, authors: 0, kind: 'event', eventShaped: true },
+      false,
+    ],
+  ] as const)(
+    'F45-AC1: F45-AC2: Given %s, When the page is asked for, Then whether it shows is %j',
+    (_, facts, shown) => {
+      expect(pageShown(facts)).toBe(shown)
+    },
+  )
 })
