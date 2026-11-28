@@ -31,6 +31,7 @@
 | `url` | `https:` の URL を、URL として読んだ形(`URL.href`)。入れたとおりの URL として扱い、記録として残す。どのページにも出さない(F27-AC59)。migration 0051 より前の行は、入れたとおりの文字を持たないので、この値を入れたとおりの URL としても扱う |
 | `normalized_url` | すでにあるかを比べる形(下の「正規化した形」)。migration 0051 で足した。NULL を許すのは、それより前の版の Worker が、この列を書かずに足せるようにするため |
 | `sanitized_url` | 整えた URL(下の「整えた URL」)。viewer の href と、サイト名に使う。migration 0052 で足した。NULL の行(それより前の版の Worker が足したもの)は、読むときに `url` から作る |
+| `gather_key`、`link_host` | リンクのページに集める鍵と、URL に書かれたホスト名。migration 0071 で足した。[リンクによる集約の実装設計](f45-link-gathering.md#データlink6-で実装済み)に書く |
 | `title` | 題名。作者が入れた 1〜100 文字(CHECK)。入れなかったときは NULL(migration 0045 で NOT NULL を外した)。画面は NULL のとき、サイト名だけを出す |
 | `position` | 足すたびに最大値 + 1。外しても詰めず、再利用しない。並びは `position` の昇順 |
 | `created_at` | 足した時刻 |

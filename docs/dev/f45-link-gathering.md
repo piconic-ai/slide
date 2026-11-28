@@ -1,6 +1,6 @@
 # リンクによる集約の実装設計
 
-[同じリンクでスライドが集まる](../features/f45-link-gathering.md)の設計。同じ URL を関連リンクに持つスライドを、`/link/<URL>` の 1 つのページに並べる。実装は 10 本の PR に分ける(計画は [issue #737](https://github.com/piconic-ai/slide/issues/737))。この文書は PR ごとに書き足す。いま実装済みなのは、link1 の純粋な関数、link2 の経路(イベントの形のリンクだけがページになる)、link3 の `/events/:id` の転送とアプリの中のリンク先、link4 のページの見出しと頭、名前を直す経路の撤去、link5 の画面の言葉(コミュニティの「リンク」のタブ、1 本の管理の文と枠)である。イベントでないリンクのページと列は、まだ無い。節ごとに、実装済みか、どの PR で実装するかを書く。
+[同じリンクでスライドが集まる](../features/f45-link-gathering.md)の設計。同じ URL を関連リンクに持つスライドを、`/link/<URL>` の 1 つのページに並べる。実装は 10 本の PR に分ける(計画は [issue #737](https://github.com/piconic-ai/slide/issues/737))。この文書は PR ごとに書き足す。いま実装済みなのは、link1 の純粋な関数、link2 の経路(イベントの形のリンクだけがページになる)、link3 の `/events/:id` の転送とアプリの中のリンク先、link4 のページの見出しと頭、名前を直す経路の撤去、link5 の画面の言葉(コミュニティの「リンク」のタブ、1 本の管理の文と枠)、link6 の列(`gather_key`、`link_host`)である。イベントでないリンクのページは、まだ無い。列は、保存するだけで、まだ読んでいない。節ごとに、実装済みか、どの PR で実装するかを書く。
 
 ## ファイルの分担
 
@@ -64,16 +64,34 @@
 
 規則(`src/links/url-rules.ts`)を変えると、すでに保存した鍵と合わなくなる。規則を変える PR は、`gather_key` を作り直す migration を足す。
 
-## データ(link6 で実装する)
+## データ(link6 で実装済み)
 
-いまは列が無く、保存もしていない。link6 の migration(0071 の予定)で、`related_links` に NULL を許す列を 2 つ足す予定である。
+migration `0071_related_link_gather_key.sql` が、`related_links` に NULL を許す列を 2 つと、索引を 2 つ足す。`normalized_url`、1 本のスライドの中の重複の判定、イベントの表(`events`、`related_link_events`)と鍵は変えていない。
 
-| 列 | 内容 |
-| --- | --- |
-| `gather_key` | `gatherKeyOf` の結果。索引 `related_links_gather_key` |
-| `link_host` | `linkHostOf` の結果。索引 `related_links_link_host` |
+| 列 | 内容 | 索引 |
+| --- | --- | --- |
+| `gather_key` | `gatherKeyOf` の結果 | `related_links_gather_key` |
+| `link_host` | `linkHostOf` の結果 | `related_links_link_host` |
 
-すでにある行は、migration の SQL で `normalized_url` と `url` から埋める。SQL は規則を写すので、`gatherKeyOf`、`linkHostOf` と比べるテストで守る。1 つ前の版のコードが足した行は NULL になり、読む側は「集まらない」と扱う。`normalized_url`、イベントの表(`events`、`related_link_events`)と鍵は変えない。
+- 新しい行は、`addLink`(`src/links/store.ts`)が、リンクを足す INSERT の中で 2 つの列を書く。行を作る経路は、ほかに無い。URL を書き換える経路も無いので、行ができたあとに鍵がずれることはない。
+- すでにある行は、migration の SQL が埋める。`gather_key` は、`normalized_url` のホスト名(ポートを除く)が YouTube の規則のもの(`youtube.com`、`m.youtube.com`、`youtu.be`)なら `t` を、ニコニコ動画の規則のもの(`nicovideo.jp`、`sp.nicovideo.jp`、`nico.ms`)なら `from` を、クエリから除いたものである。除いて何も残らなければ `?` も落とす。ほかの行は `normalized_url` と同じ値になる。`link_host` は、`url` の `https://` から最初の `/` までのうち、ポートと末尾の `.` を除いたものである。
+- 規則がホスト名を書き換えるとき、書き換えた先は同じ規則のホスト名である(`youtu.be` は `youtube.com` になる)。そのため、SQL は `normalized_url` のホスト名だけで規則を選べる。`gatherKeyOf` は規則を当てる前に `t`、`from` を除き、SQL は当てた後の形から除くが、どちらの規則もこの 2 つの名前を読まないので、結果は同じになる。
+- migration は、列と索引を足し、足した列に値を書くだけである。`DROP`、`DELETE`、表の作り直しは無く、すでにある列の値は変えない。
+
+### 規則を変えるとき
+
+SQL は `src/links/url-rules.ts` の規則を写したものである。`gatheredWithout` か、比べる形の規則を変える PR は、すでにある行の `gather_key` を作り直す migration を足す(比べる形の規則を変えるときは、`normalized_url` を作り直したあとに)。`src/db/related-link-gather-migration.test.ts` が番人で、0070 までを当てた D1 に、いろいろな書き方の URL の行を入れ、残りの migration をすべて当てて、すべての行の `gather_key` が `gatherKeyOf(url)` と、`link_host` が `linkHostOf(url)` と同じことを確かめる。規則だけを変えて migration を足し忘れると、このテストが落ちる。
+
+### NULL の行
+
+2 つの列が NULL になる行は、次の 2 通りである。
+
+| 行 | `gather_key` | `link_host` |
+| --- | --- | --- |
+| 0071 を適用してから新しい Worker が動くまでの間(と、Worker を 1 つ前の版に戻している間)に足された行 | NULL | NULL |
+| `normalized_url` が NULL の行(0051 より前の Worker が足した行) | NULL | 値が入る |
+
+読む側(link7 から)は、NULL を「集まらない」と扱う。`gather_key = ?` の条件に NULL の行は当たらないので、そのリンクは、ページにも、ページを出す条件の数にも入らない。NULL の行は、次に `gather_key` を作り直す migration で埋まる。それまでに埋めたいときは、`gather_key IS NULL` の行だけを埋める migration を足す。本番に NULL の行が何行あるかは、確かめていない。
 
 ## 経路(link2 で実装済み)
 
@@ -216,7 +234,7 @@
 | link3 | `/events/:id` の 301、アプリの中のリンク先、見る人によらない判定、テストの移動(`src/links/link-page.test.ts`) |
 | link4 | 見出しと頭、元のページへのリンクの確認の画面、名前を直す経路の撤去、幅 375px のテスト(`src/links/link-page.browser.test.ts`) |
 | link5 | コミュニティのタブ「リンク」、1 本の管理の文と枠 |
-| link6 | 列の追加と埋め戻し(migration) |
+| link6 | 列の追加と埋め戻し(migration 0071)、`addLink` が 2 つの列を書く |
 | link7 | イベントでないリンクのページ、viewer の行からのリンク |
 | link8、link9 | コミュニティへの所属を種類を問わないリンクに広げる、お知らせ、タブとページの頭 |
 | link10 | ヘルプの記事、ほかの設計の文書の書き直し |
