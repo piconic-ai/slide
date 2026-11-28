@@ -42,12 +42,20 @@ export async function readViewerParts(
       }),
     }),
   )
-  const [author, citations, stored, shown, { events, talks }] =
+  // Which links have a page is asked only of a slide that has links, so a
+  // slide with none costs the query nothing (src/cost/per-use.test.ts).
+  const linksAndPages = listLinks(database, deck.deckId).then(
+    async (stored) => ({
+      stored,
+      shown:
+        stored.length > 0 ? await listShownLinks(database, deck.deckId) : [],
+    }),
+  )
+  const [author, citations, { stored, shown }, { events, talks }] =
     await Promise.all([
       readProfile(database, deck.ownerUserId),
       readViewerCitations(database, deck, viewer),
-      listLinks(database, deck.deckId),
-      listShownLinks(database, deck.deckId),
+      linksAndPages,
       eventsAndTalks,
     ])
   const pages = new Set(shown.map((link) => link.linkId))

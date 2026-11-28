@@ -38,9 +38,12 @@ vi.mock('./settings-blocks-frame', async () => {
   const frame = await mark('settings-blocks')
   return { settingsBlocksFrame: () => frame }
 })
-vi.mock('../decks/placed-pages-frame', async () => {
+vi.mock('../decks/placed-pages-frame', async (importOriginal) => {
   const frame = await mark('placed-pages')
-  return { placedPagesFrame: () => frame }
+  return {
+    ...(await importOriginal<typeof import('../decks/placed-pages-frame')>()),
+    placedPagesFrame: () => frame,
+  }
 })
 
 const platform = await getPlatformProxy<Env>({ persist: false })
