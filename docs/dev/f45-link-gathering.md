@@ -1,6 +1,6 @@
 # リンクによる集約の実装設計
 
-[同じリンクでスライドが集まる](../features/f45-link-gathering.md)の設計。同じ URL を関連リンクに持つスライドを、`/link/<URL>` の 1 つのページに並べる。実装は 10 本の PR に分ける(計画は [issue #737](https://github.com/piconic-ai/slide/issues/737))。この文書は PR ごとに書き足す。いま実装済みなのは、link1 の純粋な関数と、link2 の経路(イベントの形のリンクだけがページになる)である。イベントでないリンクのページと列は、まだ無い。アプリの中のリンク先は、まだ `/events/:id` のままである(link3 で変える)。節ごとに、実装済みか、どの PR で実装するかを書く。
+[同じリンクでスライドが集まる](../features/f45-link-gathering.md)の設計。同じ URL を関連リンクに持つスライドを、`/link/<URL>` の 1 つのページに並べる。実装は 10 本の PR に分ける(計画は [issue #737](https://github.com/piconic-ai/slide/issues/737))。この文書は PR ごとに書き足す。いま実装済みなのは、link1 の純粋な関数、link2 の経路(イベントの形のリンクだけがページになる)、link3 の `/events/:id` の転送とアプリの中のリンク先である。イベントでないリンクのページと列は、まだ無い。ページの見出しと頭は、まだイベントのページのままである(link4 で変える)。節ごとに、実装済みか、どの PR で実装するかを書く。
 
 ## ファイルの分担
 
@@ -11,11 +11,12 @@
 | `src/links/gather.ts` | 純粋 | 集める鍵(`gatherKeyOf`)、書かれたホスト名(`linkHostOf`) | link1 で実装済み |
 | `src/links/link-address.ts` | 純粋 | `/link/` の後ろの読み方(`parseLinkPath`)、引く鍵と正規の形(`linkTargetOf`)、ページの path(`linkPagePath`)、イベントを引く鍵の候補(`eventKeysOf`) | link1、link2 で実装済み |
 | `src/links/link-page-routes.ts` | routes | `GET /link/*`、`GET /link` | link2 で実装済み(イベントだけ) |
-| `src/links/link-page-store.ts` | store | 鍵からイベントを引く(`findEventIdsByKey`)、Luma の番号から名前への対応(`findAliasedKey`)。ページの読み出しは `src/events/store.ts` の `readEventPage` を呼んでいる | link2 で実装済み。読み出しの移動は link3、イベントでないリンクは link7 |
+| `src/links/link-page-store.ts` | store | 鍵からイベントを引く(`findEventIdsByKey`)、Luma の番号から名前への対応(`findAliasedKey`)、イベントのページの読み出し(`readEventPage`)、番号から転送先を引く(`findShownEventUrl`) | link2、link3 で実装済み。イベントでないリンクは link7 |
 | `src/links/link-missing-page.ts` | pages | 「まだありません」のページ(F45-AC12、F45-AC29) | link2 で実装済み |
 | `public/share.js` | ブラウザー | フッターの言語の切り替えの行き先を、`/link/…` では `/link?to=…` にする | link2 で実装済み |
-| `src/links/link-page.ts`、`src/links/link-heading.ts` | pages、純粋 | ページ、見出し、ページを出す条件 | link3、link4 で実装する |
-| `src/events/routes.ts` | routes | `GET /events/:id` の 301 | link3 で実装する |
+| `src/links/link-page.ts`、`src/links/link-heading.ts` | pages、純粋 | ページ、見出し、ページを出す条件 | link4 で実装する(いまは `src/events/event-page.ts`) |
+| `src/events/routes.ts` | routes | `GET /events/:id` の 301 | link3 で実装済み |
+| `src/events/store.ts` | store | 1 本のスライドの入っているイベント(`listDeckEvents`)、名前を直す(`renameEvent`。link4 で消す) | link3 で、ページの読み出しを `src/links/link-page-store.ts` へ移した |
 
 `src/links/link-address.ts` は、イベントの形の判定と鍵に `src/events/event-url.ts` の `isEventAddress`、`eventRefOf` を使う。どちらも純粋なファイルで、`src/links/kind.ts` がすでに同じ向きで読み込んでいる。
 
@@ -80,12 +81,40 @@
 1. `new URL(c.req.url)` の `pathname` と `search` から、`/link/` の後ろを取り、`parseLinkPath` で読む。断られたものは、共通の 404 のページ(`errorPage`)で答える。入れられた文字列は、本文にも href にも出さない。フッターの言語の切り替えは `/link?lang=…` を指す。
 2. 届いた書き方が正規の形と違えば、`/link/<正規の形>` へ 301(F45-AC31)。
 3. イベントの形の URL で、`luma_event_aliases` に対応があれば、名前の URL の `/link/…` へ 301(F45-AC26)。
-4. `eventKeysOf` の鍵でイベントを引き、一般公開中のスライドがあれば、`/events/:id` と同じ内容を 200 で出す(`readEventPage`、`eventPageBody` をそのまま呼ぶ)。`Link`(hreflang)は付けない。`?lang=` がページを指さないためである。
+4. `eventKeysOf` の鍵でイベントを引き、一般公開中のスライドがあれば、イベントのページを 200 で出す(`readEventPage`、`eventPageBody`)。`Link`(hreflang)は付けない。`?lang=` がページを指さないためである。
 5. どれにも当たらなければ、「まだありません」のページを 404 で出す(F45-AC12)。URL は `<p>` の文字で出し、リンクにしない(F45-AC29)。イベントでないリンクは、link7 まで、すべてここになる。
 
 - 404 は、どちらも `screen_error` として数える(F40-AC14。`screen` は `/link/*`、`/link`)。
 - 検索: `isIndexablePath` は `/link/` で始まる path を載せてよいとする(F45-AC36)。`noindexPrivate` は 200 と 304 だけを通すので、404 と 301 には `X-Robots-Tag: noindex, nofollow` が付く。
 - 予約語: `link` を `ROUTE_HANDLES` に足した(F30-AC74)。`events` は、経路が残るので、残している。
+
+## `/events/:id` の転送と、ページを出す条件(link3 で実装済み)
+
+`GET /events/:id`(`src/events/routes.ts`)は、番号からイベントを引き(`findShownEventUrl`)、一般公開中のスライドが 1 本でもあれば、`linkPagePath(events.url)` へ 301 で転送する(F45-AC9)。数字でない番号、無い番号、一般公開中のスライドの無いイベントは、共通の 404。見る人を当てないので、だれが開いても同じ応答になる。クエリ(`?lang=` を含む)は、転送先に持ち越さない。
+
+- `events.url` は、`eventRefOf` が作る `https://` の URL である。`linkPagePath` が正規の形にそろえるので、転送は 1 回で終わる。Luma の番号のイベントで、名前との対応があるものだけ、`/link/…` の側でもう 1 回転送される(F45-AC26)。
+- ほかのサイトのイベントで、`www.` 有りと無しの両方がイベントになっているとき、`www.` 有りのイベントの番号は、`www.` の無い path へ転送され、無いほうに一般公開中のスライドがあれば、そちらのページが出る(上の「計画との違い」と同じ扱い)。
+
+`readEventPage`(`src/links/link-page-store.ts`)は、問い合わせを 2 つに分ける。
+
+| 問い合わせ | 見る人のミュートとブロック | 決めるもの |
+| --- | --- | --- |
+| 一般公開中のスライドのリンク(保存の古い順) | 当てない | ページを出すかどうか、connpass の元のページへのリンクのグループ(最初のリンク)、「コミュニティはまだありません」に使うホスト名の集合 |
+| 一般公開中のスライド(公開の新しい順、同じ時刻は URL の名前の順) | 当てる | 一覧と本数 |
+
+- 1 つめが 0 行なら `null` で、経路は「まだありません」のページを出す。ページが出るかどうかは、見る人によらない(F45-AC15)。ブロックやミュートで一覧が 0 本になっても、ページは 200 で、本数は 0 になる。link2 までは、見る人を当てた一覧が 0 本だと 404 だった。
+- 「一般公開中」は、どちらも `publicTalks` の条件である: 公開の版が `ready`、運営が非表示にしておらず、作者が停止中でない(`notHidden`)、作者の `accounts` の行がある(F45-AC14)。
+- `listListedEvents`(イベントの一覧)は、テストだけが使っていたので消した。F45 に、イベントの一覧は無い。
+
+アプリの中のイベントへのリンクは、`linkPagePath(event.url)` で作る。`DeckEvent`、`ViewerEvent`、`CommunityEvent` に `url`(`events.url`)を足した。
+
+| 場所 | ファイル |
+| --- | --- |
+| viewer のイベントの行(F24-AC51)、「イベントを見る」(F24-AC52) | `src/share/viewer-events-frame.ts` の `eventHref`、`src/share/viewer-recommendations-frame.ts` |
+| 1 本の管理の「発表したイベント」 | `src/decks/events-frame.ts` |
+| コミュニティのイベントのタブの見出しと「ほか n 本」 | `src/communities/community-page.ts` |
+
+`add_related_link` の説明(`src/mcp/tools.ts`)は、イベントの URL を入れると、そのイベントのリンクのページ(`/link/` と、`https://` を除いた URL)にスライドが並ぶ、と書く(F23-AC53)。
 
 ## 言語(link2 で実装済み)
 
@@ -127,7 +156,8 @@
 | --- | --- |
 | link1 | この文書、`gatheredWithout`、純粋な `gather.ts`、`link-address.ts` |
 | link2 | `/link/*` の経路(イベントだけ)、「まだありません」のページ、言語、検索に載せる条件 |
-| link3、link4 | `/events/:id` の 301、アプリの中のリンク先、見出しと頭、名前を直す経路の撤去 |
+| link3 | `/events/:id` の 301、アプリの中のリンク先、見る人によらない判定、テストの移動(`src/links/link-page.test.ts`) |
+| link4 | 見出しと頭、名前を直す経路の撤去 |
 | link5 | コミュニティのタブ「リンク」、1 本の管理の文と枠 |
 | link6 | 列の追加と埋め戻し(migration) |
 | link7 | イベントでないリンクのページ、viewer の行からのリンク |
