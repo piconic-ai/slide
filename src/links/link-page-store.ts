@@ -7,8 +7,14 @@ import { drizzle } from 'drizzle-orm/d1'
 import { alias } from 'drizzle-orm/sqlite-core'
 import { z } from 'zod'
 import { notBlockedBy } from '../blocks/store'
+import type { EventCommunityView } from '../communities/community'
+import {
+  findHostCommunity,
+  listEventCommunities,
+} from '../communities/event-communities-store'
 import {
   accounts,
+  communityLinks,
   decks,
   deployments,
   events,
@@ -150,6 +156,8 @@ export type LinkPage = Readonly<{
   source: string
   talks: readonly EventTalk[]
   linkHosts: ReadonlySet<string>
+  /** The community the link is in, which heads the page (F45-AC17). */
+  community: EventCommunityView | null
 }>
 
 const ofEvent = (eventId: number) => eq(relatedLinkEvents.event_id, eventId)
@@ -171,7 +179,7 @@ export async function readEventPage(
   viewer: string | null = null,
 ): Promise<LinkPage | null> {
   const db = drizzle(database)
-  const [event, links, rows] = await Promise.all([
+  const [event, links, rows, shownWith] = await Promise.all([
     db
       .select({
         id: events.id,
@@ -198,6 +206,7 @@ export async function readEventPage(
       .where(ofEvent(eventId))
       .orderBy(desc(publishedAt), asc(decks.slug))
       .all(),
+    listEventCommunities(database, [eventId]),
   ])
   if (!event || links.length === 0) return null
   // A deck with two links to the event comes twice; it is listed once.
@@ -213,6 +222,7 @@ export async function readEventPage(
     }),
     talks: talkSchema.array().parse(decksOnce),
     linkHosts: new Set(links.map((row) => row.linkHost)),
+    community: shownWith.get(eventId) ?? null,
   }
 }
 
@@ -254,6 +264,7 @@ const gatheredLinks = (db: ReturnType<typeof drizzle>, viewer: string | null) =>
       coverPath: deployments.cover_path,
       linkTitle: relatedLinks.title,
       href: relatedLinks.sanitized_url,
+      linkHost: relatedLinks.link_host,
     })
     .from(relatedLinks)
     .leftJoin(relatedLinkEvents, eq(relatedLinkEvents.link_id, relatedLinks.id))
@@ -271,7 +282,8 @@ const gatheredBy = (keys: readonly string[]) =>
  * The page of the links gathered by the key of an address that is no event:
  * the public slides with such a link, the most recently published first.
  * Null unless the page shows (`pageShown`): an address only one author's
- * slides carry answers as one nobody added (F45-AC2). The heading and the
+ * slides carry answers as one nobody added (F45-AC2), unless a community
+ * holds its host (F45-AC4). The heading and the
  * way out follow the oldest link (F45-AC10, F45-AC25); the viewer's mutes
  * and blocks only leave slides out of the list (F45-AC15).
  */
@@ -292,13 +304,16 @@ async function readGatheredPage(
       .orderBy(desc(publishedAt), asc(decks.slug))
       .all(),
   ])
+  // Any of the links puts the page into a community (F45-AC4), by the host
+  // it was written with: `www.` is another host (F30-AC65).
+  const hosts = new Set(links.flatMap((link) => link.linkHost ?? []))
+  const community = await findHostCommunity(database, [...hosts])
   const facts = {
     publicDecks: new Set(links.map((link) => link.deckId)).size,
     authors: new Set(links.map((link) => link.author)).size,
     kind: 'link',
     eventShaped: target.eventShaped,
-    // Links of every kind go into communities with their own change.
-    inCommunity: false,
+    inCommunity: community !== null,
   } as const
   if (!pageShown(facts)) return null
   const decksOnce = [...new Map(rows.map((row) => [row.deckId, row])).values()]
@@ -317,6 +332,7 @@ async function readGatheredPage(
     talks: talkSchema.array().parse(decksOnce),
     // Only an event's group is offered a community (F45-AC27).
     linkHosts: new Set(),
+    community,
   }
 }
 
@@ -347,7 +363,7 @@ export type ShownLink = Readonly<{ linkId: string; eventId: number | null }>
  * The related links of a deck whose page of links shows, whoever is looking
  * (F29-AC29, F29-AC30, F45-AC18): the links to an event with a public talk,
  * this deck's or another's, and the other links whose key gathers enough
- * public slides (`pageShown`). Two queries besides the deck's own links,
+ * public slides or is in a community (`pageShown`, F45-AC4). Two queries besides the deck's own links,
  * however many links it has.
  */
 export async function listShownLinks(
@@ -387,6 +403,9 @@ export async function listShownLinks(
             key: relatedLinks.gather_key,
             publicDecks: sql<number>`count(DISTINCT ${decks.id})`,
             authors: sql<number>`count(DISTINCT ${decks.owner_user_id})`,
+            // Whether a community holds the host of any of them (F45-AC4).
+            held: sql<number>`max(EXISTS (SELECT 1 FROM ${communityLinks}
+              WHERE ${communityLinks.host} = ${relatedLinks.link_host}))`,
           })
           .from(relatedLinks)
           .leftJoin(
@@ -408,7 +427,7 @@ export async function listShownLinks(
           ...row,
           kind: 'link',
           eventShaped: targets.get(row.key ?? '')?.eventShaped ?? false,
-          inCommunity: false,
+          inCommunity: row.held === 1,
         }),
       )
       .map((row) => row.key),

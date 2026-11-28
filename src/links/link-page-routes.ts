@@ -1,7 +1,6 @@
 import { Hono, type Context } from 'hono'
 import { currentOwner } from '../auth/owner-middleware'
 import { communityCoverOf, communityHref } from '../communities/community'
-import { listEventCommunities } from '../communities/event-communities-store'
 import { homePagePolicy, PAGE_POLICY } from '../decks/pages'
 import { recordFrom } from '../metrics/record-routes'
 import { contentBaseOf } from '../preview/config'
@@ -116,13 +115,8 @@ async function linkPage(c: C, target: LinkTarget) {
   return read && shownPage(c, target, read)
 }
 
-async function shownPage(c: C, target: LinkTarget, read: LinkPage) {
-  const eventId = read.event.id
-  // For now only an event is in a community.
-  const community =
-    eventId === null
-      ? null
-      : ((await listEventCommunities(c.env.DB, [eventId])).get(eventId) ?? null)
+function shownPage(c: C, target: LinkTarget, read: LinkPage) {
+  const { community } = read
   const lang = langOf(c)
   const contentBase = contentBaseOf(c.env)
   return show(c, target, {
