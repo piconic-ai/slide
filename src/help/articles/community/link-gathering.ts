@@ -69,7 +69,7 @@ export default defineArticle({
         <ul>
           <li>
             ${SERVICE_NAME}
-            は、リンク先を取りに行きません。見出しは、一般公開中のスライドのそのリンクのうち、最初に保存された題名です。題名が
+            は、リンク先を取りに行きません。見出しは、すでに保存されたイベント名(運営や管理者が直した名前を含む)があれば、それです。なければ、一般公開中のスライドのそのリンクのうち、最初に保存された題名です。題名が
             1 つも無ければ、サイト名と URL(例:
             <code>example.com https://example.com/post</code>)です。
           </li>
@@ -142,8 +142,10 @@ export default defineArticle({
         <ul>
           <li>
             ${SERVICE_NAME} does not fetch the linked page. The heading is the
-            title saved first among that link on public slides. With no title at
-            all, it is the site name and the URL (for example,
+            event name already saved for the address, if there is one (including
+            a name fixed by the service or a community admin). Otherwise it is
+            the title saved first among that link on public slides. With no
+            title at all, it is the site name and the URL (for example,
             <code>example.com https://example.com/post</code>).
           </li>
           <li>
